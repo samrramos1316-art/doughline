@@ -393,15 +393,21 @@ select
   m.org_id,
   m.name,
   m.selling_price,
-  rc.cost_per_serving,
-  (m.selling_price - rc.cost_per_serving) as margin_amount,
+  s.cost_per_serving,
+  (m.selling_price - s.cost_per_serving) as margin_amount,
   case when m.selling_price > 0
-    then round(((m.selling_price - rc.cost_per_serving) / m.selling_price) * 100, 2)
+    then round(((m.selling_price - s.cost_per_serving) / m.selling_price) * 100, 2)
     else null
   end as margin_pct
 from menu_items m
-left join recipe_costs rc on rc.recipe_id = m.recipe_id;
+left join recipe_costs rc on rc.recipe_id = m.recipe_id
+cross join lateral (
+  select rc.batch_total_cost
+    / nullif(coalesce(m.servings_per_batch, rc.batch_yield_qty), 0) as cost_per_serving
+) s;
 ```
+
+A menu item's cost per serving is the recipe's batch cost divided by the menu item's own `servings_per_batch` when set (e.g. a 24-cookie recipe sold as 6-packs → 4), falling back to the recipe's `batch_yield_qty`. The margin cascade (§6.1), margin history, and suggestion math (§8) all use this same divisor. (The first cut in `009_costing_views.sql` ignored the override; `014_menu_item_servings_per_batch.sql` replaces the view with this version.)
 
 These views inherit RLS from their underlying tables automatically (Postgres evaluates the RLS of the base tables), so no separate policy is needed on the views themselves as long as they're created with the querying role's normal permissions (not `security definer`).
 

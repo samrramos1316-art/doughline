@@ -19,7 +19,7 @@ export async function getMenuItemMarginHistory(
 ): Promise<MarginHistoryPoint[]> {
   const { data: menuItem } = await supabase
     .from("menu_items")
-    .select("selling_price, recipe_id")
+    .select("selling_price, recipe_id, servings_per_batch")
     .eq("id", menuItemId)
     .single();
   if (!menuItem?.recipe_id) return [];
@@ -51,7 +51,9 @@ export async function getMenuItemMarginHistory(
   );
   const changeDates = [...new Set(priceHistory.map((p) => p.effective_date))].sort();
   const sellingPrice = Number(menuItem.selling_price);
-  const batchYieldQty = Number(recipe.batch_yield_qty);
+  // Same divisor as the menu_item_margins view (migration 014): the menu
+  // item's own servings_per_batch override, else the recipe's yield.
+  const servingsPerBatch = Number(menuItem.servings_per_batch ?? recipe.batch_yield_qty);
 
   return changeDates.map((date) => {
     let batchTotalCost = 0;
@@ -64,7 +66,7 @@ export async function getMenuItemMarginHistory(
       if (latest) batchTotalCost += quantity * Number(latest.unit_cost);
     }
 
-    const costPerServing = batchTotalCost / batchYieldQty;
+    const costPerServing = batchTotalCost / servingsPerBatch;
     const marginPct =
       sellingPrice > 0
         ? Math.round(((sellingPrice - costPerServing) / sellingPrice) * 100 * 100) / 100

@@ -12,7 +12,7 @@ const suffix = Date.now();
 const email = `costing-test-${suffix}@example.com`;
 const password = "Test-Password-123!";
 
-let userId, orgId, flourId, sugarId, butterId, recipeId, menuItemId;
+let userId, orgId, flourId, sugarId, butterId, recipeId, menuItemId, sixPackId;
 
 try {
   // 1. A fresh org via a real signup (exercises step 2's trigger too).
@@ -140,6 +140,47 @@ try {
     `menu_item_margins.margin_pct (${viewMargin.margin_pct}) matches hand-computed ${expectedMarginPct}%`,
   );
 
+  // 5b. A menu item with its own servings_per_batch override: the same
+  //     24-cookie batch sold as 6-packs (4 per batch) at $7.00. Its cost must
+  //     be batch_total_cost / 4, not / 24 (migration 014).
+  const sixPackPrice = 7;
+  const sixPacksPerBatch = 4;
+  const expectedSixPackCost = expectedBatchTotalCost / sixPacksPerBatch; // 4.75 / 4 = 1.1875
+  const expectedSixPackMarginPct =
+    Math.round(((sixPackPrice - expectedSixPackCost) / sixPackPrice) * 100 * 100) / 100;
+
+  const { data: sixPack, error: sixPackErr } = await admin
+    .from("menu_items")
+    .insert({
+      org_id: orgId,
+      recipe_id: recipeId,
+      name: `Test Cookie 6-Pack ${suffix}`,
+      selling_price: sixPackPrice,
+      servings_per_batch: sixPacksPerBatch,
+    })
+    .select()
+    .single();
+  if (sixPackErr) throw new Error("insert 6-pack menu_item failed: " + sixPackErr.message);
+  sixPackId = sixPack.id;
+
+  const { data: sixPackMargin, error: sixPackMarginErr } = await admin
+    .from("menu_item_margins")
+    .select("*")
+    .eq("menu_item_id", sixPackId)
+    .single();
+  if (sixPackMarginErr) throw new Error("menu_item_margins 6-pack query failed: " + sixPackMarginErr.message);
+
+  console.log("Query result — menu_item_margins view row (servings_per_batch override):", JSON.stringify(sixPackMargin));
+
+  assert(
+    Math.abs(Number(sixPackMargin.cost_per_serving) - expectedSixPackCost) < 0.0001,
+    `menu_item_margins.cost_per_serving (${sixPackMargin.cost_per_serving}) honors servings_per_batch: hand-computed $${expectedSixPackCost.toFixed(4)}`,
+  );
+  assert(
+    Math.abs(Number(sixPackMargin.margin_pct) - expectedSixPackMarginPct) < 0.01,
+    `menu_item_margins.margin_pct (${sixPackMargin.margin_pct}) with servings_per_batch override matches hand-computed ${expectedSixPackMarginPct}%`,
+  );
+
   // 6. Change one ingredient's price and confirm the view moves with it
   //    instantly (no cache to invalidate — §3.9's whole point).
   const { error: updateErr } = await admin
@@ -169,6 +210,7 @@ try {
 } finally {
   console.log("\nCleaning up test fixtures...");
   if (menuItemId) await admin.from("menu_items").delete().eq("id", menuItemId);
+  if (sixPackId) await admin.from("menu_items").delete().eq("id", sixPackId);
   if (recipeId) await admin.from("recipes").delete().eq("id", recipeId); // cascades recipe_ingredients
   if (flourId) await admin.from("ingredients").delete().eq("id", flourId);
   if (sugarId) await admin.from("ingredients").delete().eq("id", sugarId);
