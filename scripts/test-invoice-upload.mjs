@@ -11,9 +11,9 @@
 // starts and stops its own).
 //
 // Run: node scripts/test-invoice-upload.mjs
-import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import { loadEnv, getAdminClient, getAnonClient, assert } from "./lib/supabaseTestEnv.mjs";
+import { startDevServer, waitForServer, killDevServer } from "./lib/devServer.mjs";
 
 loadEnv();
 
@@ -31,24 +31,6 @@ const password = "Test-Password-123!";
 let userAId, userBId, orgAId, orgBId, devServer;
 const uploadedPaths = [];
 let createdInvoiceId;
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-async function waitForServer(timeoutMs) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(BASE_URL);
-      if (res.status) return true;
-    } catch {
-      // not up yet
-    }
-    await sleep(500);
-  }
-  throw new Error(`Dev server did not become ready within ${timeoutMs}ms`);
-}
 
 function buildAuthCookie(session) {
   const encoded = "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url");
@@ -118,14 +100,8 @@ try {
   //    with a reconstructed SSR session cookie, exactly as the browser flow
   //    (ScanInvoiceClient -> fetch('/api/invoices')) does after the Storage
   //    upload above.
-  // shell: true is required for npx to resolve on Windows; args here are
-  // fixed constants, not user input, so shell-injection risk doesn't apply.
-  devServer = spawn("npx", ["next", "dev", "--port", String(PORT)], {
-    cwd: process.cwd(),
-    shell: true,
-    stdio: "ignore",
-  });
-  await waitForServer(60_000);
+  devServer = startDevServer(PORT);
+  await waitForServer(BASE_URL, 60_000);
 
   const cookie = buildAuthCookie(signInA.session);
 
@@ -165,7 +141,7 @@ try {
   console.log("\nAll invoice upload checks passed.");
 } finally {
   console.log("\nCleaning up test fixtures...");
-  if (devServer) devServer.kill();
+  killDevServer(devServer);
   if (createdInvoiceId) await admin.from("invoices").delete().eq("id", createdInvoiceId);
   for (const path of uploadedPaths) await admin.storage.from("invoices").remove([path]);
   if (orgAId) await admin.from("organizations").delete().eq("id", orgAId);
