@@ -69,6 +69,14 @@ export class ClaudeVisionProvider implements VisionProvider {
       output_config: { format: zodOutputFormat(ExtractionSchema) },
     });
 
+    // Opt-in debugging: print Claude's response text verbatim, before the
+    // SDK's parse, so it can be compared with what the pipeline stores.
+    if (process.env.VISION_DEBUG_RAW === "1") {
+      for (const block of response.content) {
+        if (block.type === "text") console.log(`[vision-raw] ${response.id} ${block.text}`);
+      }
+    }
+
     if (response.stop_reason === "refusal") {
       throw new Error(`Claude declined to extract this invoice (${response.stop_details?.category ?? "no category"})`);
     }

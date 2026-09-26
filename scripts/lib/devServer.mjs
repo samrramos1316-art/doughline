@@ -2,13 +2,15 @@
 // (to exercise actual route handlers, not just Supabase directly).
 import { spawn, execSync } from "node:child_process";
 
-export function startDevServer(port) {
+// Pass { pipeOutput: true } to read the server's stdout/stderr (e.g. to
+// capture server-side debug logs); otherwise it's discarded.
+export function startDevServer(port, { pipeOutput = false } = {}) {
   // shell: true is required for npx to resolve on Windows; args are fixed
   // constants, not user input, so shell-injection risk doesn't apply.
   return spawn("npx", ["next", "dev", "--port", String(port)], {
     cwd: process.cwd(),
     shell: true,
-    stdio: "ignore",
+    stdio: pipeOutput ? ["ignore", "pipe", "pipe"] : "ignore",
   });
 }
 

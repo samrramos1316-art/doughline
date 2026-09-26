@@ -9,6 +9,10 @@
 // lines plus subtotal / fuel-surcharge / total rows that must be skipped).
 //
 // Makes one real, billed Claude API call. Run: node scripts/test-claude-vision-scan.mjs
+//
+// KEEP_FIXTURES=1 leaves the test user/org/invoice/line items in Supabase so
+// they can be inspected afterwards (e.g. with scripts/query-invoice-scan.mjs);
+// the script prints the ids and delete instructions.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { loadEnv, getAdminClient, getAnonClient, assert } from "./lib/supabaseTestEnv.mjs";
@@ -73,7 +77,13 @@ try {
     .upload(uploadedPath, fs.readFileSync(FIXTURE), { contentType: "image/jpeg" });
   if (uploadErr) throw new Error("upload failed: " + uploadErr.message);
 
-  devServer = startDevServer(PORT);
+  // Capture Claude's verbatim response text, logged server-side by the
+  // provider when VISION_DEBUG_RAW=1 (inherited by the dev server's env).
+  process.env.VISION_DEBUG_RAW = "1";
+  devServer = startDevServer(PORT, { pipeOutput: true });
+  let serverLog = "";
+  devServer.stdout.on("data", (chunk) => { serverLog += chunk; });
+  devServer.stderr.on("data", (chunk) => { serverLog += chunk; });
   await waitForServer(BASE_URL, 90_000);
   const cookie = buildAuthCookie(signIn.session);
 
@@ -92,6 +102,11 @@ try {
   });
   const scanBody = await scanRes.json();
   console.log(`Scan took ${((Date.now() - started) / 1000).toFixed(1)}s, HTTP ${scanRes.status}`);
+
+  await new Promise((r) => setTimeout(r, 500)); // let the server's stdout flush
+  const rawLine = serverLog.split(/\r?\n/).find((l) => l.includes("[vision-raw]"));
+  console.log("\n=== Claude's raw response text (verbatim, before parsing) ===");
+  console.log(rawLine ? rawLine.slice(rawLine.indexOf("[vision-raw]")) : "(not captured — no [vision-raw] line in server output)");
   console.log("\n=== Extracted JSON (scan route response .extraction) ===");
   console.log(JSON.stringify(scanBody.extraction ?? scanBody, null, 2));
   console.log("=======================================================\n");
@@ -128,8 +143,13 @@ try {
 
   console.log("\nClaude vision end-to-end scan passed.");
 } finally {
-  console.log("\nCleaning up test fixtures...");
   killDevServer(devServer);
+  if (process.env.KEEP_FIXTURES === "1") {
+    console.log(`\nKEEP_FIXTURES=1 — left in Supabase:\n  invoice_id = ${invoiceId}\n  org_id     = ${orgId}\n  user_id    = ${userId} (${email})`);
+    console.log(`Inspect: node scripts/query-invoice-scan.mjs ${invoiceId}`);
+    process.exit(0);
+  }
+  console.log("\nCleaning up test fixtures...");
   if (invoiceId) await admin.from("invoice_line_items").delete().eq("invoice_id", invoiceId);
   if (invoiceId) await admin.from("invoices").delete().eq("id", invoiceId);
   if (uploadedPath) await admin.storage.from("invoices").remove([uploadedPath]);
