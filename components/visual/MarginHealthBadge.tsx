@@ -1,14 +1,12 @@
-// Status colors are the dataviz skill's fixed, pre-validated status palette
-// (references/palette.md) — reused verbatim, not re-derived, so no need to
-// re-run the palette validator. They always ship with an icon + label, never
-// color alone.
-const STATUS = {
-  good: { color: "#0ca30c", bg: "#eafbea", label: "On target" },
-  warning: { color: "#fab219", bg: "#fff8e6", label: "Watch" },
-  critical: { color: "#d03b3b", bg: "#fdecec", label: "Below target" },
-} as const;
+import { STATUS_COLORS, type StatusKey } from "@/lib/visual/statusColors";
 
-export type MarginStatus = keyof typeof STATUS;
+const LABELS: Record<"good" | "warning" | "critical", string> = {
+  good: "On target",
+  warning: "Watch",
+  critical: "Below target",
+};
+
+export type MarginStatus = keyof typeof LABELS;
 
 export function classifyMargin(marginPct: number | null, targetPct: number): MarginStatus {
   if (marginPct == null) return "critical";
@@ -24,8 +22,9 @@ export function MarginHealthBadge({
   marginPct: number | null;
   targetPct: number;
 }) {
-  const status = classifyMargin(marginPct, targetPct);
-  const { color, bg, label } = STATUS[status];
+  const status: StatusKey = classifyMargin(marginPct, targetPct);
+  const { color, bg } = STATUS_COLORS[status];
+  const label = LABELS[status as keyof typeof LABELS];
 
   return (
     <span

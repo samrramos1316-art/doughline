@@ -20,9 +20,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
         <nav className="flex gap-4 text-sm font-medium text-zinc-700">
           <Link href="/dashboard">Dashboard</Link>
+          <Link href="/invoices">Invoices</Link>
           <Link href="/ingredients">Ingredients</Link>
           <Link href="/recipes">Recipes</Link>
           <Link href="/menu">Menu</Link>
+          <Link href="/alerts">Alerts</Link>
+          <Link href="/market">Market</Link>
         </nav>
         <form action={logOutAction}>
           <button type="submit" className="text-sm text-zinc-500 underline">
