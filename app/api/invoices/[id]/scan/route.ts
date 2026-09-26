@@ -9,11 +9,10 @@ const EXT_TO_MIME: Record<string, string> = {
   pdf: "application/pdf",
 };
 
-// §5.2 step 4. Scaffolded per §13 step 6 — the VisionProvider call below is
-// stubbed (see lib/ai/vision/{gemini,claude}.ts, no API keys configured yet),
-// so this always extracts zero line items for now. What IS real: fetching
-// the file from Storage, persisting raw_extraction, and the status
-// transitions described in §5.2 step 4.
+// §5.2 step 4: fetch the file from Storage, run it through the configured
+// VisionProvider (VISION_PROVIDER — the Claude provider is real; Gemini is
+// still a stub that extracts nothing), persist raw_extraction, and apply the
+// status transitions described in §5.2 step 4.
 //
 // Not yet wired (deliberately out of scope for this scaffold): per-line-item
 // normalization + Voyage embedding + alias/vector matching, §5.2 step 5 — that
