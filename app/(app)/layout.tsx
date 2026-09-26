@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-full flex-1 flex-col bg-zinc-50">
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
         <nav className="flex gap-4 text-sm font-medium text-zinc-700">
+          <Link href="/dashboard">Dashboard</Link>
           <Link href="/ingredients">Ingredients</Link>
           <Link href="/recipes">Recipes</Link>
           <Link href="/menu">Menu</Link>
