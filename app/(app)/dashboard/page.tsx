@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getMenuItemMarginHistory } from "@/lib/costing/marginHistory";
 import { MenuItemCard } from "@/components/visual/MenuItemCard";
+import { getMarketTrends, DEFAULT_WINDOW_DAYS } from "@/lib/market/trends";
+import { MarketWatchPanel } from "@/components/market/MarketWatchPanel";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -18,6 +20,8 @@ export default async function DashboardPage() {
   const menuItemRows = (margins ?? []).filter(
     (m): m is typeof m & { menu_item_id: string; name: string } => m.menu_item_id != null && m.name != null,
   );
+
+  const trends = await getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS });
 
   const cards = await Promise.all(
     menuItemRows.map(async (m) => {
@@ -60,6 +64,8 @@ export default async function DashboardPage() {
           />
         ))}
       </div>
+
+      <MarketWatchPanel trends={trends} windowDays={DEFAULT_WINDOW_DAYS} compact />
     </div>
   );
 }

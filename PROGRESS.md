@@ -184,11 +184,26 @@ blocked inline, saved, matched, and a typed price raising a real alert;
 ingredient grid edit/paste/validation; CSV export → edit → import and a bad
 CSV rejected whole; recipe grid paste with costs checked by hand.
 
+## Step 11 — commodity ingestion + Market Watch
+
+- `lib/market/series.ts`: USDA MyMarketNews (eggs — report 2843, CME
+  butter — 1603, KC HRW wheat — 3223) + FAO Food Price Index CSV (6 series).
+- `GET /api/cron/ingest-market-data` (Vercel Cron daily, `CRON_SECRET`),
+  service-role writes via `lib/supabase/admin.ts` (`server-only`).
+- `lib/market/trends.ts`: stateless % change over 30/90/180 days;
+  `lib/market/categoryDefaults.ts` maps ingredients to series.
+- `/market` page + compact panel on the dashboard. Mock market data deleted.
+
+Tested: `scripts/test-market-e2e.mjs` — cron auth, live ingestion of all 9
+series, a stored egg row equal to USDA's own number from a direct API call,
+idempotent re-run, ingredient mapping (override, name, category), and every
+displayed % change recomputed independently from stored rows (90 and 30
+days); screenshots in `test-output/market/`.
+
 ## Not started yet
 
-- Step 11: commodity price ingestion + Market Watch — on hold until you say go.
+- Step 12: PWA polish — on hold until you say go.
 - Gemini vision provider (needs `GEMINI_API_KEY`).
-- PWA polish (step 12).
 
 ## Known issues
 
@@ -211,6 +226,7 @@ CSV rejected whole; recipe grid paste with costs checked by hand.
 - `scripts/test-price-cascade-e2e.mjs`
 - `scripts/test-suggestions-e2e.mjs` (needs `KEEP_FIXTURES=1` output of the above)
 - `scripts/test-bulk-import-e2e.mjs`
+- `scripts/test-market-e2e.mjs` (live USDA + FAO)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
 
