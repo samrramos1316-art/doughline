@@ -12,11 +12,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Light-only design. (The create-next-app dark-mode override that used to be
+   here turned body text near-white for anyone whose OS is in dark mode — and
+   Tailwind's preflight makes form fields inherit that color, so typed text
+   and password dots vanished into white inputs.) */
+:root {
+  color-scheme: light;
+}
+
+/* Our password fields have their own Show/Hide button; hide Edge's built-in one. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
 }
 
 body {

@@ -207,6 +207,12 @@ days); screenshots in `test-output/market/`.
 
 ## Known issues
 
+- Signup confirmation emails: Supabase's built-in email service only
+  delivers to the Supabase project's team members, and ~2 emails/hour. Real
+  signups need either custom SMTP (Supabase → Authentication → Emails) or
+  email confirmation turned off. The app now handles all three cases
+  (check-email screen, unconfirmed-login message + resend, /auth/confirm).
+
 - Voyage account has no payment method → 3 requests/min. Scans and "Add
   new" wait on 429 retries (a re-scan took ~53s instead of ~10s).
 - `scripts/smoke-test-scan-route.mjs` is stale: written for the stub
@@ -227,6 +233,7 @@ days); screenshots in `test-output/market/`.
 - `scripts/test-suggestions-e2e.mjs` (needs `KEEP_FIXTURES=1` output of the above)
 - `scripts/test-bulk-import-e2e.mjs`
 - `scripts/test-market-e2e.mjs` (live USDA + FAO)
+- `scripts/test-auth-e2e.mjs [--base=https://…]` (login/signup/confirm flows, landing page)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
 

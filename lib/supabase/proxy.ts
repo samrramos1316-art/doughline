@@ -7,6 +7,15 @@ import { NextResponse, type NextRequest } from "next/server";
 // every request and redirects unauthenticated visitors away from the
 // authenticated (app) route group.
 export async function updateSession(request: NextRequest) {
+  // If a confirmation link's redirect URL isn't on Supabase's allow-list,
+  // Supabase falls back to the Site URL (the landing page) with ?code=…;
+  // hand it to the route that finishes the sign-in.
+  if (request.nextUrl.pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const confirm = new URL("/auth/confirm", request.url);
+    confirm.search = request.nextUrl.search;
+    return NextResponse.redirect(confirm);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -41,6 +50,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/menu") ||
     request.nextUrl.pathname.startsWith("/alerts") ||
     request.nextUrl.pathname.startsWith("/market") ||
+    request.nextUrl.pathname.startsWith("/review") ||
     request.nextUrl.pathname.startsWith("/settings");
 
   if (isAppRoute && !user) {
