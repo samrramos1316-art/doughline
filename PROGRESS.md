@@ -116,10 +116,32 @@ headless Edge driving the real swipe UI with pointer drags; screenshots to
 `test-output/matching/`. All assertions pass, including matching quality
 (no wrong auto-matches, no missed in-list items).
 
+## Step 8 — price history, price alerts, margin-impact cascade
+
+- Migration `017_price_cascade.sql`: pack-size + price-outcome columns on
+  `invoice_line_items`; `apply_line_item_price()` does history → cost update
+  → (past `price_alert_threshold_pct`, either direction) `price_alerts` +
+  one `menu_item_margin_impacts` row per active menu item, before/after read
+  from the `menu_item_margins` view in one transaction. Idempotent per line.
+- Claude now extracts `pack_quantity`/`pack_unit`; `lib/costing/units.ts`
+  converts per-case invoice prices to the ingredient's base unit; lines that
+  can't be converted get a `price_note` instead of a guessed cost.
+- `lib/costing/applyPrice.ts` runs on confirm, create-ingredient, and for
+  auto-matched lines at scan time.
+- `/alerts` and `/alerts/[id]` read real rows (mock alerts now only back the
+  step 9 `SuggestionsPanel`); invoice page shows the cost applied per line.
+
+Tested: `scripts/test-price-cascade-e2e.mjs` — real Claude + Voyage +
+Supabase: pack sizes read correctly, auto-matched prices applied at scan,
+sub-threshold confirms update cost with no alert, butter +16.47% creates the
+alert and 3 impact rows whose before/after margins equal an independent JS
+calculation and the live view; excludes the non-butter recipe and the
+inactive item; re-confirm is a no-op; new ingredient's first price doesn't
+alert; `/alerts` pages screenshot-verified.
+
 ## Not started yet
 
-- Step 8: price history + price alerts + margin-impact cascade — on hold
-  until you say go.
+- Step 9: suggestion engine — on hold until you say go.
 - Gemini vision provider (needs `GEMINI_API_KEY`).
 - Commodity price ingestion job, bulk/PDF import, manual-entry grid, CSV
   import/export, PWA polish.
@@ -130,6 +152,10 @@ headless Edge driving the real swipe UI with pointer drags; screenshots to
   new" wait on 429 retries (a re-scan took ~53s instead of ~10s).
 - `scripts/smoke-test-scan-route.mjs` is stale: written for the stub
   provider, it sends random bytes and now fails against real Claude.
+- Scanning an older invoice after a newer one (step 10 backfill) would move
+  `current_unit_cost` back to the older price; needs an effective-date guard.
+- Costing views assume recipe quantities are in the ingredient's base unit
+  (`recipe_ingredients.unit` isn't converted yet).
 
 ## Test scripts (all repeatable against real Supabase)
 
@@ -140,6 +166,7 @@ headless Edge driving the real swipe UI with pointer drags; screenshots to
 - `scripts/smoke-test-scan-route.mjs` (stale — see Known issues)
 - `scripts/test-claude-vision-scan.mjs`
 - `scripts/test-matching-e2e.mjs`
+- `scripts/test-price-cascade-e2e.mjs`
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
 

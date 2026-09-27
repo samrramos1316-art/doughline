@@ -11,6 +11,11 @@ export interface ExtractedLineItem {
   unit: string | null;
   unit_cost: number | null;
   line_total: number | null;
+  // Size of ONE invoice unit as printed in the description ("36/1#" → 36
+  // lb), so a per-case price can be converted to the ingredient's base unit
+  // (lib/costing/units.ts). null when nothing is printed.
+  pack_quantity: number | null;
+  pack_unit: string | null;
 }
 
 export interface VisionExtractionResult {

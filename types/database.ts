@@ -198,6 +198,7 @@ export type Database = {
       }
       invoice_line_items: {
         Row: {
+          base_unit_cost: number | null
           candidate_matches: Json | null
           created_at: string
           embedding: string | null
@@ -210,13 +211,18 @@ export type Database = {
           org_id: string
           parsed_item_name: string | null
           parsed_line_total: number | null
+          parsed_pack_quantity: number | null
+          parsed_pack_unit: string | null
           parsed_quantity: number | null
           parsed_unit: string | null
           parsed_unit_cost: number | null
+          price_applied_at: string | null
+          price_note: string | null
           raw_text: string
           updated_at: string
         }
         Insert: {
+          base_unit_cost?: number | null
           candidate_matches?: Json | null
           created_at?: string
           embedding?: string | null
@@ -229,13 +235,18 @@ export type Database = {
           org_id: string
           parsed_item_name?: string | null
           parsed_line_total?: number | null
+          parsed_pack_quantity?: number | null
+          parsed_pack_unit?: string | null
           parsed_quantity?: number | null
           parsed_unit?: string | null
           parsed_unit_cost?: number | null
+          price_applied_at?: string | null
+          price_note?: string | null
           raw_text: string
           updated_at?: string
         }
         Update: {
+          base_unit_cost?: number | null
           candidate_matches?: Json | null
           created_at?: string
           embedding?: string | null
@@ -248,9 +259,13 @@ export type Database = {
           org_id?: string
           parsed_item_name?: string | null
           parsed_line_total?: number | null
+          parsed_pack_quantity?: number | null
+          parsed_pack_unit?: string | null
           parsed_quantity?: number | null
           parsed_unit?: string | null
           parsed_unit_cost?: number | null
+          price_applied_at?: string | null
+          price_note?: string | null
           raw_text?: string
           updated_at?: string
         }
@@ -873,6 +888,10 @@ export type Database = {
       }
     }
     Functions: {
+      apply_line_item_price: {
+        Args: { p_base_unit_cost: number; p_line_item_id: string }
+        Returns: Json
+      }
       current_org_id: { Args: never; Returns: string }
       match_ingredients: {
         Args: { match_count?: number; query_embedding: string }

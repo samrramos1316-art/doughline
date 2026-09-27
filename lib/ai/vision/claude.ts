@@ -20,6 +20,11 @@ const ExtractionSchema = z.object({
       unit: z.string().nullable(),
       unit_cost: z.number().nullable(),
       line_total: z.number().nullable(),
+      pack_quantity: z
+        .number()
+        .nullable()
+        .describe("Total amount in ONE invoice unit, from the pack size printed in the description"),
+      pack_unit: z.string().nullable().describe("Unit of pack_quantity, e.g. lb, oz, dozen, each, gal, qt"),
     }),
   ),
 });
@@ -29,6 +34,7 @@ const SYSTEM_PROMPT = `You extract line items from supplier invoices, packing sl
 - raw_text: copy each item description exactly as printed, abbreviations and codes included (e.g. "ORG CHKN BRST 40# CS"). Do not expand or correct it — it is matched against the vendor's past wording later.
 - item_name: the plain-English, generic name of the product as a cook would write it on an ingredient list — abbreviations expanded, no brand, pack size, case count, or item code (e.g. "ORG CHKN BRST 40# CS" -> "organic chicken breast"). null if you can't tell what the product is.
 - quantity / unit / unit_cost / line_total: the numbers printed on that line. Use null for anything not printed or not legible; never compute or guess a missing value.
+- pack_quantity / pack_unit: the size of ONE invoice unit (one case, bag, each…) as printed in the description, as a single total. Multiply a printed count × size: "50#" -> 50 lb; "36/1#" -> 36 lb; "15DZ" -> 15 dozen; "4/1 GAL" -> 4 gal; "12/QT" -> 12 qt; "32OZ" -> 32 oz; "6/#10" -> null (can size, not a measure). Ignore numbers that aren't a pack size (chip counts like "1M", fat % like "40%"). Use "lb" for "#". null for both if no pack size is printed.
 - Skip subtotal, tax, delivery-fee, deposit, and total rows — only purchased items.
 - invoice_date_guess: ISO 8601 (YYYY-MM-DD), or null if absent.`;
 

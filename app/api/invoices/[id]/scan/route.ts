@@ -4,6 +4,7 @@ import { getVisionProvider } from "@/lib/ai/vision";
 import { matchLines, type LineMatch } from "@/lib/matching/vectorMatch";
 import { resolveVendorId } from "@/lib/matching/vendors";
 import { refreshInvoiceStatus } from "@/lib/matching/review";
+import { applyLinePrice } from "@/lib/costing/applyPrice";
 
 const EXT_TO_MIME: Record<string, string> = {
   jpg: "image/jpeg",
@@ -17,7 +18,9 @@ const EXT_TO_MIME: Record<string, string> = {
 // still a stub that extracts nothing), persist raw_extraction, and apply the
 // status transitions described in §5.2 step 4, then match every line (§5.2
 // step 5: vendor alias → Voyage vector search → confidence routing) and set
-// the invoice to 'needs_review' or 'completed' (step 6).
+// the invoice to 'needs_review' or 'completed' (step 6). Auto-matched lines
+// have their price applied here (step 8) — nobody will confirm them, and the
+// alias fast path means most lines end up auto-matched.
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -113,6 +116,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       parsed_unit: item.unit,
       parsed_unit_cost: item.unit_cost,
       parsed_line_total: item.line_total,
+      parsed_pack_quantity: item.pack_quantity,
+      parsed_pack_unit: item.pack_unit,
       entry_method: "vision" as const,
       embedding: match?.embedding ?? null,
       match_status: match?.match_status ?? ("pending" as const),
@@ -132,6 +137,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: lineItemsErr.message }, { status: 400 });
   }
 
+  // Sequential: two lines of one invoice can hit the same ingredient, and
+  // each must see the cost the previous one set.
+  const prices = [];
+  for (const li of lineItems.filter((l) => l.match_status === "auto_matched")) {
+    prices.push({ line_item_id: li.id, ...(await applyLinePrice(supabase, li.id)) });
+  }
+
   const status = await refreshInvoiceStatus(supabase, id);
 
   return NextResponse.json({
@@ -141,5 +153,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     matching_error: matchingError,
     extraction,
     line_items: lineItems,
+    prices,
   });
 }

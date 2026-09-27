@@ -580,7 +580,9 @@ export interface VisionProvider {
           "quantity": { "type": ["number", "null"] },
           "unit": { "type": ["string", "null"] },
           "unit_cost": { "type": ["number", "null"] },
-          "line_total": { "type": ["number", "null"] }
+          "line_total": { "type": ["number", "null"] },
+          "pack_quantity": { "type": ["number", "null"], "description": "Total amount in ONE invoice unit, from the printed pack size: '36/1#' -> 36" },
+          "pack_unit": { "type": ["string", "null"], "description": "Unit of pack_quantity: lb, oz, dozen, gal, qt, ..." }
         },
         "required": ["raw_text"]
       }
@@ -594,6 +596,8 @@ export interface VisionProvider {
 
 `ingredients.base_unit` and `recipe_ingredients.unit` won't always match what the invoice says (invoice: "case of 40lb," recipe: "grams per cookie"). v1 should ship a small fixed conversion table for common kitchen units (mass: g/kg/oz/lb; volume: ml/l/tsp/tbsp/cup/fl oz; count: each/dozen/case-of-N with a per-ingredient case size field) rather than trying to solve general unit conversion — this is a well-scoped utility module (`lib/costing/units.ts`), not an AI problem.
 
+As built (step 8): instead of a per-ingredient case-size field, the vision model reads the pack size off the printed description (`pack_quantity`/`pack_unit`, e.g. "BUTTER SWT UNSLTD 36/1#" → 36 lb), since case sizes vary by vendor and the print already states them. `toBaseUnitCost()` then converts the invoice price to the ingredient's `base_unit`: sold by weight/volume → that unit's factor; else pack size (preferred over a bare "EA", which on invoices usually means one case); else a bare count unit. When no safe conversion exists the price is **not** applied and the reason is stored on the line (`invoice_line_items.price_note`, shown on the invoice page) — never a silent guess. Recipe quantities are still assumed to be in the ingredient's base unit (the costing views ignore `recipe_ingredients.unit`).
+
 ---
 
 ## 6. Margin-change detection & alerting
@@ -602,11 +606,13 @@ This is the piece that directly answers "track invoice prices, compare them to t
 
 ### 6.1 The cascade, concretely
 
-When a line item is confirmed (§5.2 step 8) and the price move crosses the org's threshold:
+When a line item is matched — confirmed by a human, created as a new ingredient, or auto-matched at scan time (otherwise the alias fast path would stop prices updating after the first invoice) — its base-unit price is applied by `apply_line_item_price()` (migration 017) in one transaction: `ingredient_price_history` row, `ingredients.current_unit_cost` update, and, when `abs(pct_change)` exceeds `organizations.price_alert_threshold_pct` (drops count too — margins going *up* is also worth knowing), the steps below. It's idempotent per line (`price_applied_at`). A first-ever price (no previous cost) never alerts.
+
+When the price move crosses the org's threshold:
 
 1. A `price_alerts` row is created for the ingredient — the fact that a real, confirmed price change happened.
 2. The system finds every `recipe_ingredients` row using that ingredient, then every `menu_items` row pointing at each of those recipes.
-3. For each affected menu item, it computes `margin_pct` twice — once with the ingredient's previous unit cost, once with the new one, using the exact same formula as the `menu_item_margins` view — and writes one `menu_item_margin_impacts` row with both numbers and the delta.
+3. For each affected menu item, it computes `margin_pct` twice — once with the ingredient's previous unit cost, once with the new one, using the exact same formula as the `menu_item_margins` view — and writes one `menu_item_margin_impacts` row with both numbers and the delta. As built, it literally reads the view before and after moving the cost, inside the same transaction, so the formula can't drift. Only **active** menu items are included — a retired item's margin isn't actionable.
 4. The UI (§10) surfaces this as, concretely: *"Chicken Breast went from $2.10/lb to $2.35/lb (+12%). This affects 3 menu items: Chicken Sandwich margin drops 34% → 29%, Chicken Caesar Wrap 41% → 37%, Family Platter 22% → 17%."* That's a materially more useful notification than "an ingredient got more expensive," and it's what makes the suggestion engine (§8) possible — it already knows exactly which menu items need attention and by how much.
 
 ### 6.2 Why this is an event-log table and not just a view

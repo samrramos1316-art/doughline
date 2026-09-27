@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { normalizeRawText } from "./normalize";
+import { applyLinePrice } from "@/lib/costing/applyPrice";
 import type { CandidateMatch } from "./vectorMatch";
 
 type Client = SupabaseClient<Database>;
@@ -49,12 +50,9 @@ export async function getReviewBacklog(supabase: Client, orgId: string) {
 }
 
 // Swipe-right (and the tail of create-ingredient): record the human's
-// decision and remember this vendor's phrasing so it auto-matches next time
-// (§5.2 step 8, first half).
-//
-// Deliberately NOT done here yet — build step 8: inserting
-// ingredient_price_history, updating ingredients.current_unit_cost, and the
-// price_alerts / menu_item_margin_impacts cascade.
+// decision, remember this vendor's phrasing so it auto-matches next time,
+// then apply the line's price — history, current cost, and past the org's
+// threshold the price alert + margin-impact cascade (§5.2 step 8, §6.1).
 export async function confirmLineItem(
   supabase: Client,
   { lineItemId, ingredientId, userId }: { lineItemId: string; ingredientId: string; userId: string },
@@ -111,6 +109,7 @@ export async function confirmLineItem(
   const { data: alias, error: aliasErr } = await aliasWrite.select().single();
   if (aliasErr) return { error: "Saving vendor alias failed: " + aliasErr.message, status: 400 as const };
 
+  const price = await applyLinePrice(supabase, lineItemId);
   const invoiceStatus = await refreshInvoiceStatus(supabase, line.invoice_id);
-  return { lineItem: updated, alias, invoiceStatus };
+  return { lineItem: updated, alias, price, invoiceStatus };
 }

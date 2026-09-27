@@ -12,7 +12,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const { data: invoice } = await supabase
     .from("invoices")
     .select(
-      "id, status, invoice_number, invoice_date, error_message, vendors(name), invoice_line_items(id, raw_text, parsed_item_name, parsed_quantity, parsed_unit, parsed_unit_cost, match_status, match_confidence, created_at, ingredients(name))",
+      "id, status, invoice_number, invoice_date, error_message, vendors(name), invoice_line_items(id, raw_text, parsed_item_name, parsed_quantity, parsed_unit, parsed_unit_cost, match_status, match_confidence, base_unit_cost, price_note, created_at, ingredients(name, base_unit))",
     )
     .eq("id", id)
     .order("created_at", { referencedTable: "invoice_line_items", ascending: true })
@@ -68,6 +68,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               <th>Qty</th>
               <th>Unit cost</th>
               <th>Matched to</th>
+              <th>Cost applied</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -85,6 +86,12 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 </td>
                 <td>{li.parsed_unit_cost != null ? `$${Number(li.parsed_unit_cost).toFixed(2)}` : "—"}</td>
                 <td className="text-zinc-700">{li.ingredients?.name ?? "—"}</td>
+                <td className="text-zinc-700">
+                  {li.base_unit_cost != null
+                    ? `$${Number(li.base_unit_cost).toFixed(4)}/${li.ingredients?.base_unit ?? "unit"}`
+                    : "—"}
+                  {li.price_note && <span className="block text-xs text-amber-700">{li.price_note}</span>}
+                </td>
                 <td>
                   <LineItemStatusBadge status={li.match_status} />
                 </td>
