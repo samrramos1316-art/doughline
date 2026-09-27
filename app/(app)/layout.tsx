@@ -5,6 +5,7 @@ import { logOutAction } from "@/app/(marketing)/auth-actions";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getReviewBacklog } from "@/lib/matching/review";
 import { ActionRequiredGate } from "@/components/review/ActionRequiredGate";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -47,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </form>
       </header>
       <main className="flex flex-1 flex-col px-4 py-6">{children}</main>
+      <InstallPrompt />
     </div>
   );
 }

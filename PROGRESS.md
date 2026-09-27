@@ -200,9 +200,25 @@ idempotent re-run, ingredient mapping (override, name, category), and every
 displayed % change recomputed independently from stored rows (90 and 30
 days); screenshots in `test-output/market/`.
 
+## Step 12 — PWA (installable app, offline screen)
+
+- Icons drawn in `scripts/make-icons.mjs` (the logo's loaf, with its score
+  line as a rising price line) and rendered to PNG/ICO in headless Edge:
+  192/512 "any", 512 maskable, 180 Apple, SVG tab icon, favicon.ico.
+- `app/manifest.ts`: opens `/dashboard` full screen; long-press shortcuts to
+  Scan, Review and Market. iOS home-screen tags in `app/layout.tsx`.
+- `public/sw.js`: never caches pages or data (prices stay live). It only
+  serves `/offline` when a page can't load, and keeps Next's hashed static
+  files and the icons. Registered in production builds only.
+- `components/pwa/InstallPrompt.tsx`: Install card in the app when the
+  browser offers install (Chrome/Edge/Android); Share → Add to Home Screen
+  steps on iPhone Safari. Not now hides it for 30 days.
+- Tested by `scripts/test-pwa-e2e.mjs`: manifest + icon sizes, head tags,
+  SW active, Chrome reports no installability errors, offline screen from
+  cache then auto-reload on reconnect, only `/offline` cached, install card.
+
 ## Not started yet
 
-- Step 12: PWA polish — on hold until you say go.
 - Gemini vision provider (needs `GEMINI_API_KEY`).
 
 ## Known issues
@@ -234,6 +250,8 @@ days); screenshots in `test-output/market/`.
 - `scripts/test-bulk-import-e2e.mjs`
 - `scripts/test-market-e2e.mjs` (live USDA + FAO)
 - `scripts/test-auth-e2e.mjs [--base=https://…]` (login/signup/confirm flows, landing page)
+- `scripts/test-pwa-e2e.mjs [--base=https://…]` (after `npm run build`; manifest, icons, service worker, offline, install card)
+- `scripts/make-icons.mjs` (regenerates the app icons, not a test)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
 
