@@ -5,6 +5,10 @@ import { createIngredientFromLineItemSchema } from "@/lib/validators/lineItem";
 import { confirmLineItem } from "@/lib/matching/review";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 
+// Claude and Voyage calls (Voyage retries 429s on its free tier) can take
+// most of a minute; don't let the platform's default timeout cut them off.
+export const maxDuration = 300;
+
 // Turn an unrecognized line into a new master ingredient and confirm the
 // line against it in one step (§4). The new ingredient is embedded right
 // away so later invoices can vector-match it.

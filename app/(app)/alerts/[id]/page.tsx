@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAlertSuggestions } from "@/lib/suggestions/engine";
+import { SuggestionsPanel } from "@/components/alerts/SuggestionsPanel";
 
 function money(n: number | string | null) {
   return n == null ? "—" : `$${Number(n).toFixed(2)}`;
@@ -29,6 +31,7 @@ export default async function AlertDetailPage({ params }: { params: Promise<{ id
     .eq("id", id)
     .maybeSingle();
   if (!alert) notFound();
+  const suggestions = await getAlertSuggestions(supabase, id);
 
   const pct = Number(alert.pct_change);
   const unit = alert.ingredients?.base_unit ? `/${alert.ingredients.base_unit}` : "";
@@ -99,6 +102,7 @@ export default async function AlertDetailPage({ params }: { params: Promise<{ id
           </table>
         )}
       </div>
+      {suggestions && suggestions.items.length > 0 && <SuggestionsPanel suggestions={suggestions} />}
     </div>
   );
 }

@@ -563,6 +563,9 @@ export type Database = {
       price_alerts: {
         Row: {
           acknowledged: boolean
+          ai_narrative: string | null
+          ai_narrative_generated_at: string | null
+          ai_narrative_model: string | null
           created_at: string
           id: string
           ingredient_id: string
@@ -574,6 +577,9 @@ export type Database = {
         }
         Insert: {
           acknowledged?: boolean
+          ai_narrative?: string | null
+          ai_narrative_generated_at?: string | null
+          ai_narrative_model?: string | null
           created_at?: string
           id?: string
           ingredient_id: string
@@ -585,6 +591,9 @@ export type Database = {
         }
         Update: {
           acknowledged?: boolean
+          ai_narrative?: string | null
+          ai_narrative_generated_at?: string | null
+          ai_narrative_model?: string | null
           created_at?: string
           id?: string
           ingredient_id?: string

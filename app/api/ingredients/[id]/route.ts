@@ -5,6 +5,10 @@ import { updateIngredientSchema } from "@/lib/validators/ingredient";
 import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 
+// Claude and Voyage calls (Voyage retries 429s on its free tier) can take
+// most of a minute; don't let the platform's default timeout cut them off.
+export const maxDuration = 300;
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();

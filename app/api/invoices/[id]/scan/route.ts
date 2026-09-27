@@ -6,6 +6,10 @@ import { resolveVendorId } from "@/lib/matching/vendors";
 import { refreshInvoiceStatus } from "@/lib/matching/review";
 import { applyLinePrice } from "@/lib/costing/applyPrice";
 
+// Claude and Voyage calls (Voyage retries 429s on its free tier) can take
+// most of a minute; don't let the platform's default timeout cut them off.
+export const maxDuration = 300;
+
 const EXT_TO_MIME: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",

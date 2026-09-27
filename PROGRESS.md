@@ -139,9 +139,28 @@ calculation and the live view; excludes the non-butter recipe and the
 inactive item; re-confirm is a no-op; new ingredient's first price doesn't
 alert; `/alerts` pages screenshot-verified.
 
+## Step 9 — suggestion engine
+
+- `lib/suggestions/math.ts` (pure): raise-price and reduce-portion per §8.
+  Goal = org target when below it, else the pre-alert margin when it
+  dropped (the target formula would say "cut the price" for items already
+  above target). Prices round up to the cent; infeasible cuts reported.
+- `lib/suggestions/engine.ts` + `GET /api/alerts/[id]/suggestions`.
+- `lib/suggestions/narrative.ts` + `POST /api/alerts/[id]/narrative`: one
+  Claude call per alert, cached on `price_alerts` (migration `018`).
+- `/alerts/[id]` shows suggestion cards + the AI summary (fetched
+  client-side, so the math never waits on Claude). Mock alerts deleted.
+
+Tested: `scripts/test-suggestions-e2e.mjs --org=<id>` on the verified
+butter alert — every price/portion number matches an independent
+calculation and lands on its goal margin when applied to the real recipe
+rows; the below-target branch exercised on the same rows (target 88%);
+real Claude narrative printed verbatim, all its numbers grounded in the
+data; cached on second request; page screenshot-verified.
+
 ## Not started yet
 
-- Step 9: suggestion engine — on hold until you say go.
+- Step 10: bulk/PDF import + manual-entry grid + CSV — on hold until you say go.
 - Gemini vision provider (needs `GEMINI_API_KEY`).
 - Commodity price ingestion job, bulk/PDF import, manual-entry grid, CSV
   import/export, PWA polish.
@@ -167,6 +186,7 @@ alert; `/alerts` pages screenshot-verified.
 - `scripts/test-claude-vision-scan.mjs`
 - `scripts/test-matching-e2e.mjs`
 - `scripts/test-price-cascade-e2e.mjs`
+- `scripts/test-suggestions-e2e.mjs` (needs `KEEP_FIXTURES=1` output of the above)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
 
