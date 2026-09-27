@@ -149,7 +149,8 @@ async function printLineItems(invoiceId, label) {
     .from("invoice_line_items")
     .select("id, raw_text, parsed_item_name, match_status, match_confidence, candidate_matches, embedding, ingredients(name)")
     .eq("invoice_id", invoiceId)
-    .order("created_at");
+    .order("created_at")
+    .order("position");
   if (error) throw new Error(error.message);
   console.log(`\n-- invoice_line_items where invoice_id = ${invoiceId} (${label}) --`);
   for (const r of rows) {

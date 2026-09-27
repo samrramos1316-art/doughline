@@ -13,7 +13,8 @@ export async function loadReviewQueue(supabase: SupabaseClient<Database>, invoic
       "id, raw_text, parsed_item_name, parsed_quantity, parsed_unit, parsed_unit_cost, match_status, candidate_matches, invoices(invoice_number, vendors(name))",
     )
     .in("match_status", [...UNRESOLVED_STATUSES])
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .order("position", { ascending: true });
   if (invoiceId) query = query.eq("invoice_id", invoiceId);
 
   const [{ data: rows, error }, { data: ingredients, error: ingErr }] = await Promise.all([

@@ -158,12 +158,37 @@ rows; the below-target branch exercised on the same rows (target 88%);
 real Claude narrative printed verbatim, all its numbers grounded in the
 data; cached on second request; page screenshot-verified.
 
+## Step 10 — bulk/PDF import, manual-entry grid, CSV
+
+- `/invoices/import` + `POST /api/invoices/bulk`: multi-file drag-and-drop
+  (photos + PDFs), queue-read one at a time, resumable; failed ones link
+  to manual entry.
+- Migration `019`: prices from invoices older than the newest price on file
+  go to history only (no current-cost rollback, no alert). `020`: line
+  `position` so lines keep invoice order.
+- `components/grid/EditableGrid.tsx` behind three screens: invoice manual
+  entry (`/invoices/[id]/manual-entry`, `POST /api/invoices/[id]/line-items`,
+  `PATCH /api/line-items/[id]`, `PATCH /api/invoices/[id]`), the ingredient
+  list (+ `GET /api/ingredients/export`, `POST /api/ingredients/import`),
+  and recipe ingredients.
+- Typed shorthand is expanded by `lib/ai/itemNames.ts` (Haiku, best-effort)
+  so manual lines match as well as scanned ones.
+- Scan route refuses a second scan of an invoice (409); `lib/invoices/lines.ts`
+  is the shared scan/manual pipeline.
+
+Tested: `scripts/test-bulk-import-e2e.mjs` (fixtures from
+`scripts/make-step10-fixtures.mjs`) — real PDF + unreadable photo through
+the real import UI; July prices stored as history only; the failed invoice
+filled via Tab-typing + clipboard paste in the grid, a line-total typo
+blocked inline, saved, matched, and a typed price raising a real alert;
+ingredient grid edit/paste/validation; CSV export → edit → import and a bad
+CSV rejected whole; recipe grid paste with costs checked by hand.
+
 ## Not started yet
 
-- Step 10: bulk/PDF import + manual-entry grid + CSV — on hold until you say go.
+- Step 11: commodity price ingestion + Market Watch — on hold until you say go.
 - Gemini vision provider (needs `GEMINI_API_KEY`).
-- Commodity price ingestion job, bulk/PDF import, manual-entry grid, CSV
-  import/export, PWA polish.
+- PWA polish (step 12).
 
 ## Known issues
 
@@ -171,8 +196,6 @@ data; cached on second request; page screenshot-verified.
   new" wait on 429 retries (a re-scan took ~53s instead of ~10s).
 - `scripts/smoke-test-scan-route.mjs` is stale: written for the stub
   provider, it sends random bytes and now fails against real Claude.
-- Scanning an older invoice after a newer one (step 10 backfill) would move
-  `current_unit_cost` back to the older price; needs an effective-date guard.
 - Costing views assume recipe quantities are in the ingredient's base unit
   (`recipe_ingredients.unit` isn't converted yet).
 
@@ -187,6 +210,7 @@ data; cached on second request; page screenshot-verified.
 - `scripts/test-matching-e2e.mjs`
 - `scripts/test-price-cascade-e2e.mjs`
 - `scripts/test-suggestions-e2e.mjs` (needs `KEEP_FIXTURES=1` output of the above)
+- `scripts/test-bulk-import-e2e.mjs`
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
 

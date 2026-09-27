@@ -1,11 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  EditableGrid,
+  blankRow,
+  gridErrors,
+  isBlankRow,
+  parseNumber,
+  type GridColumn,
+  type GridRow,
+} from "@/components/grid/EditableGrid";
 
 type IngredientOption = { id: string; name: string; base_unit: string };
 type Row = { ingredient_id: string; quantity: string; unit: string };
 
+// §9.2: a recipe's ingredient list as grid rows. Paste "Unsalted Butter<TAB>1.25"
+// lines straight from a spreadsheet; names resolve to your ingredients. The
+// unit is always the ingredient's base unit, because recipe costing
+// (recipe_costs view) multiplies quantity by cost-per-base-unit.
 export function RecipeBuilder({
   recipeId,
   ingredientOptions,
@@ -16,42 +29,76 @@ export function RecipeBuilder({
   initialRows: Row[];
 }) {
   const router = useRouter();
-  const [rows, setRows] = useState<Row[]>(initialRows);
+  const unitOf = useMemo(() => new Map(ingredientOptions.map((o) => [o.id, o.base_unit])), [ingredientOptions]);
+
+  const columns: GridColumn[] = useMemo(
+    () => [
+      {
+        key: "ingredient_id",
+        label: "Ingredient",
+        type: "select",
+        required: true,
+        minWidth: 260,
+        options: ingredientOptions.map((o) => ({ value: o.id, label: o.name })),
+      },
+      {
+        key: "quantity",
+        label: "Quantity",
+        type: "number",
+        align: "right",
+        required: true,
+        minWidth: 110,
+        validate: (v) => (parseNumber(v) === 0 ? "Quantity must be more than 0" : null),
+      },
+      { key: "unit", label: "Unit", minWidth: 80, readOnly: () => true },
+    ],
+    [ingredientOptions],
+  );
+
+  const [rows, setRows] = useState<GridRow[]>(() => [
+    ...initialRows.map((r, i) => ({ key: `existing-${i}`, values: { ...r } })),
+    blankRow(columns),
+  ]);
+  const [showAllErrors, setShowAllErrors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  function addRow() {
-    const first = ingredientOptions[0];
-    setRows((r) => [...r, { ingredient_id: first?.id ?? "", quantity: "", unit: first?.base_unit ?? "" }]);
-  }
-
-  function updateRow(index: number, patch: Partial<Row>) {
-    setRows((r) => r.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  }
-
-  function removeRow(index: number) {
-    setRows((r) => r.filter((_, i) => i !== index));
+  // Keep each row's unit in step with its ingredient.
+  function handleChange(next: GridRow[]) {
+    setRows(
+      next.map((r) => {
+        const unit = unitOf.get(r.values.ingredient_id) ?? "";
+        return r.values.unit === unit ? r : { ...r, values: { ...r.values, unit } };
+      }),
+    );
   }
 
   async function save() {
-    setPending(true);
+    setShowAllErrors(true);
     setError(null);
-
+    const errors = gridErrors(columns, rows);
+    if (errors.size) {
+      setError(`Fix the ${errors.size} highlighted row${errors.size === 1 ? "" : "s"} first — nothing was saved.`);
+      return;
+    }
+    setPending(true);
     const payload = {
       ingredients: rows
-        .filter((r) => r.ingredient_id && r.quantity)
-        .map((r) => ({ ingredient_id: r.ingredient_id, quantity: Number(r.quantity), unit: r.unit })),
+        .filter((r) => !isBlankRow(columns, r))
+        .map((r) => ({
+          ingredient_id: r.values.ingredient_id,
+          quantity: parseNumber(r.values.quantity),
+          unit: unitOf.get(r.values.ingredient_id),
+        })),
     };
-
     const res = await fetch(`/api/recipes/${recipeId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
     setPending(false);
     if (!res.ok) {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       setError(data.error ?? "Something went wrong");
       return;
     }
@@ -67,54 +114,26 @@ export function RecipeBuilder({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4">
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      {rows.map((row, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <select
-            value={row.ingredient_id}
-            onChange={(e) => updateRow(i, { ingredient_id: e.target.value })}
-            className="rounded-md border border-zinc-300 px-2 py-1 text-sm"
-          >
-            {ingredientOptions.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            step="0.0001"
-            value={row.quantity}
-            onChange={(e) => updateRow(i, { quantity: e.target.value })}
-            placeholder="qty"
-            className="w-24 rounded-md border border-zinc-300 px-2 py-1 text-sm"
-          />
-          <input
-            value={row.unit}
-            onChange={(e) => updateRow(i, { unit: e.target.value })}
-            placeholder="unit"
-            className="w-20 rounded-md border border-zinc-300 px-2 py-1 text-sm"
-          />
-          <button type="button" onClick={() => removeRow(i)} className="text-sm text-red-600">
-            Remove
-          </button>
-        </div>
-      ))}
-
-      <div className="flex gap-2">
-        <button type="button" onClick={addRow} className="text-sm font-medium text-zinc-700 underline">
-          + Add ingredient
-        </button>
+    <div className="flex flex-col gap-3">
+      <EditableGrid
+        label="Recipe ingredients"
+        columns={columns}
+        rows={rows}
+        onChange={handleChange}
+        showAllErrors={showAllErrors}
+        canDeleteRow={() => true}
+        onDeleteRow={(r) => setRows(rows.filter((x) => x.key !== r.key))}
+      />
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={save}
           disabled={pending}
-          className="ml-auto rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {pending ? "Saving…" : "Save recipe"}
         </button>
+        {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
     </div>
   );

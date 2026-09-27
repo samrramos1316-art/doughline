@@ -179,7 +179,7 @@ try {
   if (originalTarget != null) await admin.from("organizations").update({ target_margin_pct: originalTarget }).eq("id", orgId);
   if (browser) await browser.close();
   killDevServer(devServer);
-  if (args.cleanup !== undefined) {
+  if ("cleanup" in args) {
     console.log("\nCleaning up fixture org and user...");
     const { data: files } = await admin.storage.from("invoices").list(orgId);
     if (files?.length) await admin.storage.from("invoices").remove(files.map((f) => `${orgId}/${f.name}`));

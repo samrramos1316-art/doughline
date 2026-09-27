@@ -247,7 +247,8 @@ try {
     .from("invoice_line_items")
     .select("id, raw_text, parsed_quantity, parsed_unit, parsed_unit_cost, parsed_pack_quantity, parsed_pack_unit, match_status, base_unit_cost, price_applied_at, price_note, ingredients(name, base_unit)")
     .eq("invoice_id", invoiceId)
-    .order("created_at");
+    .order("created_at")
+    .order("position");
   console.log(`\n-- invoice_line_items (invoice ${invoiceId.slice(0, 8)}…) --`);
   for (const l of lines) {
     console.log(`${l.raw_text.padEnd(26)} ${l.parsed_quantity} ${l.parsed_unit} @ $${l.parsed_unit_cost}  pack=${l.parsed_pack_quantity ?? "—"} ${l.parsed_pack_unit ?? ""}`.padEnd(78) +

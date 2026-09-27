@@ -1,42 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
-import { IngredientForm } from "@/components/ingredients/IngredientForm";
-import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
+import { IngredientsGrid } from "@/components/ingredients/IngredientsGrid";
 
 export default async function IngredientsPage() {
   const supabase = await createClient();
-  const { data: ingredients } = await supabase.from("ingredients").select(INGREDIENT_COLUMNS).order("name");
+  const { data: ingredients } = await supabase
+    .from("ingredients")
+    .select("id, name, category, base_unit, current_unit_cost")
+    .order("name");
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Ingredients</h1>
-      <IngredientForm />
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 text-zinc-500">
-            <th className="py-2">Name</th>
-            <th>Category</th>
-            <th>Base unit</th>
-            <th>Unit cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(ingredients ?? []).map((i) => (
-            <tr key={i.id} className="border-b border-zinc-100">
-              <td className="py-2">{i.name}</td>
-              <td>{i.category ?? "—"}</td>
-              <td>{i.base_unit}</td>
-              <td>{i.current_unit_cost != null ? `$${Number(i.current_unit_cost).toFixed(4)}` : "—"}</td>
-            </tr>
-          ))}
-          {(ingredients ?? []).length === 0 && (
-            <tr>
-              <td colSpan={4} className="py-4 text-zinc-400">
-                No ingredients yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <div>
+        <h1 className="text-2xl font-semibold text-zinc-900">Ingredients</h1>
+        <p className="text-sm text-zinc-500">
+          Edit in place, or paste rows from a spreadsheet. Costs are per base unit.
+        </p>
+      </div>
+      <IngredientsGrid ingredients={ingredients ?? []} />
     </div>
   );
 }

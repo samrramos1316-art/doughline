@@ -14,6 +14,9 @@ export type PriceOutcome =
       threshold_pct: number;
       price_alert_id: string | null;
       impacts: number;
+      // Older than the newest price on file (a backfilled invoice): recorded
+      // in history only — current cost untouched, no alert (migration 019).
+      historical: boolean;
     }
   | { applied: false; reason: string };
 
@@ -72,6 +75,7 @@ export async function applyLinePrice(supabase: Client, lineItemId: string): Prom
     threshold_pct: number;
     price_alert_id: string | null;
     impacts: number;
+    historical: boolean;
   };
   if (!result.applied) return { applied: false, reason: result.reason ?? "not applied" };
   return {
@@ -83,5 +87,6 @@ export async function applyLinePrice(supabase: Client, lineItemId: string): Prom
     threshold_pct: result.threshold_pct,
     price_alert_id: result.price_alert_id,
     impacts: result.impacts,
+    historical: result.historical,
   };
 }

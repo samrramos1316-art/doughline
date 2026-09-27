@@ -10,3 +10,20 @@ export const createInvoiceSchema = z.object({
   file_type: z.enum(["image", "pdf"]).default("image"),
   vendor_id: z.string().uuid().optional().nullable(),
 });
+
+// §9.1 bulk backfill: many invoices, one request. Same client-supplied ids
+// as the single-scan path, for the same reason.
+export const BULK_IMPORT_MAX = 25;
+export const bulkCreateInvoicesSchema = z.object({
+  invoices: z
+    .array(createInvoiceSchema.omit({ vendor_id: true }))
+    .min(1)
+    .max(BULK_IMPORT_MAX, `At most ${BULK_IMPORT_MAX} files per import`),
+});
+
+// Header fields an owner types when the scan couldn't read them (§9.2).
+export const updateInvoiceSchema = z.object({
+  vendor_name: z.string().trim().min(1).max(200).nullable().optional(),
+  invoice_number: z.string().trim().max(100).nullable().optional(),
+  invoice_date: z.iso.date().nullable().optional(),
+});

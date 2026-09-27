@@ -16,6 +16,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     )
     .eq("id", id)
     .order("created_at", { referencedTable: "invoice_line_items", ascending: true })
+    .order("position", { referencedTable: "invoice_line_items", ascending: true })
     .maybeSingle();
   if (!invoice) notFound();
 
@@ -40,7 +41,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       {invoice.status === "failed" && (
         <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           We couldn&apos;t read this invoice automatically
-          {invoice.error_message ? ` (${invoice.error_message})` : ""}. Enter its line items by hand instead.
+          {invoice.error_message ? ` (${invoice.error_message})` : ""}.{" "}
+          <Link href={`/invoices/${invoice.id}/manual-entry`} className="font-medium underline">
+            Enter its line items by hand
+          </Link>
+          .
         </p>
       )}
 
@@ -57,6 +62,12 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         >
           {needsReviewCount} line item{needsReviewCount === 1 ? "" : "s"} need your review
           <span aria-hidden>&rarr;</span>
+        </Link>
+      )}
+
+      {invoice.status !== "failed" && invoice.status !== "pending" && invoice.status !== "processing" && (
+        <Link href={`/invoices/${invoice.id}/manual-entry`} className="self-start text-sm text-zinc-600 underline">
+          Add or correct lines by hand
         </Link>
       )}
 

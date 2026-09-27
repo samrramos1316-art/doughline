@@ -216,6 +216,7 @@ export type Database = {
           parsed_quantity: number | null
           parsed_unit: string | null
           parsed_unit_cost: number | null
+          position: number | null
           price_applied_at: string | null
           price_note: string | null
           raw_text: string
@@ -240,6 +241,7 @@ export type Database = {
           parsed_quantity?: number | null
           parsed_unit?: string | null
           parsed_unit_cost?: number | null
+          position?: number | null
           price_applied_at?: string | null
           price_note?: string | null
           raw_text: string
@@ -264,6 +266,7 @@ export type Database = {
           parsed_quantity?: number | null
           parsed_unit?: string | null
           parsed_unit_cost?: number | null
+          position?: number | null
           price_applied_at?: string | null
           price_note?: string | null
           raw_text?: string

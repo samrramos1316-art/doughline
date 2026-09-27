@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getVisionProvider } from "@/lib/ai/vision";
-import { matchLines, type LineMatch } from "@/lib/matching/vectorMatch";
 import { resolveVendorId } from "@/lib/matching/vendors";
-import { refreshInvoiceStatus } from "@/lib/matching/review";
-import { applyLinePrice } from "@/lib/costing/applyPrice";
+import { insertAndMatchLines } from "@/lib/invoices/lines";
 
 // Claude and Voyage calls (Voyage retries 429s on its free tier) can take
 // most of a minute; don't let the platform's default timeout cut them off.
@@ -24,18 +22,24 @@ const EXT_TO_MIME: Record<string, string> = {
 // step 5: vendor alias → Voyage vector search → confidence routing) and set
 // the invoice to 'needs_review' or 'completed' (step 6). Auto-matched lines
 // have their price applied here (step 8) — nobody will confirm them, and the
-// alias fast path means most lines end up auto-matched.
+// alias fast path means most lines end up auto-matched. PDFs (bulk import,
+// §9.1) go to the provider as documents, images as images.
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
   const { data: invoice, error: invoiceErr } = await supabase
     .from("invoices")
-    .select("id, org_id, file_storage_path, file_type")
+    .select("id, org_id, file_storage_path, file_type, invoice_line_items(count)")
     .eq("id", id)
     .single();
   if (invoiceErr || !invoice) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
+  // Scanning twice would insert every line twice. Once an invoice has lines,
+  // corrections go through the manual-entry grid (§9.2).
+  if ((invoice.invoice_line_items[0]?.count ?? 0) > 0) {
+    return NextResponse.json({ error: "This invoice has already been read" }, { status: 409 });
   }
 
   const { data: fileBlob, error: downloadErr } = await supabase.storage
@@ -95,60 +99,19 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     })
     .eq("id", id);
 
-  // If matching itself fails (e.g. Voyage is down), still keep the extracted
-  // lines — as 'pending', with no candidates — so they reach the review queue
-  // for a manual pick instead of vanishing (§9: the AI path is the happy
-  // path, not the only path).
-  let matches: (LineMatch | null)[];
-  let matchingError: string | null = null;
+  let result;
   try {
-    matches = await matchLines(supabase, { vendorId, lines: extraction.line_items });
+    result = await insertAndMatchLines(supabase, {
+      orgId: invoice.org_id,
+      invoiceId: id,
+      vendorId,
+      lines: extraction.line_items,
+      entryMethod: "vision",
+    });
   } catch (err) {
-    matchingError = err instanceof Error ? err.message : "Matching failed";
-    console.error(`[scan] matching failed for invoice ${id}; lines saved as 'pending':`, err);
-    matches = extraction.line_items.map(() => null);
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Saving line items failed" }, { status: 400 });
   }
-
-  const lineItemRows = extraction.line_items.map((item, i) => {
-    const match = matches[i];
-    return {
-      org_id: invoice.org_id,
-      invoice_id: id,
-      raw_text: item.raw_text,
-      parsed_item_name: item.item_name,
-      parsed_quantity: item.quantity,
-      parsed_unit: item.unit,
-      parsed_unit_cost: item.unit_cost,
-      parsed_line_total: item.line_total,
-      parsed_pack_quantity: item.pack_quantity,
-      parsed_pack_unit: item.pack_unit,
-      entry_method: "vision" as const,
-      embedding: match?.embedding ?? null,
-      match_status: match?.match_status ?? ("pending" as const),
-      matched_ingredient_id: match?.matched_ingredient_id ?? null,
-      match_confidence: match?.match_confidence ?? null,
-      candidate_matches: match?.candidate_matches ?? null,
-    };
-  });
-
-  const { data: lineItems, error: lineItemsErr } = await supabase
-    .from("invoice_line_items")
-    .insert(lineItemRows)
-    .select(
-      "id, raw_text, parsed_item_name, parsed_quantity, parsed_unit, parsed_unit_cost, parsed_line_total, match_status, matched_ingredient_id, match_confidence, candidate_matches",
-    );
-  if (lineItemsErr) {
-    return NextResponse.json({ error: lineItemsErr.message }, { status: 400 });
-  }
-
-  // Sequential: two lines of one invoice can hit the same ingredient, and
-  // each must see the cost the previous one set.
-  const prices = [];
-  for (const li of lineItems.filter((l) => l.match_status === "auto_matched")) {
-    prices.push({ line_item_id: li.id, ...(await applyLinePrice(supabase, li.id)) });
-  }
-
-  const status = await refreshInvoiceStatus(supabase, id);
+  const { lineItems, prices, status, matchingError } = result;
 
   return NextResponse.json({
     invoice_id: id,

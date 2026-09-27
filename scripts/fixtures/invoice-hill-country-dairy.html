@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- Test fixture for scripts/test-bulk-import-e2e.mjs: a clean, emailed-PDF
+     style invoice from a second supplier, dated in July — i.e. the kind of
+     historical invoice a bulk backfill (§9.1) imports. Rendered to
+     invoice-hill-country-dairy.pdf by scripts/make-step10-fixtures.mjs. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: Letter; margin: 0.6in; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1c1c1c; font-size: 12px; }
+  .top { display: flex; justify-content: space-between; border-bottom: 3px solid #2f5d3a; padding-bottom: 12px; }
+  h1 { color: #2f5d3a; margin: 0; font-size: 22px; }
+  .muted { color: #666; }
+  .meta td { padding: 2px 0 2px 16px; text-align: right; }
+  .addr { display: flex; gap: 64px; margin: 18px 0; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table.lines th { background: #2f5d3a; color: #fff; text-align: left; padding: 7px 6px; font-size: 11px; }
+  table.lines td { padding: 7px 6px; border-bottom: 1px solid #ddd; }
+  .n { text-align: right; }
+  .totals { margin-left: auto; margin-top: 12px; }
+  .totals td { padding: 3px 6px; }
+  .grand td { font-weight: bold; border-top: 2px solid #1c1c1c; }
+  .foot { margin-top: 36px; font-size: 10px; color: #666; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <h1>Hill Country Dairy Supply</h1>
+      <div class="muted">2208 Ranch Rd 12 · San Marcos, TX 78666 · orders@hillcountrydairy.example</div>
+    </div>
+    <table class="meta">
+      <tr><td class="muted">Invoice</td><td><b>HCD-40718</b></td></tr>
+      <tr><td class="muted">Invoice date</td><td>July 14, 2026</td></tr>
+      <tr><td class="muted">Due</td><td>July 28, 2026</td></tr>
+      <tr><td class="muted">Account</td><td>SCB-0412</td></tr>
+    </table>
+  </div>
+  <div class="addr">
+    <div><b>Bill to</b><br>Sweet Crumb Bakery<br>412 E 6th St<br>Austin, TX 78701</div>
+    <div><b>Ship to</b><br>Same as billing<br>Delivered 07/14/2026, 6:40 AM</div>
+  </div>
+  <table class="lines">
+    <tr><th>Item</th><th>Description</th><th class="n">Qty</th><th>Unit</th><th class="n">Unit price</th><th class="n">Amount</th></tr>
+    <tr><td>20114</td><td>BUTTER UNSALTED AA 36/1 LB</td><td class="n">2</td><td>CS</td><td class="n">118.80</td><td class="n">237.60</td></tr>
+    <tr><td>20391</td><td>MILK WHOLE 4/1 GAL</td><td class="n">3</td><td>CS</td><td class="n">17.96</td><td class="n">53.88</td></tr>
+    <tr><td>20455</td><td>CREAM HEAVY 40% 12/1 QT</td><td class="n">1</td><td>CS</td><td class="n">58.20</td><td class="n">58.20</td></tr>
+    <tr><td>30017</td><td>EGGS LARGE GR A 15 DZ</td><td class="n">2</td><td>CS</td><td class="n">42.30</td><td class="n">84.60</td></tr>
+    <tr><td>20988</td><td>CREAM CHEESE BLOCK 30 LB</td><td class="n">1</td><td>CS</td><td class="n">96.45</td><td class="n">96.45</td></tr>
+  </table>
+  <table class="totals">
+    <tr><td class="muted">Subtotal</td><td class="n">530.73</td></tr>
+    <tr><td class="muted">Delivery</td><td class="n">12.00</td></tr>
+    <tr class="grand"><td>Total due</td><td class="n">$542.73</td></tr>
+  </table>
+  <p class="foot">Thank you for your business. Returns accepted within 24 hours of delivery for temperature-controlled items only.</p>
+</body>
+</html>

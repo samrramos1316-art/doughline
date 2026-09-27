@@ -664,6 +664,8 @@ The AI pipeline (§5) is the happy path, not the only path — the app has to ke
 
 The camera-first `scan/page.tsx` flow (§10) is built for "just took a photo of today's delivery." Seeding the system with months of history is a different job, usually done at a desk, not on a phone: `app/(app)/invoices/import/page.tsx` is a drag-and-drop zone accepting multiple images and PDFs at once, calling `POST /api/invoices/bulk` to create all the invoice rows in one request, then processing (and reviewing) them as a queue rather than one at a time. This is also the natural place PDF support (§5.1) pays off, since old invoices are far more likely to be emailed PDFs than photos.
 
+As built (step 10): images are compressed client-side as on the scan screen; PDFs (≤ 20 MB) upload as-is and go to the vision model as documents. Up to 25 files per import; the queue reads one invoice at a time (keeps Claude/Voyage inside rate limits), and because every row exists before reading starts, an interrupted queue is resumable ("N imported invoices haven't been read yet"). `POST /api/invoices/bulk` honours the §6.3 review cap like single scans. **Historical prices:** an invoice dated before the newest price already on file for an ingredient is recorded in `ingredient_price_history` only — it never rolls `current_unit_cost` back or raises an alert (migration 019). Re-scanning an invoice that already has lines is refused (409) — corrections go through manual entry.
+
 ### 9.2 Manual entry and the spreadsheet-style grid
 
 A single reusable component, `components/grid/EditableGrid.tsx` (tab-to-navigate, paste-a-block-of-cells, inline validation), backs three different screens rather than being a one-off:
@@ -673,6 +675,13 @@ A single reusable component, `components/grid/EditableGrid.tsx` (tab-to-navigate
 - **Recipe ingredients** — building or editing a recipe's ingredient list as rows, not one-at-a-time forms.
 
 On top of the grid, `POST /api/ingredients/import` / `GET /api/ingredients/export` (CSV) is the literal "in case the software is bugging" escape hatch you asked for: at any point, the owner can pull their entire ingredient list into a real spreadsheet, edit it there, and push it back — the app never becomes the only way to see or fix this data.
+
+As built (step 10):
+- `EditableGrid`: Tab across, Enter/↑↓ down a column, pasting a tab-separated block (what copying spreadsheet cells produces) fills cells from the one pasted into and adds rows; select columns resolve pasted names case-insensitively; inline per-cell validation (required, numbers, and screen-specific rules such as "qty × unit price ≠ line total"); an always-present trailing blank row; nothing is saved while any row is invalid.
+- Manual entry (`/invoices/[id]/manual-entry`, linked from any `failed` invoice and from every invoice as "Add or correct lines"): header (vendor, number, date — the vendor keys alias memory) + line grid with pack size, the original file shown alongside. `POST /api/invoices/[id]/line-items` runs typed lines through the scan's exact pipeline (`lib/invoices/lines.ts`: alias → vector → routing → price). Because raw distributor shorthand embeds poorly (§5.2), typed text is first expanded to a plain-English `item_name` by a small text-only Claude call (`lib/ai/itemNames.ts`, Haiku 4.5); it's best-effort — on failure matching uses the typed text, so manual entry still works without AI. `PATCH /api/line-items/[id]` re-matches an unresolved line whose text changed, retries a price a fix made convertible, and refuses to change price fields already applied to costs.
+- Ingredients: the grid and CSV import share one all-or-nothing bulk upsert (`lib/ingredients/bulkUpsert.ts`): match by id, then name; one Voyage call for all new/renamed names; cost changes write `manual` price history; a blank cost leaves the cost alone; errors name the row the person sees (CSV line incl. header, or grid row).
+- Recipes: ingredient rows as a grid; pasted names resolve to ingredients; the unit is locked to the ingredient's base unit (what the costing views assume).
+- Line items keep invoice order via `invoice_line_items.position` (migration 020).
 
 ---
 
