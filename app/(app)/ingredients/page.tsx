@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { IngredientForm } from "@/components/ingredients/IngredientForm";
+import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
 
 export default async function IngredientsPage() {
   const supabase = await createClient();
-  const { data: ingredients } = await supabase.from("ingredients").select("*").order("name");
+  const { data: ingredients } = await supabase.from("ingredients").select(INGREDIENT_COLUMNS).order("name");
 
   return (
     <div className="flex flex-col gap-6">

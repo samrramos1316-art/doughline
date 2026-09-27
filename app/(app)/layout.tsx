@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { logOutAction } from "@/app/(marketing)/auth-actions";
+import { getCurrentOrgId } from "@/lib/supabase/org";
+import { getReviewBacklog } from "@/lib/matching/review";
+import { ActionRequiredGate } from "@/components/review/ActionRequiredGate";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -15,12 +18,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // data-security guidance for Proxy).
   if (!user) redirect("/login");
 
+  const orgId = await getCurrentOrgId(supabase);
+  const backlog = orgId ? await getReviewBacklog(supabase, orgId) : null;
+
   return (
     <div className="flex min-h-full flex-1 flex-col bg-zinc-50">
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
-        <nav className="flex gap-4 text-sm font-medium text-zinc-700">
+      {backlog?.blocked && <ActionRequiredGate unresolved={backlog.unresolved} cap={backlog.cap} />}
+      <header className="flex items-start justify-between gap-4 border-b border-zinc-200 bg-white px-4 py-3">
+        {/* Wraps rather than overflowing: on a phone a single row is wider
+            than the screen, which scrolls the page sideways and leaves part
+            of it outside the full-screen Action Required gate. */}
+        <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium text-zinc-700">
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/invoices">Invoices</Link>
+          <Link href="/review" className={backlog?.unresolved ? "text-amber-700" : undefined}>
+            Review{backlog?.unresolved ? ` (${backlog.unresolved})` : ""}
+          </Link>
           <Link href="/ingredients">Ingredients</Link>
           <Link href="/recipes">Recipes</Link>
           <Link href="/menu">Menu</Link>
@@ -28,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/market">Market</Link>
         </nav>
         <form action={logOutAction}>
-          <button type="submit" className="text-sm text-zinc-500 underline">
+          <button type="submit" className="whitespace-nowrap text-sm text-zinc-500 underline">
             Log out
           </button>
         </form>

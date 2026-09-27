@@ -12,6 +12,10 @@ const ExtractionSchema = z.object({
   line_items: z.array(
     z.object({
       raw_text: z.string().describe("The item description exactly as printed"),
+      item_name: z
+        .string()
+        .nullable()
+        .describe("Plain-English generic product name, abbreviations expanded, no brand/pack size/code"),
       quantity: z.number().nullable(),
       unit: z.string().nullable(),
       unit_cost: z.number().nullable(),
@@ -23,6 +27,7 @@ const ExtractionSchema = z.object({
 const SYSTEM_PROMPT = `You extract line items from supplier invoices, packing slips, and receipts for a small food business. The input is usually a phone photo: it may be skewed, crumpled, or partly shadowed.
 
 - raw_text: copy each item description exactly as printed, abbreviations and codes included (e.g. "ORG CHKN BRST 40# CS"). Do not expand or correct it — it is matched against the vendor's past wording later.
+- item_name: the plain-English, generic name of the product as a cook would write it on an ingredient list — abbreviations expanded, no brand, pack size, case count, or item code (e.g. "ORG CHKN BRST 40# CS" -> "organic chicken breast"). null if you can't tell what the product is.
 - quantity / unit / unit_cost / line_total: the numbers printed on that line. Use null for anything not printed or not legible; never compute or guess a missing value.
 - Skip subtotal, tax, delivery-fee, deposit, and total rows — only purchased items.
 - invoice_date_guess: ISO 8601 (YYYY-MM-DD), or null if absent.`;

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/media/compressImage";
 import { CaptureButton } from "@/components/camera/CaptureButton";
 
-type Stage = "idle" | "previewing" | "uploading" | "done" | "error";
+type Stage = "idle" | "previewing" | "uploading" | "reading" | "done" | "error";
 
 export function ScanInvoiceClient({ orgId }: { orgId: string }) {
+  const router = useRouter();
   const [stage, setStage] = useState<Stage>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -52,7 +54,15 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
         throw new Error(body.error ?? "Failed to create invoice record");
       }
 
+      // §5.2 steps 4-6: extract, match, route. Synchronous for v1 — a few
+      // seconds — then straight to the swipe queue if anything needs a human.
+      setStage("reading");
+      const scanRes = await fetch(`/api/invoices/${invoiceId}/scan`, { method: "POST" });
+      const scan = await scanRes.json().catch(() => ({}));
+      if (!scanRes.ok) throw new Error(scan.error ?? "Couldn't read this invoice");
+
       setStage("done");
+      router.push(scan.status === "needs_review" ? `/invoices/${invoiceId}/review` : `/invoices/${invoiceId}`);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Upload failed");
       setStage("error");
@@ -103,20 +113,14 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
         </div>
       )}
 
-      {stage === "done" && (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-sm font-medium text-green-700">
-            Uploaded. This invoice is pending — extraction isn&apos;t wired up yet.
-          </p>
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-full border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-700"
-          >
-            Scan another
-          </button>
+      {stage === "reading" && (
+        <div className="flex items-center gap-2 text-sm text-zinc-500">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+          Reading invoice and matching ingredients…
         </div>
       )}
+
+      {stage === "done" && <p className="text-sm font-medium text-green-700">Done — opening your invoice…</p>}
 
       {stage === "error" && (
         <div className="flex flex-col items-center gap-3">

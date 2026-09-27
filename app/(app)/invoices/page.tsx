@@ -1,8 +1,14 @@
 import Link from "next/link";
-import { mockInvoices } from "@/lib/mock/invoices";
+import { createClient } from "@/lib/supabase/server";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 
-export default function InvoicesPage() {
+export default async function InvoicesPage() {
+  const supabase = await createClient();
+  const { data: invoices } = await supabase
+    .from("invoices")
+    .select("id, status, invoice_number, invoice_date, total_amount, created_at, vendors(name)")
+    .order("created_at", { ascending: false });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -15,15 +21,21 @@ export default function InvoicesPage() {
         </Link>
       </div>
 
+      {!invoices?.length && (
+        <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-500">
+          No invoices yet — scan your first delivery.
+        </p>
+      )}
+
       <ul className="flex flex-col gap-2">
-        {mockInvoices.map((inv) => (
+        {invoices?.map((inv) => (
           <li key={inv.id}>
             <Link
               href={`/invoices/${inv.id}`}
               className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 hover:border-zinc-300"
             >
               <div>
-                <p className="font-medium text-zinc-900">{inv.vendor_name}</p>
+                <p className="font-medium text-zinc-900">{inv.vendors?.name ?? "Unknown vendor"}</p>
                 <p className="text-xs text-zinc-500">
                   {inv.invoice_date ?? "No date yet"}
                   {inv.invoice_number ? ` · ${inv.invoice_number}` : ""}
@@ -31,7 +43,7 @@ export default function InvoicesPage() {
               </div>
               <div className="flex items-center gap-3">
                 {inv.total_amount != null && (
-                  <span className="text-sm text-zinc-600">${inv.total_amount.toFixed(2)}</span>
+                  <span className="text-sm text-zinc-600">${Number(inv.total_amount).toFixed(2)}</span>
                 )}
                 <InvoiceStatusBadge status={inv.status} />
               </div>

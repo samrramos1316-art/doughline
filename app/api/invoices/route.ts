@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { createInvoiceSchema } from "@/lib/validators/invoice";
+import { getReviewBacklog } from "@/lib/matching/review";
 
 export async function GET() {
   const supabase = await createClient();
@@ -25,6 +26,18 @@ export async function POST(request: Request) {
 
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  // §6.3: no new scans while the org's review backlog is over its cap.
+  const backlog = await getReviewBacklog(supabase, orgId);
+  if (backlog.blocked) {
+    return NextResponse.json(
+      {
+        error: `Review ${backlog.unresolved - backlog.cap} more line item(s) before scanning — ${backlog.unresolved} are waiting (limit ${backlog.cap}).`,
+        review_backlog: backlog,
+      },
+      { status: 423 },
+    );
+  }
 
   const parsed = createInvoiceSchema.safeParse(await request.json());
   if (!parsed.success) {

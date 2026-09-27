@@ -208,6 +208,7 @@ export type Database = {
           match_status: string
           matched_ingredient_id: string | null
           org_id: string
+          parsed_item_name: string | null
           parsed_line_total: number | null
           parsed_quantity: number | null
           parsed_unit: string | null
@@ -226,6 +227,7 @@ export type Database = {
           match_status?: string
           matched_ingredient_id?: string | null
           org_id: string
+          parsed_item_name?: string | null
           parsed_line_total?: number | null
           parsed_quantity?: number | null
           parsed_unit?: string | null
@@ -244,6 +246,7 @@ export type Database = {
           match_status?: string
           matched_ingredient_id?: string | null
           org_id?: string
+          parsed_item_name?: string | null
           parsed_line_total?: number | null
           parsed_quantity?: number | null
           parsed_unit?: string | null
@@ -871,6 +874,14 @@ export type Database = {
     }
     Functions: {
       current_org_id: { Args: never; Returns: string }
+      match_ingredients: {
+        Args: { match_count?: number; query_embedding: string }
+        Returns: {
+          ingredient_id: string
+          name: string
+          similarity: number
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

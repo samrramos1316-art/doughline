@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getVisionProvider } from "@/lib/ai/vision";
+import { matchLines, type LineMatch } from "@/lib/matching/vectorMatch";
+import { resolveVendorId } from "@/lib/matching/vendors";
+import { refreshInvoiceStatus } from "@/lib/matching/review";
 
 const EXT_TO_MIME: Record<string, string> = {
   jpg: "image/jpeg",
@@ -12,11 +15,9 @@ const EXT_TO_MIME: Record<string, string> = {
 // §5.2 step 4: fetch the file from Storage, run it through the configured
 // VisionProvider (VISION_PROVIDER — the Claude provider is real; Gemini is
 // still a stub that extracts nothing), persist raw_extraction, and apply the
-// status transitions described in §5.2 step 4.
-//
-// Not yet wired (deliberately out of scope for this scaffold): per-line-item
-// normalization + Voyage embedding + alias/vector matching, §5.2 step 5 — that
-// needs a Voyage API key and the matching logic, neither of which exist yet.
+// status transitions described in §5.2 step 4, then match every line (§5.2
+// step 5: vendor alias → Voyage vector search → confidence routing) and set
+// the invoice to 'needs_review' or 'completed' (step 6).
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -68,35 +69,77 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ invoice_id: id, status: "failed", extraction });
   }
 
+  let vendorId: string | null = null;
+  try {
+    vendorId = await resolveVendorId(supabase, invoice.org_id, extraction.vendor_name_guess);
+  } catch {
+    // An unresolved vendor only costs alias memory for this invoice (aliases
+    // then key on vendor_id null); not worth failing the scan over.
+  }
+
   await supabase
     .from("invoices")
     .update({
       status: "processing",
       raw_extraction: JSON.parse(JSON.stringify(extraction)),
-      vendor_id: null, // TODO: resolve vendor_name_guess -> vendors row once matching (§5.2 step 5) exists
+      vendor_id: vendorId,
       invoice_number: extraction.invoice_number_guess,
       invoice_date: extraction.invoice_date_guess,
     })
     .eq("id", id);
 
-  // TODO: for each line item — normalize raw_text, insert invoice_line_items,
-  // compute + store its Voyage embedding, then run alias/vector matching
-  // (§5.2 step 5) to set match_status. None of that is wired yet.
-  const lineItemRows = extraction.line_items.map((item) => ({
-    org_id: invoice.org_id,
-    invoice_id: id,
-    raw_text: item.raw_text,
-    parsed_quantity: item.quantity,
-    parsed_unit: item.unit,
-    parsed_unit_cost: item.unit_cost,
-    parsed_line_total: item.line_total,
-    entry_method: "vision" as const,
-  }));
+  // If matching itself fails (e.g. Voyage is down), still keep the extracted
+  // lines — as 'pending', with no candidates — so they reach the review queue
+  // for a manual pick instead of vanishing (§9: the AI path is the happy
+  // path, not the only path).
+  let matches: (LineMatch | null)[];
+  let matchingError: string | null = null;
+  try {
+    matches = await matchLines(supabase, { vendorId, lines: extraction.line_items });
+  } catch (err) {
+    matchingError = err instanceof Error ? err.message : "Matching failed";
+    console.error(`[scan] matching failed for invoice ${id}; lines saved as 'pending':`, err);
+    matches = extraction.line_items.map(() => null);
+  }
 
-  const { error: lineItemsErr } = await supabase.from("invoice_line_items").insert(lineItemRows);
+  const lineItemRows = extraction.line_items.map((item, i) => {
+    const match = matches[i];
+    return {
+      org_id: invoice.org_id,
+      invoice_id: id,
+      raw_text: item.raw_text,
+      parsed_item_name: item.item_name,
+      parsed_quantity: item.quantity,
+      parsed_unit: item.unit,
+      parsed_unit_cost: item.unit_cost,
+      parsed_line_total: item.line_total,
+      entry_method: "vision" as const,
+      embedding: match?.embedding ?? null,
+      match_status: match?.match_status ?? ("pending" as const),
+      matched_ingredient_id: match?.matched_ingredient_id ?? null,
+      match_confidence: match?.match_confidence ?? null,
+      candidate_matches: match?.candidate_matches ?? null,
+    };
+  });
+
+  const { data: lineItems, error: lineItemsErr } = await supabase
+    .from("invoice_line_items")
+    .insert(lineItemRows)
+    .select(
+      "id, raw_text, parsed_item_name, parsed_quantity, parsed_unit, parsed_unit_cost, parsed_line_total, match_status, matched_ingredient_id, match_confidence, candidate_matches",
+    );
   if (lineItemsErr) {
     return NextResponse.json({ error: lineItemsErr.message }, { status: 400 });
   }
 
-  return NextResponse.json({ invoice_id: id, status: "processing", extraction });
+  const status = await refreshInvoiceStatus(supabase, id);
+
+  return NextResponse.json({
+    invoice_id: id,
+    status,
+    vendor_id: vendorId,
+    matching_error: matchingError,
+    extraction,
+    line_items: lineItems,
+  });
 }

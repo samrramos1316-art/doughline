@@ -8,17 +8,29 @@ const SWIPE_THRESHOLD = 100;
 
 export function SwipeCard({
   rawText,
+  itemName,
   parsedQuantity,
   parsedUnit,
   parsedUnitCost,
   candidate,
+  candidatePosition,
+  lowConfidence = false,
+  leftLabel,
+  rightLabel,
+  disabled = false,
   onSwipe,
 }: {
   rawText: string;
+  itemName: string | null;
   parsedQuantity: number | null;
   parsedUnit: string | null;
   parsedUnitCost: number | null;
   candidate: Candidate | null;
+  candidatePosition?: string;
+  lowConfidence?: boolean;
+  leftLabel: string;
+  rightLabel: string;
+  disabled?: boolean;
   onSwipe: (direction: "left" | "right") => void;
 }) {
   const [dragX, setDragX] = useState(0);
@@ -27,6 +39,10 @@ export function SwipeCard({
   const startX = useRef(0);
 
   function handlePointerDown(e: React.PointerEvent) {
+    // A press on one of the card's buttons is a tap, not a drag: capturing
+    // the pointer here would retarget its click to the card and the button
+    // would never fire.
+    if (disabled || (e.target as Element).closest("button")) return;
     setDragging(true);
     startX.current = e.clientX - dragX;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
@@ -38,7 +54,7 @@ export function SwipeCard({
   }
 
   function finish(direction: "left" | "right") {
-    if (exiting) return;
+    if (exiting || disabled) return;
     setExiting(direction);
     setTimeout(() => onSwipe(direction), 180);
   }
@@ -74,19 +90,20 @@ export function SwipeCard({
         style={{ opacity: confirmOpacity }}
         className="absolute top-4 right-4 rounded-md border-2 border-green-500 px-2 py-0.5 text-sm font-bold tracking-wide text-green-500"
       >
-        CONFIRM
+        {rightLabel.toUpperCase()}
       </span>
       <span
         aria-hidden
         style={{ opacity: skipOpacity }}
         className="absolute top-4 left-4 rounded-md border-2 border-red-500 px-2 py-0.5 text-sm font-bold tracking-wide text-red-500"
       >
-        SKIP
+        {leftLabel.toUpperCase()}
       </span>
 
       <div>
         <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">Scanned as</p>
         <p className="mt-1 text-lg font-medium text-zinc-900">{rawText}</p>
+        {itemName && <p className="text-sm text-zinc-600 italic">Read as “{itemName}”</p>}
         <p className="mt-1 text-sm text-zinc-500">
           {parsedQuantity ?? "—"} {parsedUnit ?? ""}
           {parsedUnitCost != null && ` · $${parsedUnitCost.toFixed(2)}`}
@@ -96,29 +113,39 @@ export function SwipeCard({
       <div className="rounded-xl bg-zinc-50 p-4 text-center">
         {candidate ? (
           <>
-            <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">Best match</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-900">{candidate.name}</p>
-            <p className="text-sm text-zinc-500">{Math.round(candidate.similarity * 100)}% confident</p>
+            <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">
+              {lowConfidence ? "Low confidence — is this…" : "Is this…"}{" "}
+              {candidatePosition && <span className="normal-case">({candidatePosition})</span>}
+            </p>
+            <p data-testid="candidate-name" className="mt-1 text-xl font-semibold text-zinc-900">
+              {candidate.name}
+            </p>
+            <p className="text-sm text-zinc-500">{Math.round(candidate.similarity * 100)}% similar</p>
           </>
         ) : (
-          <p className="text-sm text-zinc-500">No confident match — add as a new ingredient?</p>
+          <>
+            <p className="text-xl font-semibold text-zinc-900">No match found</p>
+            <p className="mt-1 text-sm text-zinc-500">Create it as a new ingredient, or search your ingredients below.</p>
+          </>
         )}
       </div>
 
       <div className="flex gap-3">
         <button
           type="button"
+          disabled={disabled}
           onClick={() => finish("left")}
-          className="flex-1 rounded-full border border-red-300 py-2.5 text-sm font-medium text-red-600"
+          className="flex-1 rounded-full border border-red-300 py-2.5 text-sm font-medium text-red-600 disabled:opacity-50"
         >
-          Skip
+          {leftLabel}
         </button>
         <button
           type="button"
+          disabled={disabled}
           onClick={() => finish("right")}
-          className="flex-1 rounded-full bg-green-600 py-2.5 text-sm font-medium text-white"
+          className="flex-1 rounded-full bg-green-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
-          {candidate ? "Confirm" : "Add new"}
+          {rightLabel}
         </button>
       </div>
     </div>

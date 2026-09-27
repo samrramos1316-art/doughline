@@ -80,17 +80,56 @@ end-to-end without crashing; since the stub always returns zero line items,
 the correct asserted outcome is `status: 'failed'` with `raw_extraction`
 persisted.
 
+## Real Claude vision (`c822426`, `90791d6`)
+
+`lib/ai/vision/claude.ts` calls `claude-opus-5` with structured outputs
+(§5.3 schema as Zod). `VISION_PROVIDER=claude`; Gemini is still a stub.
+
+Tested: `scripts/test-claude-vision-scan.mjs` — photographed Sysco invoice
+fixture through the real scan route; every field matches the print.
+
+## Step 7 — matching, confidence routing, swipe-to-verify, review gate
+
+- Migrations `015_matching.sql` (`match_ingredients()` exact per-org vector
+  search; trigger refusing `completed` with unresolved lines) and
+  `016_line_item_item_name.sql` (`parsed_item_name`). `014` (margin fix)
+  also applied.
+- `lib/ai/embeddings/voyage.ts` (voyage-3.5, symmetric, retries 429s),
+  `lib/matching/{normalize,vectorMatch,vendors,review,queue}.ts`.
+- Scan route: vendor resolution → alias check → embed Claude's `item_name`
+  → vector search → routing (auto ≥ 0.90, review ≥ 0.75, else new).
+  Swipe card hides candidates below 0.65 ("No match found": create new or
+  search); 0.65–0.75 shows as a low-confidence suggestion. Display only.
+- `POST /api/line-items/[id]/{confirm,reject,create-ingredient}`; ingredient
+  create/rename embeds server-side; `scripts/backfill-ingredient-embeddings.mjs`.
+- Real-data UI: invoices list/detail, `/invoices/[id]/review`, org-wide
+  `/review`, swipe deck with picker + add-new form, Action Required
+  interstitial, 423 on new scans over the cap. Mock invoice data removed.
+- Confirm deliberately stops at the alias: no price history, cost update,
+  or alerts — that's step 8.
+- Design change from the original plan, driven by measurements on real
+  data: embeddings are of Claude's plain-English `item_name`, not the raw
+  print (ARCHITECTURE.md §5.2). The review bar stays at the spec's 0.75.
+
+Tested: `scripts/test-matching-e2e.mjs` — real Claude + Voyage + Supabase,
+headless Edge driving the real swipe UI with pointer drags; screenshots to
+`test-output/matching/`. All assertions pass, including matching quality
+(no wrong auto-matches, no missed in-list items).
+
 ## Not started yet
 
-- Real Gemini/Claude vision calls (needs `GEMINI_API_KEY` or `CLAUDE_API_KEY`
-  in `.env.local` — links and tradeoffs discussed, key not yet added as of
-  this snapshot).
-- Voyage embeddings + alias/vector matching (§5.2 step 5) — needs
-  `VOYAGE_API_KEY`.
-- Step 7 (matching/swipe UI wired to real data) — explicitly on hold per
-  your instruction not to start without you.
+- Step 8: price history + price alerts + margin-impact cascade — on hold
+  until you say go.
+- Gemini vision provider (needs `GEMINI_API_KEY`).
 - Commodity price ingestion job, bulk/PDF import, manual-entry grid, CSV
   import/export, PWA polish.
+
+## Known issues
+
+- Voyage account has no payment method → 3 requests/min. Scans and "Add
+  new" wait on 429 retries (a re-scan took ~53s instead of ~10s).
+- `scripts/smoke-test-scan-route.mjs` is stale: written for the stub
+  provider, it sends random bytes and now fails against real Claude.
 
 ## Test scripts (all repeatable against real Supabase)
 
@@ -98,7 +137,10 @@ persisted.
 - `scripts/test-signup-org-creation.mjs`
 - `scripts/test-costing-views.mjs`
 - `scripts/test-invoice-upload.mjs`
-- `scripts/smoke-test-scan-route.mjs`
+- `scripts/smoke-test-scan-route.mjs` (stale — see Known issues)
+- `scripts/test-claude-vision-scan.mjs`
+- `scripts/test-matching-e2e.mjs`
+- `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
 
 Shared helpers: `scripts/lib/supabaseTestEnv.mjs` (Supabase admin/anon

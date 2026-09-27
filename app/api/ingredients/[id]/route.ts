@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { updateIngredientSchema } from "@/lib/validators/ingredient";
+import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
+import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,8 +17,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   const { current_unit_cost, ...rest } = parsed.data;
 
+  // §4: re-embed when the name changes, so matching follows the new name.
+  // On a Voyage failure the old embedding is cleared rather than left
+  // describing a name the ingredient no longer has.
+  let embeddingUpdate: { embedding: string | null } | Record<string, never> = {};
+  if (rest.name != null) {
+    try {
+      const [vector] = await embedTexts([ingredientEmbeddingText({ name: rest.name })]);
+      embeddingUpdate = { embedding: toPgVector(vector) };
+    } catch (err) {
+      console.error(`[ingredients] re-embedding ${id} failed; embedding cleared:`, err);
+      embeddingUpdate = { embedding: null };
+    }
+  }
+
   const updates = {
     ...rest,
+    ...embeddingUpdate,
     ...(current_unit_cost != null
       ? { current_unit_cost, current_unit_cost_updated_at: new Date().toISOString() }
       : {}),
@@ -26,7 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .from("ingredients")
     .update(updates)
     .eq("id", id)
-    .select()
+    .select(INGREDIENT_COLUMNS)
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
