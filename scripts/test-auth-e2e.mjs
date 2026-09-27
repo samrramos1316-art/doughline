@@ -57,6 +57,8 @@ try {
   await phone.screenshot({ path: `${OUT}/02-landing-phone.png`, fullPage: true });
   const overflow = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert(await desk.getByRole("link", { name: "Get started" }).isVisible(), "logged-out nav offers Get started");
+  const loginTab = desk.getByRole("banner").getByRole("link", { name: "Log in" });
+  assert((await loginTab.getAttribute("href")) === "/login", "nav has a Log in tab that launches the app's login");
   assert(overflow <= 0, `no sideways scroll on a phone (overflow ${overflow}px)`);
 
   banner("2. login form with the browser in dark mode");
@@ -152,7 +154,8 @@ try {
   await p8.goto(`${BASE}/signup`);
   await p8.screenshot({ path: `${OUT}/06-signup.png`, fullPage: true });
   await page.goto(BASE);
-  assert(await page.getByRole("link", { name: "Open dashboard" }).isVisible(), "signed-in visitors get Open dashboard on the landing page");
+  const openApp = page.getByRole("banner").getByRole("link", { name: "Open app" });
+  assert((await openApp.isVisible()) && (await openApp.getAttribute("href")) === "/dashboard", "signed-in visitors get an Open app tab straight into /dashboard");
 
   console.log(`\nAuth end-to-end test passed. Screenshots in ${OUT}/`);
 } finally {
