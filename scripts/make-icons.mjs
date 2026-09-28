@@ -1,4 +1,4 @@
-// Draws DoughLine's app icons and renders them to PNG/ICO in headless Edge.
+// Draws DoughTally's app icons and renders them to PNG/ICO in headless Edge.
 // The mark is the logo's loaf: an amber dome whose score line doubles as a
 // rising price line, on the site's dark stone background.
 //

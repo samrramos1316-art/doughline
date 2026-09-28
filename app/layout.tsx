@@ -22,11 +22,11 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "DoughLine",
+  title: "DoughTally",
   description: "Protects margins for micro food businesses by automating wholesale invoice processing and real-time cost/margin tracking.",
-  applicationName: "DoughLine",
+  applicationName: "DoughTally",
   // Home-screen behaviour on iOS (the manifest covers everyone else).
-  appleWebApp: { capable: true, title: "DoughLine", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "DoughTally", statusBarStyle: "default" },
   formatDetection: { telephone: false },
 };
 

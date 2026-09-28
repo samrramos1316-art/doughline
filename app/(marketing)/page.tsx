@@ -34,11 +34,11 @@ const TOUR = [
     id: "alert",
     step: "03 — Understand",
     title: "Price changes, explained in menu items.",
-    body: "When a confirmed price moves past your threshold, DoughLine traces it through every recipe to every menu item — margin before, margin after — then works out your options: the exact price that restores the margin, or how much to trim the portion.",
+    body: "When a confirmed price moves past your threshold, DoughTally traces it through every recipe to every menu item — margin before, margin after — then works out your options: the exact price that restores the margin, or how much to trim the portion.",
     points: ["Before/after margins recorded the moment the price changed", "Deterministic options you can check by hand", "A short, plain-English take on which option fits the item"],
     mock: <AlertMock />,
     frame: "browser" as const,
-    url: "doughline · alerts",
+    url: "doughtally · alerts",
   },
   {
     id: "market",
@@ -48,7 +48,7 @@ const TOUR = [
     points: ["Pulled automatically every day from USDA and the FAO", "Tied to your own ingredient list, so only relevant moves surface", "Kept visually separate from alerts about your real invoices"],
     mock: <MarketMock />,
     frame: "browser" as const,
-    url: "doughline · market watch",
+    url: "doughtally · market watch",
   },
   {
     id: "grid",
@@ -58,7 +58,7 @@ const TOUR = [
     points: ["Tab, Enter and paste work like a real spreadsheet", "Typos caught inline — the line total has to add up", "Import past invoices in bulk to build your price history"],
     mock: <GridMock />,
     frame: "browser" as const,
-    url: "doughline · enter invoice lines",
+    url: "doughtally · enter invoice lines",
   },
 ];
 
@@ -90,7 +90,7 @@ export default async function LandingPage() {
       {/* ---------------------------------------------------------------- nav */}
       <header className="sticky top-0 z-30 border-b border-stone-900/[0.06] bg-[#faf7f2]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-8">
-          <Link href="/" aria-label="DoughLine home">
+          <Link href="/" aria-label="DoughTally home">
             <Logo />
           </Link>
           <nav aria-label="Sections" className="hidden items-center gap-7 text-[13px] text-stone-600 md:flex">
@@ -132,7 +132,7 @@ export default async function LandingPage() {
               Every invoice, <em className="text-amber-700">traced</em> to your menu.
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-[17px] leading-relaxed text-stone-600 sm:text-lg">
-              DoughLine reads your supplier invoices, keeps every ingredient cost current, and shows exactly how each
+              DoughTally reads your supplier invoices, keeps every ingredient cost current, and shows exactly how each
               price change moves the margin on every item you sell — with clear options for what to do next.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -151,7 +151,7 @@ export default async function LandingPage() {
           </div>
 
           <div className="relative mx-auto mt-16 max-w-5xl px-5 pb-24 sm:px-8">
-            <BrowserFrame url="doughline · dashboard">
+            <BrowserFrame url="doughtally · dashboard">
               <DashboardMock />
             </BrowserFrame>
             <div className="absolute -top-8 right-4 hidden w-60 rotate-[2deg] rounded-2xl bg-stone-900 p-4 text-left text-stone-100 shadow-2xl lg:block xl:-right-10">
@@ -199,7 +199,7 @@ export default async function LandingPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl border border-stone-900/[0.07] bg-white p-6">
-                <p className="text-xs font-semibold tracking-wide text-stone-400 uppercase">Without DoughLine</p>
+                <p className="text-xs font-semibold tracking-wide text-stone-400 uppercase">Without DoughTally</p>
                 <ol className="mt-5 space-y-5 text-sm">
                   {[
                     ["Monday", "Invoice goes in the folder with the others."],
@@ -217,7 +217,7 @@ export default async function LandingPage() {
                 </ol>
               </div>
               <div className="rounded-3xl bg-stone-900 p-6 text-stone-100 shadow-xl">
-                <p className="text-xs font-semibold tracking-wide text-amber-400 uppercase">With DoughLine</p>
+                <p className="text-xs font-semibold tracking-wide text-amber-400 uppercase">With DoughTally</p>
                 <ol className="mt-5 space-y-5 text-sm">
                   {[
                     ["Monday, at delivery", "Invoice scanned; 8 lines read and costed per pound."],
@@ -246,7 +246,7 @@ export default async function LandingPage() {
               <h2 className="mt-4 font-serif text-4xl leading-[1.05] text-balance sm:text-6xl">
                 From the delivery door to the menu board.
               </h2>
-              <p className="mt-5 text-lg text-stone-600">Five things DoughLine does, each one built for a kitchen without a bookkeeper.</p>
+              <p className="mt-5 text-lg text-stone-600">Five things DoughTally does, each one built for a kitchen without a bookkeeper.</p>
             </div>
 
             <div className="mt-20 space-y-28 sm:space-y-36">
@@ -271,7 +271,7 @@ export default async function LandingPage() {
                       {t.frame === "phone" ? (
                         <PhoneFrame>{t.mock}</PhoneFrame>
                       ) : t.frame === "browser" ? (
-                        <BrowserFrame url={t.url ?? "doughline"}>{t.mock}</BrowserFrame>
+                        <BrowserFrame url={t.url ?? "doughtally"}>{t.mock}</BrowserFrame>
                       ) : (
                         t.mock
                       )}
@@ -447,7 +447,7 @@ export default async function LandingPage() {
             </ul>
           </div>
         </div>
-        <p className="border-t border-stone-900/[0.06] py-6 text-center text-xs text-stone-400">© 2026 DoughLine</p>
+        <p className="border-t border-stone-900/[0.06] py-6 text-center text-xs text-stone-400">© 2026 DoughTally</p>
       </footer>
     </div>
   );

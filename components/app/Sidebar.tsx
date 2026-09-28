@@ -68,7 +68,7 @@ export function Sidebar({ business, owner, counts, logOut }: { business: string;
         <LogoMark className="h-8 w-8" />
         <span className="min-w-0">
           <span className="block truncate text-sm font-semibold text-white">{business}</span>
-          <span className="block text-[11px] tracking-wider text-stone-500 uppercase">DoughLine</span>
+          <span className="block text-[11px] tracking-wider text-stone-500 uppercase">DoughTally</span>
         </span>
       </Link>
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3">

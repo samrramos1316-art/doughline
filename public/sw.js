@@ -1,4 +1,4 @@
-// DoughLine service worker.
+// DoughTally service worker.
 //
 // Deliberately small: it never caches pages or data, so prices and margins
 // are always live. It only
@@ -6,8 +6,8 @@
 //   - keeps Next's hashed static files (/_next/static/…) and the icons, which
 //     never change once published, so the app shell loads fast.
 // Bump VERSION to drop old caches after changing this file.
-const VERSION = "v1";
-const CACHE = `doughline-${VERSION}`;
+const VERSION = "v2";
+const CACHE = `doughtally-${VERSION}`;
 const OFFLINE_URL = "/offline";
 
 self.addEventListener("install", (event) => {
@@ -30,7 +30,8 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       for (const key of await caches.keys()) {
-        if (key.startsWith("doughline-") && key !== CACHE) await caches.delete(key);
+        // "doughline-" caches predate the rename.
+        if ((key.startsWith("doughtally-") || key.startsWith("doughline-")) && key !== CACHE) await caches.delete(key);
       }
       await self.clients.claim();
     })(),

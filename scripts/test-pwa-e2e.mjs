@@ -5,7 +5,7 @@
 //   2. <head>: manifest link, iOS home-screen tags, tab and Apple icons.
 //   3. Service worker: served uncached, registers, activates; Chrome reports
 //      no installability errors.
-//   4. Offline: a signed-in page with no connection shows DoughLine's
+//   4. Offline: a signed-in page with no connection shows DoughTally's
 //      offline screen (styled, from cache), then the real page once back.
 //   5. Nothing but the offline page is cached as a page (prices stay live).
 //   6. Install card: appears when the browser offers install, Not now hides
@@ -61,7 +61,7 @@ try {
   const mres = await fetch(`${BASE}/manifest.webmanifest`);
   const manifest = await mres.json();
   console.log(JSON.stringify({ name: manifest.name, start_url: manifest.start_url, display: manifest.display, theme_color: manifest.theme_color, background_color: manifest.background_color, shortcuts: manifest.shortcuts.map((s) => s.url) }));
-  assert(mres.ok && manifest.name === "DoughLine" && manifest.start_url === "/dashboard" && manifest.display === "standalone", "manifest served: DoughLine, opens /dashboard full screen");
+  assert(mres.ok && manifest.name === "DoughTally" && manifest.start_url === "/dashboard" && manifest.display === "standalone", "manifest served: DoughTally, opens /dashboard full screen");
   for (const icon of manifest.icons) {
     const r = await fetch(`${BASE}${icon.src}`);
     const [w, h] = pngSize(Buffer.from(await r.arrayBuffer()));
@@ -85,7 +85,7 @@ try {
   }));
   console.log(JSON.stringify(head));
   assert(head.manifest === "/manifest.webmanifest" && head.apple?.startsWith("/apple-icon") && head.icon.some((h) => h.startsWith("/icon")) && head.theme === "#ffffff", "manifest, Apple icon, tab icon and theme colour linked");
-  assert(head.capable === "yes" && head.title === "DoughLine", "iOS home-screen tags set");
+  assert(head.capable === "yes" && head.title === "DoughTally", "iOS home-screen tags set");
   const apple = await fetch(`${BASE}${head.apple}`);
   assert(pngSize(Buffer.from(await apple.arrayBuffer())).join("x") === "180x180", "Apple icon is 180x180");
 
@@ -103,7 +103,7 @@ try {
   assert(sw.state === "activated" && sw.scope === `${BASE}/`, "service worker registered and active for the whole site");
   // Playwright's contexts count as incognito, where nothing is installable;
   // ask a real (persistent) profile instead.
-  const profileDir = fs.mkdtempSync(`${process.env.TEMP ?? "/tmp"}/doughline-pwa-`);
+  const profileDir = fs.mkdtempSync(`${process.env.TEMP ?? "/tmp"}/doughtally-pwa-`);
   const profile = await chromium.launchPersistentContext(profileDir, { channel: "msedge", headless: true });
   const ppage = profile.pages()[0] ?? (await profile.newPage());
   await ppage.goto(BASE);
@@ -115,7 +115,7 @@ try {
   fs.rmSync(profileDir, { recursive: true, force: true });
   console.log(`manifest errors: ${JSON.stringify(manifestErrors)}`);
   console.log(`installability errors: ${JSON.stringify(installabilityErrors)}`);
-  assert(installabilityErrors.length === 0 && manifestErrors.length === 0, "browser considers DoughLine installable");
+  assert(installabilityErrors.length === 0 && manifestErrors.length === 0, "browser considers DoughTally installable");
 
   banner("4. offline");
   const { data: created, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { business_name: "PWA Check Bakery" } });
@@ -148,9 +148,9 @@ try {
   banner("6. install card");
   await page.goto(`${BASE}/dashboard`);
   await page.waitForLoadState("networkidle");
-  assert(!(await page.getByRole("complementary", { name: "Install DoughLine" }).count()), "no card until the browser offers install");
+  assert(!(await page.getByRole("complementary", { name: "Install DoughTally" }).count()), "no card until the browser offers install");
   await offerInstall(page);
-  const card = page.getByRole("complementary", { name: "Install DoughLine" });
+  const card = page.getByRole("complementary", { name: "Install DoughTally" });
   await card.waitFor();
   await page.screenshot({ path: `${OUT}/02-install-card-phone.png` });
   await card.getByRole("button", { name: "Install" }).click();
@@ -164,7 +164,7 @@ try {
   const desk = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await logIn(desk);
   await offerInstall(desk);
-  await desk.getByRole("complementary", { name: "Install DoughLine" }).waitFor();
+  await desk.getByRole("complementary", { name: "Install DoughTally" }).waitFor();
   await desk.screenshot({ path: `${OUT}/03-install-card-desktop.png` });
 
   const iphone = await (await browser.newContext({
@@ -172,7 +172,7 @@ try {
     userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
   })).newPage();
   await logIn(iphone);
-  const iosCard = iphone.getByRole("complementary", { name: "Install DoughLine" });
+  const iosCard = iphone.getByRole("complementary", { name: "Install DoughTally" });
   await iosCard.waitFor();
   await iphone.screenshot({ path: `${OUT}/04-install-card-iphone.png` });
   const iosText = await iosCard.innerText();

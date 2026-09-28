@@ -1,6 +1,6 @@
 import { parseCsv } from "@/lib/csv";
 
-// §7 / §3.10: the commodity series DoughLine tracks. Each is one clean,
+// §7 / §3.10: the commodity series DoughTally tracks. Each is one clean,
 // comparable daily or monthly number — chosen by looking at what the
 // sources actually publish (USDA reports split by grade, protein, region…;
 // a series must pin those down or the "trend" would mix apples and pears).
@@ -133,7 +133,7 @@ export const FAO_SERIES: Record<string, { code: string; label: string }> = {
 };
 
 export async function fetchFaoSeries(since: Date): Promise<SeriesPoint[]> {
-  const res = await fetch(FAO_CSV_URL, { headers: { "User-Agent": "DoughLine market ingest" }, cache: "no-store" });
+  const res = await fetch(FAO_CSV_URL, { headers: { "User-Agent": "DoughTally market ingest" }, cache: "no-store" });
   if (!res.ok) throw new Error(`FAO: HTTP ${res.status}`);
   const table = parseCsv(await res.text());
   const headerIdx = table.findIndex((r) => r[0]?.trim() === "Date");

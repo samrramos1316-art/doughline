@@ -34,7 +34,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       )}
 
       <p className="text-center text-sm text-stone-600">
-        New to DoughLine?{" "}
+        New to DoughTally?{" "}
         <Link href="/signup" className="font-medium text-stone-900 underline">
           Create an account
         </Link>

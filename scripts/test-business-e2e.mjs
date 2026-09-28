@@ -1,4 +1,4 @@
-// Runs a whole small business through DoughLine, in a real browser, the way
+// Runs a whole small business through DoughTally, in a real browser, the way
 // its owner would — against the live site by default (real Claude, Voyage,
 // Supabase). Paperwork comes from scripts/make-business-fixtures.mjs.
 //

@@ -1,13 +1,13 @@
 import type { MetadataRoute } from "next";
 
 // Web app manifest (served at /manifest.webmanifest): what the phone uses
-// when DoughLine is installed to the home screen. Icons come from
+// when DoughTally is installed to the home screen. Icons come from
 // scripts/make-icons.mjs.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/dashboard",
-    name: "DoughLine",
-    short_name: "DoughLine",
+    name: "DoughTally",
+    short_name: "DoughTally",
     description: "Snap your wholesale invoices and see what every price change does to your menu margins.",
     start_url: "/dashboard",
     scope: "/",

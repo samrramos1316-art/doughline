@@ -10,7 +10,7 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-const DISMISS_KEY = "doughline-install-dismissed";
+const DISMISS_KEY = "doughtally-install-dismissed";
 const DISMISS_DAYS = 30;
 
 function recentlyDismissed() {
@@ -35,7 +35,7 @@ function needsIosSteps() {
 }
 const noSubscription = () => () => {};
 
-// "Install DoughLine" card inside the app. Android/desktop Chrome and Edge get
+// "Install DoughTally" card inside the app. Android/desktop Chrome and Edge get
 // a real Install button; iPhone/iPad Safari can't be prompted from a page, so
 // they get the Share → Add to Home Screen steps instead. Hidden once
 // installed, when opened from the home screen, or for 30 days after Not now.
@@ -80,14 +80,14 @@ export function InstallPrompt() {
 
   return (
     <aside
-      aria-label="Install DoughLine"
+      aria-label="Install DoughTally"
       className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-2xl bg-stone-900 p-4 text-white shadow-[0_20px_50px_-12px_rgba(28,25,23,0.6)] sm:right-5 sm:bottom-5 sm:left-auto sm:mx-0 sm:w-96"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="flex gap-3">
         <LogoMark className="h-11 w-11 shrink-0 rounded-xl ring-1 ring-white/10" />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">Install DoughLine</p>
+          <p className="font-semibold">Install DoughTally</p>
           {ios ? (
             <p className="mt-1 text-sm text-stone-300">
               Tap{" "}

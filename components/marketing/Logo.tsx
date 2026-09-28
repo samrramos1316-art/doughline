@@ -1,4 +1,4 @@
-// DoughLine wordmark: a loaf whose score line doubles as a rising trend line.
+// DoughTally wordmark: a loaf whose score line doubles as a rising trend line.
 export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
@@ -13,7 +13,7 @@ export function Logo({ light = false }: { light?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2">
       <LogoMark />
-      <span className={`text-lg font-semibold tracking-tight ${light ? "text-white" : "text-stone-900"}`}>DoughLine</span>
+      <span className={`text-lg font-semibold tracking-tight ${light ? "text-white" : "text-stone-900"}`}>DoughTally</span>
     </span>
   );
 }

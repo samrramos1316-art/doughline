@@ -22,7 +22,7 @@ export async function GET() {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="doughline-ingredients-${date}.csv"`,
+      "Content-Disposition": `attachment; filename="doughtally-ingredients-${date}.csv"`,
     },
   });
 }

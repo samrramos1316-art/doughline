@@ -16,7 +16,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="How DoughLine judges your margins and when it speaks up" />
+      <PageHeader title="Settings" subtitle="How DoughTally judges your margins and when it speaks up" />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <Panel title="Business" className="xl:col-span-8">
           <SettingsForm
