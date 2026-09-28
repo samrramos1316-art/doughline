@@ -134,9 +134,9 @@ try {
   console.log(`generated (not emailed) signup link for ${newEmail}; confirmed before click: ${!!link.user.email_confirmed_at}`);
   const p6 = await (await browser.newContext()).newPage();
   await p6.goto(`${BASE}/auth/confirm?token_hash=${link.properties.hashed_token}&type=signup`);
-  await p6.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  await p6.waitForURL(/\/onboarding\/import/, { timeout: 30_000 });
   const { data: after } = await admin.auth.admin.getUserById(link.user.id);
-  assert(p6.url().endsWith("/dashboard") && !!after.user.email_confirmed_at, `link confirmed the email and signed in → ${p6.url().replace(BASE, "")}`);
+  assert(/\/onboarding\/import\?welcome=1$/.test(p6.url()) && !!after.user.email_confirmed_at, `link confirmed the email and signed in → ${p6.url().replace(BASE, "")} (the first-run import)`);
 
   banner("7. broken link");
   const p7 = await (await browser.newContext()).newPage();

@@ -45,7 +45,13 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
           <p className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Cost per serving (live)</p>
           <p className="mt-1 text-2xl font-semibold text-stone-900 tabular-nums">{cost?.cost_per_serving != null ? `$${Number(cost.cost_per_serving).toFixed(4)}` : "—"}</p>
         </div>
-        <Kpi label="Batch cost" value={money(batch)} sub={`${breakdown.length} ingredient${breakdown.length === 1 ? "" : "s"}`} />
+        <Kpi
+          label="Batch cost"
+          value={money(batch)}
+          tone={breakdown.some((b) => b.unitCost == null) ? "warning" : "neutral"}
+          sub={breakdown.some((b) => b.unitCost == null) ? `no price yet: ${breakdown.filter((b) => b.unitCost == null).map((b) => b.name).join(", ")}` : `${breakdown.length} ingredient${breakdown.length === 1 ? "" : "s"}`}
+          href={breakdown.some((b) => b.unitCost == null) ? "/ingredients" : undefined}
+        />
         <Kpi label="Biggest cost" value={breakdown[0]?.line != null && batch ? `${Math.round((breakdown[0].line / batch) * 100)}%` : "—"} sub={breakdown[0]?.name ?? "—"} />
         <Kpi
           label="Sold as"
@@ -78,7 +84,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
                   <tr key={b.name} className={row}>
                     <td className={`${td} font-medium`}>{b.name}</td>
                     <td className={tdNum}>{b.qty} {b.unit}</td>
-                    <td className={tdNum}>{unitMoney(b.unitCost)}</td>
+                    <td className={tdNum}>{b.unitCost == null ? <span className="text-amber-700">no price</span> : unitMoney(b.unitCost)}</td>
                     <td className={tdNum}>{money(b.line)}</td>
                     <td className={td}>{b.line != null && batch ? <HBar share={b.line / batch} /> : "—"}</td>
                   </tr>

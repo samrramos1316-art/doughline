@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validators/auth";
+import { ONBOARDING_URL } from "@/lib/onboarding/paths";
 
 export type AuthActionState =
   | { error: string; unconfirmedEmail?: string }
@@ -62,7 +63,8 @@ export async function signUpAction(_prevState: AuthActionState, formData: FormDa
   if (!data.session) {
     redirect(`/signup/check-email?email=${encodeURIComponent(email)}`);
   }
-  redirect("/dashboard");
+  // First stop for a new business: the menu/recipe import (§9.3), shown once.
+  redirect(ONBOARDING_URL);
 }
 
 export async function logInAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {

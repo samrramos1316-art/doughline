@@ -8,7 +8,7 @@
 // Run: node scripts/make-business-fixtures.mjs
 import fs from "node:fs";
 import { chromium } from "playwright-core";
-import { BUSINESS, INGREDIENTS, INVOICES, money, lineTotal } from "./fixtures/maple-rye/data.mjs";
+import { BUSINESS, INGREDIENTS, INVOICES, MENU_BOARD, RECIPE_CARD, RECIPE_DOC, money, lineTotal } from "./fixtures/maple-rye/data.mjs";
 
 const DIR = "scripts/fixtures/maple-rye";
 
@@ -94,6 +94,42 @@ function photoHtml(pngB64, { rotate, blur, width, brightness }) {
   </body></html>`;
 }
 
+function menuHtml(m) {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  @page { size: Letter; margin: 0.7in; }
+  body { font-family: Georgia, serif; color: #2b2118; margin: 0; }
+  h1 { text-align: center; font-size: 34px; letter-spacing: 2px; margin: 0; }
+  .sub { text-align: center; font-style: italic; color: #7a6a58; margin: 4px 0 26px; }
+  h2 { font: 600 13px Helvetica, Arial, sans-serif; letter-spacing: 3px; text-transform: uppercase; color: #9a5b1e; border-bottom: 1px solid #d8c9b4; padding-bottom: 4px; margin: 22px 0 8px; }
+  .item { display: flex; justify-content: space-between; margin: 10px 0 0; font-size: 18px; }
+  .desc { font-size: 13px; color: #7a6a58; font-style: italic; }
+  .add { margin-top: 18px; font-size: 13px; color: #7a6a58; text-align: right; }
+</style></head><body>
+  <h1>${BUSINESS.name.toUpperCase()}</h1><p class="sub">Baked every morning at ${BUSINESS.address[0]}</p>
+  ${m.sections.map(([h, items]) => `<h2>${h}</h2>${items.map(([n, p, d]) => `<div class="item"><span>${n}</span><span>${p}</span></div><div class="desc">${d}</div>`).join("")}`).join("")}
+  <p class="add">${m.addOn}</p>
+  <p class="sub" style="margin-top:30px">Open Tue–Sun, 7am until we sell out</p>
+</body></html>`;
+}
+
+function cardHtml(r) {
+  return `<!doctype html><html><body style="margin:0;padding:34px 38px;width:560px;background:#fffdf5;background-image:repeating-linear-gradient(#fffdf5 0 33px,#bcd3ea 33px 34px);font:21px/34px 'Segoe Print','Bradley Hand','Comic Sans MS',cursive;color:#1f2a44">
+  <div style="border-bottom:2px solid #e39b9b;margin-bottom:6px;font-size:26px">${r.title} <span style="float:right;font-size:18px">${r.yieldText}</span></div>
+  ${r.lines.map((l) => `<div>• ${l}</div>`).join("")}
+  <div style="margin-top:8px;font-size:16px;line-height:26px;color:#40506e">${r.method}</div></body></html>`;
+}
+
+function docHtml(r) {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  @page { size: Letter; margin: 0.8in; } body { font: 13px/1.6 Calibri, Arial, sans-serif; color: #222; }
+  h1 { font-size: 24px; margin: 0 0 2px; } .y { color: #666; margin: 0 0 16px; } h2 { font-size: 15px; margin: 18px 0 6px; }
+</style></head><body>
+  <h1>${r.title}</h1><p class="y">${r.yieldText} · from Jordan's recipe binder</p>
+  <h2>Ingredients</h2><ul>${r.lines.map((l) => `<li>${l}</li>`).join("")}</ul>
+  <h2>Method</h2><ol><li>Brown the butter and let it cool until just warm.</li><li>Whisk with both sugars, then the eggs and vanilla.</li><li>Fold in flour and salt, then the chips. Chill 24 hours.</li><li>Scoop 70 g balls, bake at 180°C for 11–12 minutes, finish with flaky salt.</li></ol>
+</body></html>`;
+}
+
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 try {
   for (const inv of INVOICES) {
@@ -118,6 +154,25 @@ try {
     }
     console.log(`${out}  ${fs.statSync(out).size} bytes`);
   }
+  // Onboarding (§9.3): the menu as a PDF, the croissant card as a phone
+  // photo, the cookie recipe as a typed PDF.
+  const pdf = await browser.newPage();
+  await pdf.setContent(menuHtml(MENU_BOARD));
+  await pdf.pdf({ path: `${DIR}/${MENU_BOARD.file}`, format: "Letter", printBackground: true });
+  await pdf.setContent(docHtml(RECIPE_DOC));
+  await pdf.pdf({ path: `${DIR}/${RECIPE_DOC.file}`, format: "Letter", printBackground: true });
+  await pdf.close();
+  const card = await browser.newPage({ viewport: { width: 636, height: 560 }, deviceScaleFactor: 2 });
+  await card.setContent(cardHtml(RECIPE_CARD));
+  const cardPng = (await card.screenshot({ fullPage: true })).toString("base64");
+  await card.close();
+  const cardPhoto = await browser.newPage({ viewport: { width: 900, height: 1200 }, deviceScaleFactor: 2 });
+  await cardPhoto.setContent(photoHtml(cardPng, { rotate: 3, blur: 0.3, width: 760, brightness: 0.96 }));
+  await cardPhoto.waitForTimeout(200);
+  await cardPhoto.screenshot({ path: `${DIR}/${RECIPE_CARD.file}`, type: "jpeg", quality: 82 });
+  await cardPhoto.close();
+  for (const f of [MENU_BOARD.file, RECIPE_CARD.file, RECIPE_DOC.file]) console.log(`${DIR}/${f}  ${fs.statSync(`${DIR}/${f}`).size} bytes`);
+
   const csv = ["name,category,base_unit,current_unit_cost", ...INGREDIENTS.map((r) => r.join(","))].join("\n") + "\n";
   fs.writeFileSync(`${DIR}/ingredients.csv`, csv);
   console.log(`${DIR}/ingredients.csv  ${INGREDIENTS.length} rows`);

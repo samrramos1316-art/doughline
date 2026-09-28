@@ -30,7 +30,16 @@ export type LineMatch = {
 // alias hits, so invoice_line_items.embedding is always populated (§5.2 step 4).
 export async function matchLines(
   supabase: SupabaseClient<Database>,
-  { vendorId, lines }: { vendorId: string | null; lines: { raw_text: string; item_name: string | null }[] },
+  {
+    vendorId,
+    lines,
+    recordAliasUse = true,
+  }: {
+    vendorId: string | null;
+    lines: { raw_text: string; item_name: string | null }[];
+    // false for a dry run (§9.3 onboarding drafts): match, but write nothing.
+    recordAliasUse?: boolean;
+  },
 ): Promise<LineMatch[]> {
   const normalized = lines.map((l) => normalizeRawText(l.raw_text));
   const vectors = await embedTexts(lines.map(lineItemEmbeddingText));
@@ -49,11 +58,13 @@ export async function matchLines(
       const embedding = toPgVector(vectors[i]);
 
       const alias = aliasByText.get(text);
-      if (alias) {
+      if (alias && recordAliasUse) {
         await supabase
           .from("vendor_ingredient_aliases")
           .update({ times_used: alias.times_used + 1 })
           .eq("id", alias.id);
+      }
+      if (alias) {
         if (alias.is_not_ingredient || !alias.ingredient_id) {
           return {
             raw_text_normalized: text,

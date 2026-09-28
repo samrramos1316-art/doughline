@@ -870,6 +870,7 @@ export type Database = {
           name: string | null
           org_id: string | null
           selling_price: number | null
+          unpriced_ingredients: number | null
         }
         Relationships: [
           {
@@ -890,6 +891,7 @@ export type Database = {
           name: string | null
           org_id: string | null
           recipe_id: string | null
+          unpriced_ingredients: number | null
         }
         Relationships: [
           {

@@ -75,7 +75,9 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
     const mi = menuItems?.find((m) => m.id === impact.menu_item_id);
     const recipe = recipes?.find((r) => r.id === impact.recipe_id);
     const cps = margins?.find((m) => m.menu_item_id === impact.menu_item_id)?.cost_per_serving;
-    if (!mi || !recipe || cps == null) continue; // item or recipe deleted since the alert
+    // Item or recipe deleted since the alert, or a cost that was/is unknown
+    // (an unpriced ingredient, migration 023): nothing to compute from.
+    if (!mi || !recipe || cps == null || impact.previous_margin_pct == null) continue;
     // A recipe can list the same ingredient on more than one line.
     const qty = (recipeIngs ?? [])
       .filter((ri) => ri.recipe_id === recipe.id)

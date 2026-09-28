@@ -2,7 +2,7 @@ import type { VisionProvider } from "./types";
 import { GeminiVisionProvider } from "./gemini";
 import { ClaudeVisionProvider } from "./claude";
 
-export type { VisionProvider, VisionExtractionResult, ExtractedLineItem } from "./types";
+export type { VisionProvider, VisionExtractionResult, ExtractedLineItem, MenuExtractionResult, RecipeExtractionResult, RecipeIngredientLine } from "./types";
 
 // Switching providers — or later running both and reconciling — is a
 // one-line env change, not a rewrite (§5.1).

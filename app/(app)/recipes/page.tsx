@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewRecipeForm } from "@/components/recipes/NewRecipeForm";
-import { Panel, Kpi, PageHeader, Empty, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { Panel, Kpi, PageHeader, ButtonLink, Empty, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 export default async function RecipesPage() {
   const supabase = await createClient();
   const [{ data: recipes }, { data: costs }, { data: lines }, { data: menu }] = await Promise.all([
     supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit").order("name"),
-    supabase.from("recipe_costs").select("recipe_id, batch_total_cost, cost_per_serving"),
+    supabase.from("recipe_costs").select("recipe_id, batch_total_cost, cost_per_serving, unpriced_ingredients"),
     supabase.from("recipe_ingredients").select("recipe_id"),
     supabase.from("menu_items").select("name, recipe_id, is_active"),
   ]);
@@ -22,7 +22,7 @@ export default async function RecipesPage() {
 
   return (
     <>
-      <PageHeader title="Recipes" subtitle="What each batch costs to make, live from today's ingredient prices" />
+      <PageHeader title="Recipes" subtitle="What each batch costs to make, live from today's ingredient prices" actions={<ButtonLink href="/onboarding/import">Import from photo</ButtonLink>} />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Recipes" value={list.length} />
         <Kpi label="On the menu" value={list.length - unused} sub={unused ? `${unused} not sold yet` : "all in use"} tone={unused ? "warning" : "neutral"} />
@@ -32,7 +32,7 @@ export default async function RecipesPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <Panel title="All recipes" flush className="xl:col-span-9">
           {list.length === 0 ? (
-            <Empty>No recipes yet. Create one on the right, then list what goes into a batch.</Empty>
+            <Empty>No recipes yet. Create one on the right, or <Link href="/onboarding/import" className="font-medium text-amber-700 underline">import them from photos or PDFs</Link>.</Empty>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -61,7 +61,11 @@ export default async function RecipesPage() {
                         </td>
                         <td className={tdNum}>{countBy.get(r.id) ?? <span className="text-amber-700">none yet</span>}</td>
                         <td className={tdNum}>{money(c?.batch_total_cost == null ? null : Number(c.batch_total_cost))}</td>
-                        <td className={`${tdNum} font-semibold`}>{c?.cost_per_serving == null ? "—" : `$${Number(c.cost_per_serving).toFixed(4)}`}</td>
+                        <td className={`${tdNum} font-semibold`}>
+                          {c?.unpriced_ingredients ? (
+                            <Link href="/ingredients" className="text-xs font-medium text-amber-700 hover:underline">{c.unpriced_ingredients} without a price</Link>
+                          ) : c?.cost_per_serving == null ? "—" : `$${Number(c.cost_per_serving).toFixed(4)}`}
+                        </td>
                         <td className={`${td} text-stone-500`}>{menuBy.get(r.id)?.join(", ") ?? <span className="text-stone-400">Not on the menu</span>}</td>
                       </tr>
                     );

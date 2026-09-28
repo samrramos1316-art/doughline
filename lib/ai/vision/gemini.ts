@@ -1,4 +1,4 @@
-import type { VisionProvider, VisionExtractionResult } from "./types";
+import type { VisionProvider, VisionExtractionResult, MenuExtractionResult, RecipeExtractionResult } from "./types";
 
 // §5.1: Gemini 2.5 Flash with a forced JSON response schema (§5.3). Not wired
 // to a real call yet — GEMINI_API_KEY isn't in .env.local, and guessing at
@@ -21,5 +21,19 @@ export class GeminiVisionProvider implements VisionProvider {
       invoice_total_guess: null,
       line_items: [],
     };
+  }
+
+  // Same stub treatment as extractInvoice (§9.3): nothing extracted, so the
+  // onboarding screen falls back to "enter these by hand".
+  async extractMenu(fileBuffer: Buffer, mimeType: string): Promise<MenuExtractionResult> {
+    void fileBuffer;
+    void mimeType;
+    return { items: [] };
+  }
+
+  async extractRecipe(fileBuffer: Buffer, mimeType: string): Promise<RecipeExtractionResult> {
+    void fileBuffer;
+    void mimeType;
+    return { name_guess: null, yield_qty_guess: null, yield_unit_guess: null, ingredient_lines: [] };
   }
 }

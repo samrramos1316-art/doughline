@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getOverview } from "@/lib/dashboard/overview";
 import { NewMenuItemForm } from "@/components/menu/NewMenuItemForm";
-import { Panel, Kpi, PageHeader, Pill, Delta, MarginBar, Spark, Empty, marginTone, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { Panel, Kpi, PageHeader, ButtonLink, Pill, Delta, MarginBar, Spark, Empty, marginTone, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 const TONE_TEXT = { good: "On target", warning: "Watch", critical: "Below target", serious: "Watch", neutral: "No cost" } as const;
 const SORTS = { margin: "Worst margin", name: "Name", price: "Price" } as const;
@@ -28,6 +29,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
         title="Menu & margins"
         subtitle={`${items.length} item${items.length === 1 ? "" : "s"} · target ${target}% · margins update the moment an invoice price lands`}
         tabs={Object.entries(SORTS).map(([k, label]) => ({ href: `/menu?sort=${k}`, label: `Sort: ${label}`, active: sort === k }))}
+        actions={<ButtonLink href="/onboarding/import">Import from photo</ButtonLink>}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Avg margin" value={o.kpis.avgMargin == null ? "—" : `${o.kpis.avgMargin.toFixed(1)}%`} tone={marginTone(o.kpis.avgMargin, target)} sub={<><Delta value={o.kpis.marginChange30d} suffix="pp" goodWhenUp /> in 30 days</>} />
@@ -37,7 +39,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Panel title="Every menu item" flush className="xl:col-span-9">
+        <Panel title="Every menu item" flush className="xl:col-span-12">
           {items.length === 0 ? (
             <Empty>No menu items yet. Add one on the right — pick the recipe it&apos;s made from and its selling price.</Empty>
           ) : (
@@ -72,7 +74,19 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
                         <td className={td}><MarginBar pct={m.marginPct} target={target} /></td>
                         <td className={tdNum}><Delta value={m.marginPct != null && m.marginPct30dAgo != null ? m.marginPct - m.marginPct30dAgo : null} suffix="pp" goodWhenUp /></td>
                         <td className={td}><Spark values={m.history.map((p) => p.value)} /></td>
-                        <td className={td}>{m.isActive ? <Pill tone={tone}>{TONE_TEXT[tone]}</Pill> : <Pill tone="neutral">Inactive</Pill>}</td>
+                        <td className={td}>
+                          {!m.isActive ? (
+                            <Pill tone="neutral">Inactive</Pill>
+                          ) : m.unpriced.length ? (
+                            <Link href="/ingredients" title={`No price yet: ${m.unpriced.join(", ")}`}>
+                              <Pill tone="warning">{m.unpriced.length === 1 ? "Needs a price" : `Needs ${m.unpriced.length} prices`}</Pill>
+                            </Link>
+                          ) : m.recipeName == null ? (
+                            <Pill tone="neutral">No recipe</Pill>
+                          ) : (
+                            <Pill tone={tone}>{TONE_TEXT[tone]}</Pill>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -81,7 +95,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
             </div>
           )}
         </Panel>
-        <Panel title="Add a menu item" className="xl:col-span-3">
+        <Panel title="Add a menu item" className="xl:col-span-4">
           <NewMenuItemForm recipeOptions={recipes ?? []} />
           <p className="mt-3 text-xs text-stone-500">
             Cost per serving comes from the recipe; each invoice that changes an ingredient price moves it automatically.

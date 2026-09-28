@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { ONBOARDING_URL } from "@/lib/onboarding/paths";
 import { createClient } from "@/lib/supabase/server";
 
 // Where the signup confirmation email lands. Supabase sends either a PKCE
@@ -36,5 +37,7 @@ export async function GET(request: NextRequest) {
     login.searchParams.set("error", message);
     return NextResponse.redirect(login);
   }
-  return NextResponse.redirect(new URL("/dashboard", url));
+  // Only signup confirmations come through here: a new business starts at
+  // the menu/recipe import (§9.3).
+  return NextResponse.redirect(new URL(ONBOARDING_URL, url));
 }

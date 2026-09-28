@@ -183,3 +183,41 @@ export const INVOICES = [
 
 export const money = (n) => n.toFixed(2);
 export const lineTotal = ([, , qty, , price]) => Math.round(qty * price * 100) / 100;
+
+// ---- §9.3 onboarding import: the owner's menu and two recipes -------------
+export const MENU_BOARD = {
+  file: "10-menu.pdf",
+  sections: [
+    ["Pastries", [["Butter Croissant", "4.25", "Laminated for three days"], ["Pain au Chocolat", "4.75", "Two batons of dark chocolate"], ["Cinnamon Roll", "4.75", "Cream cheese glaze"]]],
+    ["Cookies & Cake", [["Chocolate Chip Cookie", "3.00", "Brown butter, flaky salt"], ["Cheesecake Slice", "6.50", "New York style"]]],
+    ["Bread", [["Country Sourdough Loaf", "9.00", "Naturally leavened, 36-hour ferment"]]],
+    ["Coffee", [["Drip Coffee", "3.00 / 3.75", "12 oz / 16 oz"]]],
+  ],
+  addOn: "Add oat milk +0.75",
+  // What the review table should end up with.
+  expect: [["Butter Croissant", 4.25], ["Pain au Chocolat", 4.75], ["Cinnamon Roll", 4.75], ["Chocolate Chip Cookie", 3.0], ["Cheesecake Slice", 6.5], ["Country Sourdough Loaf", 9.0], ["Drip Coffee", 3.0]],
+};
+
+// A handwritten card, photographed: metric weights and a litre of milk, so
+// every line converts to the ingredient's base unit on its own.
+export const RECIPE_CARD = {
+  file: "11-croissant-recipe-card.jpg",
+  title: "Butter Croissants",
+  yieldText: "Makes 24",
+  lines: ["2 kg bread flour", "1.25 kg unsalted butter (cold, for the block)", "1 L whole milk", "225 g sugar", "40 g instant yeast", "40 g kosher salt", "2 eggs (wash)"],
+  method: "Mix, rest overnight. Laminate: 3 letter folds, 30 min rests. Shape, proof 2 h, egg wash, bake 200°C 18 min.",
+  // ingredient → quantity in its base unit
+  expect: { "Bread Flour": 4.4092, "Unsalted Butter": 2.7558, "Whole Milk": 0.2642, "Granulated Sugar": 0.496, "Instant Yeast": 0.0882, "Kosher Salt": 0.0882, "Large Eggs": 2 },
+};
+
+// A typed recipe in cups and spoons: volumes can't become pounds without a
+// density, so the owner types those in (what `fill` holds), and "flaky sea
+// salt" isn't in the price list, so it's created as a new ingredient.
+export const RECIPE_DOC = {
+  file: "12-cookie-recipe.pdf",
+  title: "Brown Butter Chocolate Chip Cookies",
+  yieldText: "Makes 18 large cookies",
+  lines: ["2 1/4 cups all-purpose flour", "1 cup (227 g) unsalted butter, browned", "3/4 cup light brown sugar, packed", "1/2 cup granulated sugar", "2 large eggs", "2 cups (340 g) semi-sweet chocolate chips", "2 tsp pure vanilla extract", "1 tsp kosher salt", "Flaky sea salt, for finishing"],
+  fill: { flour: 0.62, "brown sugar": 0.36, "granulated sugar": 0.22, vanilla: 0.33, "kosher salt": 0.013, flaky: 0.01 },
+  newIngredient: { match: /flaky/i, name: "Flaky Sea Salt", unit: "lb", category: "dry_goods" },
+};

@@ -26,6 +26,31 @@ export interface VisionExtractionResult {
   line_items: ExtractedLineItem[];
 }
 
+// §9.3 onboarding import: a menu (board, printed card, PDF) → items + prices.
+export interface MenuExtractionResult {
+  items: { name_guess: string; price_guess: number | null }[];
+}
+
+// §9.3 onboarding import: one recipe (card, notebook page, doc).
+export interface RecipeIngredientLine {
+  raw_text: string; // the line as written, e.g. "2 1/4 cups all-purpose flour"
+  quantity_guess: number | null;
+  unit_guess: string | null;
+  // Plain-English ingredient name with no quantity/prep ("all-purpose
+  // flour") — what matching embeds, for the same reason as an invoice line's
+  // item_name (see ExtractedLineItem). Not in §9.3's shape; added so recipe
+  // lines match as well as invoice lines do.
+  item_name_guess: string | null;
+}
+export interface RecipeExtractionResult {
+  name_guess: string | null;
+  yield_qty_guess: number | null;
+  yield_unit_guess: string | null;
+  ingredient_lines: RecipeIngredientLine[];
+}
+
 export interface VisionProvider {
   extractInvoice(fileBuffer: Buffer, mimeType: string): Promise<VisionExtractionResult>;
+  extractMenu(fileBuffer: Buffer, mimeType: string): Promise<MenuExtractionResult>;
+  extractRecipe(fileBuffer: Buffer, mimeType: string): Promise<RecipeExtractionResult>;
 }

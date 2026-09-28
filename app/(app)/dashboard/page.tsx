@@ -20,8 +20,8 @@ export default async function DashboardPage() {
   const { kpis, org } = o;
   const setupLeft = [
     !o.counts.ingredients && { href: "/ingredients", label: "Add your ingredients (or import a spreadsheet)" },
-    !o.counts.recipes && { href: "/recipes", label: "Build a recipe" },
-    !o.counts.menuItems && { href: "/menu", label: "Put an item on the menu with its price" },
+    !o.counts.recipes && { href: "/onboarding/import", label: "Import your recipes from photos" },
+    !o.counts.menuItems && { href: "/onboarding/import", label: "Import your menu with its prices" },
     !o.counts.invoices && { href: "/invoices/scan", label: "Scan your first invoice" },
   ].filter(Boolean) as { href: string; label: string }[];
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
           <p className="text-sm font-semibold text-amber-900">Finish setting up — {4 - setupLeft.length} of 4 done</p>
           <ol className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
             {setupLeft.map((s) => (
-              <li key={s.href}>
+              <li key={s.label}>
                 <Link href={s.href} className="font-medium text-amber-800 underline underline-offset-2">
                   {s.label}
                 </Link>
@@ -134,7 +134,19 @@ export default async function DashboardPage() {
                           <Delta value={m.marginPct != null && m.marginPct30dAgo != null ? m.marginPct - m.marginPct30dAgo : null} suffix="pp" goodWhenUp />
                         </td>
                         <td className={td}><Spark values={m.history.map((p) => p.value)} /></td>
-                        <td className={td}>{m.isActive ? <Pill tone={tone}>{TONE_TEXT[tone]}</Pill> : <Pill tone="neutral">Inactive</Pill>}</td>
+                        <td className={td}>
+                          {!m.isActive ? (
+                            <Pill tone="neutral">Inactive</Pill>
+                          ) : m.unpriced.length ? (
+                            <Link href="/ingredients" title={`No price yet: ${m.unpriced.join(", ")}`}>
+                              <Pill tone="warning">{m.unpriced.length === 1 ? "Needs a price" : `Needs ${m.unpriced.length} prices`}</Pill>
+                            </Link>
+                          ) : m.recipeName == null ? (
+                            <Pill tone="neutral">No recipe</Pill>
+                          ) : (
+                            <Pill tone={tone}>{TONE_TEXT[tone]}</Pill>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}

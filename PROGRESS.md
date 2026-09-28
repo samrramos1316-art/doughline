@@ -200,7 +200,9 @@ idempotent re-run, ingredient mapping (override, name, category), and every
 displayed % change recomputed independently from stored rows (90 and 30
 days); screenshots in `test-output/market/`.
 
-## Step 12 — PWA (installable app, offline screen)
+## Step 13 — PWA (installable app, offline screen)
+
+(Built as step 12 before §9.3 was added to the build order; now step 13.)
 
 - Icons drawn in `scripts/make-icons.mjs` (the logo's loaf, with its score
   line as a rising price line) and rendered to PNG/ICO in headless Edge:
@@ -227,6 +229,52 @@ days); screenshots in `test-output/market/`.
 - `scripts/test-rls-isolation.mjs` now checks both views both ways.
 - Supabase "Confirm email" is off (Supabase's mailer couldn't deliver to
   real users); signup → dashboard → log out → log in verified on the live site.
+
+## Step 12 — recipe & menu onboarding import (§9.3)
+
+- `VisionProvider.extractMenu()` / `extractRecipe()` (Claude implemented,
+  Gemini stubbed like `extractInvoice`), one shared Claude call path.
+  Recipe lines also carry `item_name_guess` (plain ingredient name) because
+  that, not the raw line, is what matching embeds — same lesson as invoices.
+- `POST /api/onboarding/import-menu` and `/import-recipe`: read an upload
+  from `{org_id}/onboarding/…` in the invoices bucket and return drafts;
+  nothing is written. Recipe lines run through `matchLines()` (vendor-less
+  aliases, then vectors, same thresholds) in dry-run mode, and each matched
+  line's quantity is converted to the ingredient's base unit when the units
+  share a dimension (kg → lb, L → gal). Cups/spoons → lb need a density, so
+  the review screen asks the owner instead of guessing.
+- `app/(app)/onboarding/import/page.tsx`: signup (and the email-confirm
+  link) lands here once with `?welcome=1`; "Skip — I'll enter these
+  manually" goes to Recipes. Two drop zones (menu / recipes), then one
+  editable review screen: recipes with each ingredient matched, suggested or
+  "New ingredient?" inline; menu items with prices, auto-linked to recipes
+  read in the same session. Save creates new ingredients in one batch
+  (`/api/ingredients/import`, one embedding call), then recipes, then menu
+  items, all through the existing APIs. Also reachable later from "Import
+  from photo" on Recipes and Menu, and the Overview's setup checklist.
+- Found by its test: a recipe with an unpriced ingredient got a cost anyway
+  (SUM skips NULLs), so margins looked better than they were. Migration 023:
+  the cost is unknown until every ingredient is priced, and both costing
+  views report `unpriced_ingredients`; screens say "Needs a price".
+- `scripts/test-onboarding-e2e.mjs`: 34/34 locally (menu PDF, photographed
+  handwritten card, typed recipe PDF → 2 recipes, 7 menu items, 1 new
+  ingredient; croissant margin matches hand math).
+
+## Redesign + business run-through (after step 13)
+
+- Control-room layout: dark sidebar with live counts, dense Overview
+  (headline figures, margins vs target, inbox, cost movers, cost drivers,
+  supplier spend, recent invoices, market), a tabbed table-first page per
+  section, new Settings page (name, target margin, alert threshold, review
+  limit). Alerts can be marked handled.
+- `scripts/test-business-e2e.mjs` runs a whole bakery (Maple & Rye) through
+  the app: CSV price list, 5 recipes, 5 menu items, backfilled invoices, a
+  2-page PDF, a phone photo, a packaging invoice, a blurry receipt typed in
+  by hand, and a repeat delivery. 75/75 locally. Fixes it found: menu item
+  Add didn't refresh the list; hand-entered prices dated in UTC made same-day
+  invoices "historical" in US evenings (now the browser's local date);
+  "Not an ingredient" for supplies (remembered per vendor, migration 022);
+  invoice totals now read and saved.
 
 ## Not started yet
 
@@ -261,6 +309,9 @@ days); screenshots in `test-output/market/`.
 - `scripts/test-bulk-import-e2e.mjs`
 - `scripts/test-market-e2e.mjs` (live USDA + FAO)
 - `scripts/test-auth-e2e.mjs [--base=https://…]` (login/signup/confirm flows, landing page)
+- `scripts/test-business-e2e.mjs [--base=…] [--keep]` (a whole bakery, live Claude/Voyage)
+- `scripts/test-onboarding-e2e.mjs [--base=…] [--keep]` (§9.3 import)
+- `scripts/screenshot-app.mjs --email=… --password=…` (every screen, desktop + phone)
 - `scripts/test-pwa-e2e.mjs [--base=https://…]` (after `npm run build`; manifest, icons, service worker, offline, install card)
 - `scripts/make-icons.mjs` (regenerates the app icons, not a test)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)

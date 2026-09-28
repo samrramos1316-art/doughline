@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import type { VisionProvider, VisionExtractionResult } from "./types";
+import type { VisionProvider, VisionExtractionResult, MenuExtractionResult, RecipeExtractionResult } from "./types";
 
 // §5.3's extraction contract, as Zod. Structured outputs constrain sampling to
 // this schema, so the response is guaranteed to parse — no retry loop.
@@ -42,11 +42,51 @@ const SYSTEM_PROMPT = `You extract line items from supplier invoices, packing sl
 
 const MODEL = "claude-opus-5";
 
+// §9.3: a menu → items and prices.
+const MenuSchema = z.object({
+  items: z.array(
+    z.object({
+      name_guess: z.string().describe("The menu item's name as printed, without its price or description"),
+      price_guess: z.number().nullable().describe("Its price in dollars; the single-item price if several sizes are listed"),
+    }),
+  ),
+});
+
+const MENU_PROMPT = `You read menus for a small food business — a chalkboard photo, a printed card, a Canva PDF, a screenshot. List every item a customer can buy, in the order printed.
+
+- name_guess: the item's name as printed (fix obvious photo-reading errors, keep the business's own wording). No price, no description, no allergen codes.
+- price_guess: the price as a number of dollars ("$4.25" -> 4.25, "4.5" -> 4.5). If an item lists several sizes or counts, use the smallest/single one. null if no price is printed for it.
+- Skip section headings, descriptions, opening hours, and add-ons that aren't sold on their own ("add oat milk +0.50").`;
+
+// §9.3: one recipe → name, yield, ingredient lines.
+const RecipeSchema = z.object({
+  name_guess: z.string().nullable(),
+  yield_qty_guess: z.number().nullable().describe("How many servings/pieces one batch makes"),
+  yield_unit_guess: z.string().nullable().describe("What the yield counts, e.g. cookies, slices, loaves"),
+  ingredient_lines: z.array(
+    z.object({
+      raw_text: z.string().describe("The ingredient line exactly as written"),
+      quantity_guess: z.number().nullable(),
+      unit_guess: z.string().nullable(),
+      item_name_guess: z.string().nullable().describe("Plain-English ingredient name, no quantity or preparation"),
+    }),
+  ),
+});
+
+const RECIPE_PROMPT = `You read recipes for a small food business — a handwritten card, a notebook page, a printed or typed document. Extract ONE recipe (the main one if the page has several).
+
+- name_guess: the recipe's title.
+- yield_qty_guess / yield_unit_guess: what one batch makes ("Makes 2 dozen cookies" -> 24, "cookies"; "Serves 8" -> 8, "servings"; "One 9-inch cake, 12 slices" -> 12, "slices"). null if not stated.
+- ingredient_lines: one entry per ingredient, in order. raw_text copied as written. quantity_guess as a number — convert fractions and mixed numbers ("1 1/2" -> 1.5, "½" -> 0.5); for a range use the first number. unit_guess as written but spelled simply (cup, tbsp, tsp, g, kg, oz, lb, ml, l, each, stick, pinch); null for a bare count ("3 eggs" -> 3, null). If a line gives two measures ("1 cup (227 g) butter"), prefer the weight: 227, "g".
+- item_name_guess: the plain ingredient a cook would buy, no quantity or preparation ("2 cups flour, sifted" -> "all-purpose flour"; "3 large eggs, room temp" -> "large eggs").
+- Skip method steps, notes, and equipment.`;
+
 type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 const IMAGE_TYPES: readonly string[] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 // §5.1: Claude's structured-outputs API as a vision provider (selected with
-// VISION_PROVIDER=claude).
+// VISION_PROVIDER=claude). One call shape for all three targets (§9.3):
+// the file as an image or PDF document, a system prompt, a Zod schema.
 export class ClaudeVisionProvider implements VisionProvider {
   private client: Anthropic;
 
@@ -57,7 +97,19 @@ export class ClaudeVisionProvider implements VisionProvider {
     this.client = apiKey ? new Anthropic({ apiKey }) : new Anthropic();
   }
 
-  async extractInvoice(fileBuffer: Buffer, mimeType: string): Promise<VisionExtractionResult> {
+  extractInvoice(fileBuffer: Buffer, mimeType: string): Promise<VisionExtractionResult> {
+    return this.extract(ExtractionSchema, SYSTEM_PROMPT, fileBuffer, mimeType, "invoice");
+  }
+
+  extractMenu(fileBuffer: Buffer, mimeType: string): Promise<MenuExtractionResult> {
+    return this.extract(MenuSchema, MENU_PROMPT, fileBuffer, mimeType, "menu");
+  }
+
+  extractRecipe(fileBuffer: Buffer, mimeType: string): Promise<RecipeExtractionResult> {
+    return this.extract(RecipeSchema, RECIPE_PROMPT, fileBuffer, mimeType, "recipe");
+  }
+
+  private async extract<T extends z.ZodType>(schema: T, system: string, fileBuffer: Buffer, mimeType: string, what: string): Promise<z.infer<T>> {
     const data = fileBuffer.toString("base64");
 
     let fileBlock: Anthropic.ContentBlockParam;
@@ -66,20 +118,15 @@ export class ClaudeVisionProvider implements VisionProvider {
     } else if (IMAGE_TYPES.includes(mimeType)) {
       fileBlock = { type: "image", source: { type: "base64", media_type: mimeType as ImageMediaType, data } };
     } else {
-      throw new Error(`Unsupported invoice file type for Claude vision: ${mimeType}`);
+      throw new Error(`Unsupported ${what} file type for Claude vision: ${mimeType}`);
     }
 
     const response = await this.client.messages.parse({
       model: MODEL,
       max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: [fileBlock, { type: "text", text: "Extract this invoice." }],
-        },
-      ],
-      output_config: { format: zodOutputFormat(ExtractionSchema) },
+      system,
+      messages: [{ role: "user", content: [fileBlock, { type: "text", text: `Extract this ${what}.` }] }],
+      output_config: { format: zodOutputFormat(schema) },
     });
 
     // Opt-in debugging: print Claude's response text verbatim, before the
@@ -91,10 +138,10 @@ export class ClaudeVisionProvider implements VisionProvider {
     }
 
     if (response.stop_reason === "refusal") {
-      throw new Error(`Claude declined to extract this invoice (${response.stop_details?.category ?? "no category"})`);
+      throw new Error(`Claude declined to extract this ${what} (${response.stop_details?.category ?? "no category"})`);
     }
     if (response.stop_reason === "max_tokens") {
-      throw new Error("Claude's extraction was cut off at max_tokens — invoice has too many lines for one call");
+      throw new Error(`Claude's extraction was cut off at max_tokens — this ${what} is too long for one call`);
     }
     if (!response.parsed_output) {
       throw new Error("Claude returned no parseable extraction");

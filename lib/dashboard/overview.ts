@@ -16,6 +16,7 @@ export type MenuRow = {
   marginPct30dAgo: number | null;
   history: { date: string; value: number }[];
   isActive: boolean;
+  unpriced: string[]; // ingredients with no price yet — margin unknown until they have one
 };
 
 export type Mover = { id: string; name: string; unit: string; from: number; to: number; pct: number; menuItems: number };
@@ -113,6 +114,7 @@ export async function getOverview(supabase: Client, orgId: string) {
       marginPct30dAgo: marginOf(ago),
       history: points,
       isActive: m.is_active,
+      unpriced: [...new Set(lines.filter((l) => currentCost(l.ingredient_id) == null).map((l) => ing.get(l.ingredient_id)?.name ?? "?"))],
     };
   });
   const active = menu.filter((m) => m.isActive && m.marginPct != null);
