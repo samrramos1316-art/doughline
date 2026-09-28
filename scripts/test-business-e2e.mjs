@@ -188,11 +188,15 @@ try {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /sign up|create/i }).click();
-  await page.waitForURL(/\/dashboard/, { timeout: 60_000 });
+  // New signups land on the menu/recipe import (§9.3); this owner types
+  // theirs in by hand, so they skip it.
+  await page.waitForURL(/\/onboarding\/import\?welcome=1/, { timeout: 60_000 });
+  await page.getByRole("link", { name: "Skip — I'll enter these manually" }).click();
+  await page.waitForURL(/\/recipes$/);
   const { data: users } = await admin.auth.admin.listUsers({ perPage: 1000 });
   userId = users.users.find((u) => u.email === email).id;
   orgId = (await admin.from("profiles").select("org_id").eq("id", userId).single()).data.org_id;
-  check(true, `signed up as ${email} → /dashboard`);
+  check(true, `signed up as ${email} → the import screen → skipped to Recipes`);
   await snap(page, "empty-dashboard", false);
 
   banner("2. ingredient spreadsheet");
