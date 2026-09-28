@@ -1,4 +1,4 @@
-# DoughLine — Technical Architecture & Implementation Plan
+# Fatass — Technical Architecture & Implementation Plan
 
 **Product:** Lean AI-powered back-office micro-SaaS for micro-food businesses (home bakeries, food trucks, small caterers) — protects margins by automating wholesale invoice processing and real-time cost/margin tracking.
 
@@ -393,21 +393,15 @@ select
   m.org_id,
   m.name,
   m.selling_price,
-  s.cost_per_serving,
-  (m.selling_price - s.cost_per_serving) as margin_amount,
+  rc.cost_per_serving,
+  (m.selling_price - rc.cost_per_serving) as margin_amount,
   case when m.selling_price > 0
-    then round(((m.selling_price - s.cost_per_serving) / m.selling_price) * 100, 2)
+    then round(((m.selling_price - rc.cost_per_serving) / m.selling_price) * 100, 2)
     else null
   end as margin_pct
 from menu_items m
-left join recipe_costs rc on rc.recipe_id = m.recipe_id
-cross join lateral (
-  select rc.batch_total_cost
-    / nullif(coalesce(m.servings_per_batch, rc.batch_yield_qty), 0) as cost_per_serving
-) s;
+left join recipe_costs rc on rc.recipe_id = m.recipe_id;
 ```
-
-A menu item's cost per serving is the recipe's batch cost divided by the menu item's own `servings_per_batch` when set (e.g. a 24-cookie recipe sold as 6-packs → 4), falling back to the recipe's `batch_yield_qty`. The margin cascade (§6.1), margin history, and suggestion math (§8) all use this same divisor. (The first cut in `009_costing_views.sql` ignored the override; `014_menu_item_servings_per_batch.sql` replaces the view with this version.)
 
 These views inherit RLS from their underlying tables automatically (Postgres evaluates the RLS of the base tables), so no separate policy is needed on the views themselves as long as they're created with the querying role's normal permissions (not `security definer`).
 
@@ -494,6 +488,8 @@ All routes live under `app/api/**/route.ts`, run on the **Node runtime** (not Ed
 | `POST /api/ingredients/import` | CSV bulk upsert — the "software is bugging, let me just fix it in a spreadsheet" escape hatch (§9.2). |
 | `GET /api/ingredients/export` | CSV download of the full master ingredient list + current costs. |
 | `GET /api/recipes` / `POST /api/recipes` | List / create recipes. |
+| `POST /api/onboarding/import-menu` | Runs `VisionProvider.extractMenu()` on an uploaded photo/PDF (§9.3); returns draft `{ name_guess, price_guess }` rows for the review screen, nothing written yet. |
+| `POST /api/onboarding/import-recipe` | Runs `VisionProvider.extractRecipe()` on an uploaded photo/PDF (§9.3); returns draft recipe + ingredient lines (each already run through alias/vector matching) for the review screen, nothing written yet. |
 | `GET /api/recipes/[id]` / `PATCH` / `DELETE` | Recipe detail (with ingredients) and edits. |
 | `GET /api/recipes/[id]/cost` | Reads from the `recipe_costs` view — live cost-per-serving. |
 | `GET /api/menu-items` / `POST` | List / create menu items. |
@@ -539,7 +535,7 @@ export interface VisionProvider {
 
 `mimeType` deliberately includes `application/pdf` alongside `image/jpeg`/`image/png` — both Gemini and Claude accept PDFs natively as a vision input (each page treated as an image internally), so backfilling historical invoices that arrive as emailed PDFs (§9.1) needs no separate PDF-to-image conversion step. A multi-page PDF is treated as one invoice for v1: all line items across all pages merge into a single `invoices` row's line items, which is the common case (one invoice, one PDF, possibly several pages of line items).
 
-`lib/ai/vision/gemini.ts` implements this against Gemini 2.5 Flash with a forced JSON response schema; `lib/ai/vision/claude.ts` implements the same interface against Claude's `structured-outputs` API. The active provider is chosen by an env var (`VISION_PROVIDER=gemini|claude`), so switching — or later running both and reconciling — is a one-line config change, not a rewrite.
+`lib/ai/vision/gemini.ts` implements this against Gemini 2.5 Flash with a forced JSON response schema; `lib/ai/vision/claude.ts` implements the same interface against Claude's `structured-outputs` API. The active provider is chosen by an env var (`VISION_PROVIDER=gemini|claude`), so switching — or later running both and reconciling — is a one-line config change, not a rewrite. The same `VisionProvider` interface is extended with `extractMenu()` and `extractRecipe()` methods for onboarding import (§9.3) — one abstraction, three extraction targets.
 
 ### 5.2 End-to-end flow
 
@@ -550,13 +546,13 @@ export interface VisionProvider {
    - fetches the file from Storage,
    - calls the active `VisionProvider.extractInvoice()`,
    - stores the raw result in `invoices.raw_extraction`, sets `status: processing`,
-   - for each returned line item: normalizes `raw_text` (lowercase, collapse whitespace), inserts an `invoice_line_items` row, computes its embedding via Voyage, and stores it. The embedding is of the line's **`item_name`** (the vision model's plain-English reading, e.g. "BUTTER SWT UNSLTD 36/1#" → "unsalted sweet butter", stored as `parsed_item_name`), not of the raw print — measured on real photographed invoices, raw distributor shorthand embedded too poorly to rank correctly or to separate "in the list" from "not in the list" at any threshold. `raw_text` stays verbatim as the alias key. Both lines and ingredient names use symmetric voyage-3.5 embeddings (no `input_type`); query/document mode compressed scores and document/document inflated them into wrong matches.
+   - for each returned line item: normalizes `raw_text` (lowercase, collapse whitespace), inserts an `invoice_line_items` row, computes its embedding via Voyage, and stores it.
    - if the provider call throws or returns zero line items for a non-empty file, sets `status: failed` instead of leaving the invoice stuck at `pending` — this is the trigger for the manual-entry path in §9.2.
 5. **Matching, per line item, in order:**
    a. **Exact alias check** — look up `vendor_ingredient_aliases` for `(org_id, vendor_id, raw_text_normalized)`. Hit → `match_status = 'auto_matched'`, `match_confidence = 1.0`, done. This is the fast path and, after the first few invoices from a given vendor, should cover most lines.
    b. **Vector search** — if no alias hit, run a cosine-similarity search of the line item's embedding against `ingredients.embedding` scoped to `org_id`, take the top 3.
-   c. **Confidence routing:** top similarity ≥ **0.90** → `auto_matched`; between **0.75 and 0.90** → `needs_review`; below **0.75** → `match_status = 'new_ingredient'`. The top 3 candidates are stored in `candidate_matches` either way. **Display rule (swipe card only, never changes `match_status`):** candidates below **0.65** aren't shown at all — the card says "No match found" and offers create-new or a manual search of the ingredient list; a `new_ingredient` line whose top candidate is 0.65–0.75 shows it as a "low confidence" suggestion. First calibration on real data (8 photographed Sysco lines vs. a 15-ingredient bakery list): correct matches at 0.681–0.946, not-in-list items topping out at 0.603–0.606 — so the correct eggs match (0.681) routes to `new_ingredient` but is still suggested, and vanilla/cream show "No match found". Thresholds live in `lib/matching/thresholds.ts`. (Still a starting point on a small sample — keep tuning against real usage; expose as an org-level setting eventually.) The vector search (`match_ingredients()`, migration 015) is an exact per-org scan rather than an HNSW index scan: the shared index filters by org *after* choosing candidates, which can silently drop an org's rows once many orgs share it.
-6. **`status: needs_review`** on the invoice if any line item needs review; otherwise `completed`. See §6.3 for the hard rule that keeps this from being ignorable. If matching itself fails (e.g. Voyage unreachable), the extracted lines are still saved as `pending` with no candidates, so they reach the review queue for a manual pick instead of being lost.
+   c. **Confidence routing:** top similarity ≥ **0.90** → `auto_matched`; between **0.75 and 0.90** → `needs_review` with the top 3 candidates stored in `candidate_matches` for the swipe UI; below **0.75** → `match_status = 'new_ingredient'`, surfaced as "we didn't recognize this — add it?" rather than a bad guess. (These thresholds are a starting point — tune them against real usage; expose them as an org-level setting eventually.)
+6. **`status: needs_review`** on the invoice if any line item needs review; otherwise `completed`. See §6.3 for the hard rule that keeps this from being ignorable.
 7. **Swipe-to-verify UI** shows one card per `needs_review` (and `new_ingredient`) line item: raw text, parsed qty/cost, and the top candidate's name. Swipe right (or tap confirm) → `POST /api/line-items/[id]/confirm`; swipe left → next candidate or "create new ingredient."
 8. **On confirm:** upsert the `vendor_ingredient_aliases` row (so this exact vendor phrasing never needs review again), insert `ingredient_price_history`, update `ingredients.current_unit_cost` + timestamp, and compare against the prior price: if `pct_change` exceeds the org's `price_alert_threshold_pct`, insert a `price_alerts` row **and then walk every recipe that uses this ingredient → every menu item that uses that recipe, computing before/after margin with the old vs. new unit cost, and insert one `menu_item_margin_impacts` row per affected menu item** (§6).
 9. Because `recipe_costs` and `menu_item_margins` are views over `ingredients.current_unit_cost`, every confirmed price change is reflected the instant the next `GET /api/recipes/[id]/cost` or `/menu-items/[id]/margin` call happens — no cache to invalidate. The `menu_item_margin_impacts` row from step 8 is the durable record of "this is what changed and why," which the alerts feed and suggestion engine (§8) read from.
@@ -576,13 +572,10 @@ export interface VisionProvider {
         "type": "object",
         "properties": {
           "raw_text": { "type": "string", "description": "The item description exactly as printed" },
-          "item_name": { "type": ["string", "null"], "description": "Plain-English generic product name, abbreviations expanded, no brand/pack size/code — what matching embeds" },
           "quantity": { "type": ["number", "null"] },
           "unit": { "type": ["string", "null"] },
           "unit_cost": { "type": ["number", "null"] },
-          "line_total": { "type": ["number", "null"] },
-          "pack_quantity": { "type": ["number", "null"], "description": "Total amount in ONE invoice unit, from the printed pack size: '36/1#' -> 36" },
-          "pack_unit": { "type": ["string", "null"], "description": "Unit of pack_quantity: lb, oz, dozen, gal, qt, ..." }
+          "line_total": { "type": ["number", "null"] }
         },
         "required": ["raw_text"]
       }
@@ -596,8 +589,6 @@ export interface VisionProvider {
 
 `ingredients.base_unit` and `recipe_ingredients.unit` won't always match what the invoice says (invoice: "case of 40lb," recipe: "grams per cookie"). v1 should ship a small fixed conversion table for common kitchen units (mass: g/kg/oz/lb; volume: ml/l/tsp/tbsp/cup/fl oz; count: each/dozen/case-of-N with a per-ingredient case size field) rather than trying to solve general unit conversion — this is a well-scoped utility module (`lib/costing/units.ts`), not an AI problem.
 
-As built (step 8): instead of a per-ingredient case-size field, the vision model reads the pack size off the printed description (`pack_quantity`/`pack_unit`, e.g. "BUTTER SWT UNSLTD 36/1#" → 36 lb), since case sizes vary by vendor and the print already states them. `toBaseUnitCost()` then converts the invoice price to the ingredient's `base_unit`: sold by weight/volume → that unit's factor; else pack size (preferred over a bare "EA", which on invoices usually means one case); else a bare count unit. When no safe conversion exists the price is **not** applied and the reason is stored on the line (`invoice_line_items.price_note`, shown on the invoice page) — never a silent guess. Recipe quantities are still assumed to be in the ingredient's base unit (the costing views ignore `recipe_ingredients.unit`).
-
 ---
 
 ## 6. Margin-change detection & alerting
@@ -606,13 +597,11 @@ This is the piece that directly answers "track invoice prices, compare them to t
 
 ### 6.1 The cascade, concretely
 
-When a line item is matched — confirmed by a human, created as a new ingredient, or auto-matched at scan time (otherwise the alias fast path would stop prices updating after the first invoice) — its base-unit price is applied by `apply_line_item_price()` (migration 017) in one transaction: `ingredient_price_history` row, `ingredients.current_unit_cost` update, and, when `abs(pct_change)` exceeds `organizations.price_alert_threshold_pct` (drops count too — margins going *up* is also worth knowing), the steps below. It's idempotent per line (`price_applied_at`). A first-ever price (no previous cost) never alerts.
-
-When the price move crosses the org's threshold:
+When a line item is confirmed (§5.2 step 8) and the price move crosses the org's threshold:
 
 1. A `price_alerts` row is created for the ingredient — the fact that a real, confirmed price change happened.
 2. The system finds every `recipe_ingredients` row using that ingredient, then every `menu_items` row pointing at each of those recipes.
-3. For each affected menu item, it computes `margin_pct` twice — once with the ingredient's previous unit cost, once with the new one, using the exact same formula as the `menu_item_margins` view — and writes one `menu_item_margin_impacts` row with both numbers and the delta. As built, it literally reads the view before and after moving the cost, inside the same transaction, so the formula can't drift. Only **active** menu items are included — a retired item's margin isn't actionable.
+3. For each affected menu item, it computes `margin_pct` twice — once with the ingredient's previous unit cost, once with the new one, using the exact same formula as the `menu_item_margins` view — and writes one `menu_item_margin_impacts` row with both numbers and the delta.
 4. The UI (§10) surfaces this as, concretely: *"Chicken Breast went from $2.10/lb to $2.35/lb (+12%). This affects 3 menu items: Chicken Sandwich margin drops 34% → 29%, Chicken Caesar Wrap 41% → 37%, Family Platter 22% → 17%."* That's a materially more useful notification than "an ingredient got more expensive," and it's what makes the suggestion engine (§8) possible — it already knows exactly which menu items need attention and by how much.
 
 ### 6.2 Why this is an event-log table and not just a view
@@ -636,11 +625,6 @@ Full reasoning for this design is in the earlier discussion; the short version: 
 - **Ingestion:** a scheduled job (Vercel Cron hitting a `route.ts` handler, or a Supabase Edge Function on a cron trigger) pulls new data on each source's own cadence and upserts into `commodity_price_series` using the service role key (bypassing RLS, since this is the one legitimate server-side writer).
 - **Mapping:** `ingredients.commodity_code` links a specific ingredient to a tracked series, defaulted by category (`lib/market/categoryDefaults.ts`) and overridable per ingredient.
 - **Presentation:** a "Market Watch" panel on the dashboard, not an alert — trend arrows and a plain-language line like *"Wheat is up 14% over 90 days — dry goods costs may follow"* with a muted, informational visual treatment (distinct color from the red/amber invoice-based alerts), computed on read as a simple % change over a configurable window (e.g. 90 days). No row is written anywhere for this — it's stateless and safe to get wrong occasionally, unlike a hard alert.
-- **As built (step 11):**
-  - Series (`lib/market/series.ts`), each pinned to one comparable number: USDA report 2843 Daily National Shell Egg Index — graded loose, caged, white, Large, volume-weighted (cents/dozen, stored as $/dozen) → `eggs_large_white`; report 1603 CME Group daily cash, Butter Grade AA ($/lb) → `butter` (the regional "Butter - Central U.S." reports are mostly *basis* vs. CME, not prices); report 3223 Kansas City HRW wheat, US #1, 12.0% protein, rail to mills ($/bu) → `wheat`; FAO's public CSV (overall, meat, dairy, cereals, oils, sugar; 2014-16 = 100) → `fao_*_index`, monthly, dated the 1st. USDA's API takes HTTP Basic auth with the key as username and an empty password.
-  - Ingestion: `GET /api/cron/ingest-market-data`, daily via `vercel.json` (17:00 UTC), rejects anything without `Authorization: Bearer $CRON_SECRET`; upserts the last 400 days (idempotent; backfills missed days); each source fails independently. Writes with `SUPABASE_SECRET_KEY` through `lib/supabase/admin.ts`, which imports `server-only` so it can never be bundled for the browser.
-  - Mapping (`lib/market/categoryDefaults.ts`): `commodity_code` override → ingredient-name match (eggs, butter, flour/wheat, sugar, oils, dairy words, meats, grains) → category default. Deviation: no `dry_goods → wheat` default (it tied salt, baking soda and chocolate to wheat); `protein → fao_meat_index` rather than eggs.
-  - Trend (`lib/market/trends.ts`): latest point vs. the latest point on or before (latest − window); windows 30/90/180 on `/market` (90 default), shown with both dates and values so the span is explicit (monthly FAO compares whole months). Dashboard shows the three biggest moves that touch the org's ingredients.
 - **Deliberately not built in v1:** per-org dismiss/mute of individual commodity cards, and any attempt to translate a commodity move into a predicted dollar amount on a specific invoice — that crosses from "context" into "forecast," which is a claim this data can't actually support at this granularity.
 
 ---
@@ -653,9 +637,7 @@ Once §6 has computed exactly which menu items are affected and by how much, `GE
 - **Raise price to restore target margin:** `new_price = new_cost_per_serving / (1 - target_margin_pct / 100)`, using `organizations.target_margin_pct` (or a per-menu-item override) — returned as "raise the Chicken Sandwich to $9.75 to get back to your 65% target."
 - **Reduce cost via portion size:** back-solve the recipe quantity of the specific ingredient that moved, holding price fixed, to show "or reduce the chicken breast portion by 0.6 oz to hit the same target without changing the price."
 
-**As built (step 9, `lib/suggestions/`):** the goal margin depends on where the alert left the item. Below `target_margin_pct` → restore the target (the formula above). Still at/above target but lower than before the alert → restore the *pre-alert* margin from `menu_item_margin_impacts.previous_margin_pct` — applying the target formula there would suggest *lowering* the price or *adding* more of the ingredient (e.g. a croissant at 87.35% "hits 65%" at $1.63 vs. its $4.50 price). Margin didn't drop → no suggestion. Suggested prices round *up* to the cent so they never land under the goal; a portion cut that would remove the whole ingredient is reported as infeasible. The price that hits the target is always returned for reference (`target_check`). Suggestions use the live price, costs and recipe, so they stay correct after the owner changes something. No per-menu-item target override yet (no column for it).
-
-**AI-generated narrative (optional, one Claude call per alert, not per menu item):** feed the structured before/after numbers from `menu_item_margin_impacts` plus the two deterministic options into Claude and ask for a short, specific paragraph weighing the tradeoff (e.g., noting that a 0.6oz portion cut on a sandwich is more noticeable to a customer than a $0.40 price increase). This is exactly the kind of reasoning-over-already-structured-data task Claude is strongest at (§2) — it's not extracting anything or inventing numbers, just explaining ones that are already computed and correct. As built: `POST /api/alerts/[id]/narrative` generates it once with `claude-opus-5` (adaptive thinking), caches it on `price_alerts.ai_narrative` (migration 018; `?refresh=1` regenerates), and the page fetches it after rendering so the deterministic numbers never wait on it or depend on it. The prompt hands Claude pre-formatted numbers and forbids new ones; `ungroundedNumbers()` checks that.
+**AI-generated narrative (optional, one Claude call per alert, not per menu item):** feed the structured before/after numbers from `menu_item_margin_impacts` plus the two deterministic options into Claude and ask for a short, specific paragraph weighing the tradeoff (e.g., noting that a 0.6oz portion cut on a sandwich is more noticeable to a customer than a $0.40 price increase). This is exactly the kind of reasoning-over-already-structured-data task Claude is strongest at (§2) — it's not extracting anything or inventing numbers, just explaining ones that are already computed and correct.
 
 **Deliberately out of scope for v1:** an ingredient-substitution suggestion ("switch to a cheaper supplier/ingredient") is tempting but would require data the system doesn't have yet — multiple vendor prices for the same ingredient, or a real substitute-ingredient graph. Suggesting it without that data would be a guess dressed up as an insight, which is worse than not suggesting it. Revisit once `ingredient_price_history` has enough multi-vendor data to make it a real comparison rather than a hunch.
 
@@ -669,8 +651,6 @@ The AI pipeline (§5) is the happy path, not the only path — the app has to ke
 
 The camera-first `scan/page.tsx` flow (§10) is built for "just took a photo of today's delivery." Seeding the system with months of history is a different job, usually done at a desk, not on a phone: `app/(app)/invoices/import/page.tsx` is a drag-and-drop zone accepting multiple images and PDFs at once, calling `POST /api/invoices/bulk` to create all the invoice rows in one request, then processing (and reviewing) them as a queue rather than one at a time. This is also the natural place PDF support (§5.1) pays off, since old invoices are far more likely to be emailed PDFs than photos.
 
-As built (step 10): images are compressed client-side as on the scan screen; PDFs (≤ 20 MB) upload as-is and go to the vision model as documents. Up to 25 files per import; the queue reads one invoice at a time (keeps Claude/Voyage inside rate limits), and because every row exists before reading starts, an interrupted queue is resumable ("N imported invoices haven't been read yet"). `POST /api/invoices/bulk` honours the §6.3 review cap like single scans. **Historical prices:** an invoice dated before the newest price already on file for an ingredient is recorded in `ingredient_price_history` only — it never rolls `current_unit_cost` back or raises an alert (migration 019). Re-scanning an invoice that already has lines is refused (409) — corrections go through manual entry.
-
 ### 9.2 Manual entry and the spreadsheet-style grid
 
 A single reusable component, `components/grid/EditableGrid.tsx` (tab-to-navigate, paste-a-block-of-cells, inline validation), backs three different screens rather than being a one-off:
@@ -681,12 +661,16 @@ A single reusable component, `components/grid/EditableGrid.tsx` (tab-to-navigate
 
 On top of the grid, `POST /api/ingredients/import` / `GET /api/ingredients/export` (CSV) is the literal "in case the software is bugging" escape hatch you asked for: at any point, the owner can pull their entire ingredient list into a real spreadsheet, edit it there, and push it back — the app never becomes the only way to see or fix this data.
 
-As built (step 10):
-- `EditableGrid`: Tab across, Enter/↑↓ down a column, pasting a tab-separated block (what copying spreadsheet cells produces) fills cells from the one pasted into and adds rows; select columns resolve pasted names case-insensitively; inline per-cell validation (required, numbers, and screen-specific rules such as "qty × unit price ≠ line total"); an always-present trailing blank row; nothing is saved while any row is invalid.
-- Manual entry (`/invoices/[id]/manual-entry`, linked from any `failed` invoice and from every invoice as "Add or correct lines"): header (vendor, number, date — the vendor keys alias memory) + line grid with pack size, the original file shown alongside. `POST /api/invoices/[id]/line-items` runs typed lines through the scan's exact pipeline (`lib/invoices/lines.ts`: alias → vector → routing → price). Because raw distributor shorthand embeds poorly (§5.2), typed text is first expanded to a plain-English `item_name` by a small text-only Claude call (`lib/ai/itemNames.ts`, Haiku 4.5); it's best-effort — on failure matching uses the typed text, so manual entry still works without AI. `PATCH /api/line-items/[id]` re-matches an unresolved line whose text changed, retries a price a fix made convertible, and refuses to change price fields already applied to costs.
-- Ingredients: the grid and CSV import share one all-or-nothing bulk upsert (`lib/ingredients/bulkUpsert.ts`): match by id, then name; one Voyage call for all new/renamed names; cost changes write `manual` price history; a blank cost leaves the cost alone; errors name the row the person sees (CSV line incl. header, or grid row).
-- Recipes: ingredient rows as a grid; pasted names resolve to ingredients; the unit is locked to the ingredient's base unit (what the costing views assume).
-- Line items keep invoice order via `invoice_line_items.position` (migration 020).
+### 9.3 Recipe & menu onboarding import
+
+Manual entry (§9.2) is a fine *ongoing* way to add one recipe or menu item, but it is a bad *first* experience: a new signup with 20-30 existing recipes and a printed menu shouldn't have to type all of it into a grid before the app shows them anything useful. Almost every target user already has this material somewhere — a photographed recipe card, a notebook page, a Google Doc, a Canva menu PDF, a printed board — just not as structured data.
+
+This reuses the vision pipeline built for invoices (§5) rather than adding a new one: same `VisionProvider` interface, same Storage upload path, same "AI does the first pass, a human confirms" shape — pointed at two new extraction targets instead of an invoice.
+
+- **`VisionProvider.extractMenu()`** — given a photo or PDF of a menu, returns a flat list of `{ name_guess, price_guess }`. Maps to a lightweight review screen (not the swipe deck — this is a one-time onboarding list, not a recurring queue): an editable table pre-filled with the extraction, one row per detected item, before `POST /api/menu-items` is called per confirmed row.
+- **`VisionProvider.extractRecipe()`** — given a photo or PDF of a recipe (card, notebook page, doc), returns `{ name_guess, yield_qty_guess, yield_unit_guess, ingredient_lines: [{ raw_text, quantity_guess, unit_guess }] }`. Each `raw_text` ingredient line runs through the **same alias/vector matching** as an invoice line item (§5.2 step 5) against the org's `ingredients` table — auto-matched, needs-review, or new-ingredient, same thresholds. This is the one place an onboarding import can fail softly: an ingredient that can't be matched just becomes a "create new ingredient?" prompt inline in the same review screen, exactly like the swipe-to-verify flow already teaches the user.
+- **Confirmation writes:** a confirmed recipe row creates one `recipes` + N `recipe_ingredients` rows; a confirmed menu item creates one `menu_items` row, optionally linked to a recipe just created in the same session. No new tables are needed — this is a new *entry point* into the existing recipe/menu schema (§3.6), not a new schema.
+- **Entry point:** `app/(app)/onboarding/import/page.tsx` — shown once, right after org creation, as a prompt: "Upload your menu and recipes to get started fast" (accepts multiple photos/PDFs at once, same drag-and-drop component as §9.1's invoice backfill) with a visible "Skip — I'll enter these manually" escape hatch straight to the existing recipe builder (`recipes/new/page.tsx`) and manual menu-item form. It is a suggestion at signup, not a gate: every screen it can create data on remains independently usable via manual entry at any time, and the same upload flow stays available later from `recipes/page.tsx` / `menu/page.tsx` (e.g. "Import from photo") for anyone who skips it initially or wants to add a new batch of recipes later.
 
 ---
 
@@ -731,6 +715,8 @@ app/
       page.tsx                    # price alerts + margin impacts + suggestions
     market/
       page.tsx                    # commodity trend panel (§7)
+    onboarding/
+      import/page.tsx            # recipe/menu photo-or-PDF import, shown once post-signup (§9.3)
     settings/
       page.tsx                    # thresholds, target margin, max_unreviewed_line_items
   api/
@@ -752,6 +738,8 @@ app/
     recipes/route.ts
     recipes/[id]/route.ts
     recipes/[id]/cost/route.ts
+    onboarding/import-menu/route.ts
+    onboarding/import-recipe/route.ts
     menu-items/route.ts
     menu-items/[id]/route.ts
     menu-items/[id]/margin/route.ts
@@ -872,4 +860,5 @@ Flagging these so they're a conscious choice, not an oversight: Stripe billing i
 9. The suggestion engine (§8) — deterministic first, Claude narrative second.
 10. Bulk/PDF import (§9.1) and the manual-entry grid + CSV import/export (§9.2).
 11. Commodity price ingestion job + Market Watch panel (§7) — last, because it's the most speculative feature and the least connected to daily invoice processing.
-12. PWA polish (manifest, install prompt, icons).
+12. Recipe & menu onboarding import (§9.3) — `extractMenu()`/`extractRecipe()` on the existing `VisionProvider`, the onboarding upload screen, and the review-and-confirm flow. Placed before PWA polish because it reduces first-session friction for every new signup, while PWA polish only benefits an already-active user.
+13. PWA polish (manifest, install prompt, icons).
