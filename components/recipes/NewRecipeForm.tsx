@@ -44,13 +44,14 @@ export function NewRecipeForm() {
       {error && <p className="w-full text-sm text-red-600">{error}</p>}
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-zinc-600">Name</label>
-        <input name="name" required className="rounded-md border border-zinc-300 px-2 py-1 text-sm" />
+        <label htmlFor="recipe-name" className="text-xs font-medium text-zinc-600">Name</label>
+        <input id="recipe-name" name="name" required className="rounded-md border border-zinc-300 px-2 py-1 text-sm" />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-zinc-600">Batch yield qty</label>
+        <label htmlFor="recipe-batch-yield-qty" className="text-xs font-medium text-zinc-600">Batch yield qty</label>
         <input
+          id="recipe-batch-yield-qty"
           name="batch_yield_qty"
           type="number"
           step="0.0001"
@@ -60,8 +61,9 @@ export function NewRecipeForm() {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-zinc-600">Batch yield unit</label>
+        <label htmlFor="recipe-batch-yield-unit" className="text-xs font-medium text-zinc-600">Batch yield unit</label>
         <input
+          id="recipe-batch-yield-unit"
           name="batch_yield_unit"
           required
           placeholder="servings"

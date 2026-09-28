@@ -13,7 +13,11 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
     setPending(true);
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
+    // Keep the form element: React clears e.currentTarget once the handler
+    // yields at the first await, so reading it after the fetch threw and the
+    // new item never appeared in the list (it was saved, though).
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const body = {
       name: formData.get("name"),
       recipe_id: formData.get("recipe_id") || undefined,
@@ -32,7 +36,7 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
       setError(data.error ?? "Something went wrong");
       return;
     }
-    e.currentTarget.reset();
+    form.reset();
     router.refresh();
   }
 
@@ -44,13 +48,13 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
       {error && <p className="w-full text-sm text-red-600">{error}</p>}
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-zinc-600">Name</label>
-        <input name="name" required className="rounded-md border border-zinc-300 px-2 py-1 text-sm" />
+        <label htmlFor="menu-name" className="text-xs font-medium text-zinc-600">Name</label>
+        <input id="menu-name" name="name" required className="rounded-md border border-zinc-300 px-2 py-1 text-sm" />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-zinc-600">Recipe</label>
-        <select name="recipe_id" className="rounded-md border border-zinc-300 px-2 py-1 text-sm">
+        <label htmlFor="menu-recipe-id" className="text-xs font-medium text-zinc-600">Recipe</label>
+        <select id="menu-recipe-id" name="recipe_id" className="rounded-md border border-zinc-300 px-2 py-1 text-sm">
           <option value="">—</option>
           {recipeOptions.map((r) => (
             <option key={r.id} value={r.id}>
@@ -61,8 +65,9 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-zinc-600">Selling price</label>
+        <label htmlFor="menu-selling-price" className="text-xs font-medium text-zinc-600">Selling price</label>
         <input
+          id="menu-selling-price"
           name="selling_price"
           type="number"
           step="0.01"
