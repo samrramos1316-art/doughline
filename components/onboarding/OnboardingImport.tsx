@@ -9,7 +9,7 @@ import { canonicalUnit, conversionFactor } from "@/lib/costing/units";
 import { LOCAL_DATE_HEADER, browserLocalDate } from "@/lib/dates/localDate";
 
 type Ingredient = { id: string; name: string; base_unit: string };
-type Recipe = { id: string; name: string };
+type Recipe = { id: string; name: string; yieldQty: number | null; yieldUnit: string | null; ingredients: string[] };
 type Kind = "menu" | "recipe";
 type FileItem = { key: string; file: File; kind: Kind; status: "ready" | "reading" | "done" | "failed"; note?: string };
 
@@ -23,6 +23,8 @@ type ApiLine = {
   matched_ingredient_id: string | null;
   candidates: Candidate[];
   base_quantity: number | null;
+  new_ingredient?: { name: string; unit: string; quantity: number | null };
+  note?: string; // the reasoning pass's why (lib/onboarding/reason.ts)
 };
 type LineDraft = {
   key: string;
@@ -37,9 +39,12 @@ type LineDraft = {
   newName: string;
   newUnit: string;
   newCategory: string;
+  note: string;
 };
 type RecipeDraft = { key: string; include: boolean; source: string; name: string; yieldQty: string; yieldUnit: string; lines: LineDraft[] };
-type MenuDraft = { key: string; include: boolean; name: string; price: string; recipe: string }; // recipe: "", "id:<uuid>", "draft:<key>"
+// recipe: "", "id:<uuid>", "draft:<key>". servings: how many of this item one
+// batch makes, when that differs from the recipe's own yield (a slice of a cake).
+type MenuDraft = { key: string; include: boolean; name: string; price: string; recipe: string; servings: string; note: string };
 
 const CATEGORIES = ["dairy", "dry_goods", "produce", "protein", "packaging", "beverage", "frozen"];
 const cell = "w-full min-w-0 rounded border border-stone-300 bg-white px-2 py-1 text-[13px] text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
@@ -66,8 +71,8 @@ function qtyIn(base: string, qtyGuess: number | null, unitGuess: string | null) 
   return f == null ? "" : String(round4(qtyGuess * f));
 }
 
-// Best token overlap between a menu item and a recipe name ("Chocolate Chip
-// Cookie" ↔ "Chocolate Chip Cookies").
+// Fallback when the linking call fails: best token overlap between a menu
+// item and a recipe name ("Chocolate Chip Cookie" ↔ "Chocolate Chip Cookies").
 const tokens = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((t) => t.length > 2).map((t) => t.replace(/(es|s)$/, "")));
 function bestRecipe(name: string, options: { value: string; label: string }[]) {
   const t = tokens(name);
@@ -100,6 +105,7 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
   const [phase, setPhase] = useState<"pick" | "reading" | "review" | "saving" | "done">("pick");
   const [error, setError] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [saved, setSaved] = useState<{ ingredients: number; recipes: number; menu: number } | null>(null);
   const ingById = new Map(ingredients.map((i) => [i.id, i]));
   const readyCount = files.filter((f) => f.status === "ready").length;
@@ -127,27 +133,31 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
         if (f.kind === "menu") {
           const { items } = await postJson("/api/onboarding/import-menu", { file_storage_path: path });
           for (const it of items as { name_guess: string; price_guess: number | null }[]) {
-            newMenu.push({ key: newKey(), include: true, name: it.name_guess, price: it.price_guess == null ? "" : String(it.price_guess), recipe: "" });
+            newMenu.push({ key: newKey(), include: true, name: it.name_guess, price: it.price_guess == null ? "" : String(it.price_guess), recipe: "", servings: "", note: "" });
           }
           setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, status: items.length ? "done" : "failed", note: items.length ? `${items.length} items` : "No items found — add them below by hand" } : x)));
         } else {
           const { recipe, lines } = await postJson("/api/onboarding/import-recipe", { file_storage_path: path });
           const draftLines: LineDraft[] = (lines as ApiLine[]).map((l) => {
             const matched = l.matched_ingredient_id && ingById.has(l.matched_ingredient_id) ? l.matched_ingredient_id : "";
-            const fresh = newIngredientUnit(l.unit_guess, l.quantity_guess);
+            const fresh = l.new_ingredient
+              ? { unit: l.new_ingredient.unit, qty: l.new_ingredient.quantity }
+              : newIngredientUnit(l.unit_guess, l.quantity_guess);
+            const free = l.match_status === "free"; // water: no cost, left out
             return {
               key: newKey(),
-              include: true,
+              include: !free,
               raw: l.raw_text,
               qtyGuess: l.quantity_guess,
               unitGuess: l.unit_guess,
-              choice: matched || "new",
-              status: matched ? l.match_status : "new_ingredient",
+              choice: free ? "" : matched || "new",
+              status: free ? "free" : matched ? l.match_status : "new_ingredient",
               candidates: l.candidates,
-              qty: matched ? (l.base_quantity == null ? "" : String(l.base_quantity)) : fresh.qty == null ? "" : String(fresh.qty),
-              newName: titleCase(l.item_name_guess ?? l.raw_text),
+              qty: free ? "" : matched ? (l.base_quantity == null ? "" : String(l.base_quantity)) : fresh.qty == null ? "" : String(fresh.qty),
+              newName: l.new_ingredient?.name ?? titleCase(l.item_name_guess ?? l.raw_text),
               newUnit: fresh.unit,
               newCategory: "",
+              note: l.note ?? "",
             };
           });
           newDrafts.push({
@@ -165,11 +175,49 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
         setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, status: "failed", note: err instanceof Error ? err.message : "Couldn't read it" } : x)));
       }
     }
-    // Link each menu item to the recipe it's most likely made from.
-    const recipeOptions = [...recipes.map((r) => ({ value: `id:${r.id}`, label: r.name })), ...newDrafts.map((d) => ({ value: `draft:${d.key}`, label: d.name }))];
     setDrafts((cur) => [...cur, ...newDrafts]);
-    setMenu((cur) => [...cur, ...newMenu.map((m) => ({ ...m, recipe: bestRecipe(m.name, recipeOptions) }))]);
+    setMenu((cur) => [...cur, ...newMenu]);
     setPhase("review");
+    await linkMenu(newMenu, [...drafts, ...newDrafts]);
+  }
+
+  // Suggest the recipe each new menu item is made from (and its portion),
+  // across existing recipes and the ones just read. Falls back to name
+  // overlap if the call fails.
+  async function linkMenu(items: MenuDraft[], allDrafts: RecipeDraft[]) {
+    const candidates = [
+      ...recipes.map((r) => ({ key: `id:${r.id}`, name: r.name, yield_qty: r.yieldQty, yield_unit: r.yieldUnit, ingredients: r.ingredients.slice(0, 60) })),
+      ...allDrafts.filter((d) => d.include).map((d) => ({
+        key: `draft:${d.key}`,
+        name: d.name,
+        yield_qty: d.yieldQty !== "" && Number.isFinite(Number(d.yieldQty)) ? Number(d.yieldQty) : null,
+        yield_unit: d.yieldUnit || null,
+        ingredients: d.lines
+          .filter((l) => l.include)
+          .map((l) => (l.choice && l.choice !== "new" ? ingById.get(l.choice)?.name : l.newName) ?? l.raw)
+          .slice(0, 60),
+      })),
+    ];
+    if (!items.length || !candidates.length) return;
+    setLinking(true);
+    let patch: Map<string, Partial<MenuDraft>>;
+    try {
+      const { links } = await postJson("/api/onboarding/link-menu", {
+        menu: items.map((m) => ({ key: m.key, name: m.name, price: m.price === "" ? null : Number(m.price) })),
+        recipes: candidates,
+      });
+      patch = new Map(
+        (links as { key: string; recipe_key: string | null; servings_per_batch: number | null; note: string }[]).map((l) => [
+          l.key,
+          { recipe: l.recipe_key ?? "", servings: l.servings_per_batch == null ? "" : String(l.servings_per_batch), note: l.note },
+        ]),
+      );
+    } catch {
+      const options = candidates.map((c) => ({ value: c.key, label: c.name }));
+      patch = new Map(items.map((m) => [m.key, { recipe: bestRecipe(m.name, options) }]));
+    }
+    setMenu((cur) => cur.map((m) => (patch.has(m.key) ? { ...m, ...patch.get(m.key) } : m)));
+    setLinking(false);
   }
 
   const setDraft = (key: string, patch: Partial<RecipeDraft>) => setDrafts((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
@@ -188,7 +236,8 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
   };
   const recipeError = (d: RecipeDraft) =>
     !d.include ? null : !d.name.trim() ? "Name the recipe" : !(num(d.yieldQty) > 0) ? "How many does a batch make?" : d.lines.some(lineError) ? "Finish the highlighted lines" : null;
-  const rowError = (m: MenuDraft) => (!m.include ? null : !m.name.trim() ? "Name" : !(num(m.price) >= 0) ? "Price" : null);
+  const rowError = (m: MenuDraft) =>
+    !m.include ? null : !m.name.trim() ? "Name" : !(num(m.price) >= 0) ? "Price" : m.servings.trim() !== "" && !(num(m.servings) > 0) ? "Servings" : null;
   const included = drafts.filter((d) => d.include);
   const includedMenu = menu.filter((m) => m.include);
   const problems = included.filter(recipeError).length + includedMenu.filter(rowError).length;
@@ -231,7 +280,13 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
       // 3. Menu items, linked to an existing recipe or one just created.
       for (const m of includedMenu) {
         const recipe_id = m.recipe.startsWith("id:") ? m.recipe.slice(3) : m.recipe.startsWith("draft:") ? recipeIdByDraft.get(m.recipe.slice(6)) : undefined;
-        await postJson("/api/menu-items", { name: m.name.trim(), selling_price: num(m.price), ...(recipe_id ? { recipe_id } : {}) });
+        const servings = num(m.servings);
+        await postJson("/api/menu-items", {
+          name: m.name.trim(),
+          selling_price: num(m.price),
+          ...(recipe_id ? { recipe_id } : {}),
+          ...(recipe_id && servings > 0 ? { servings_per_batch: servings } : {}),
+        });
       }
       setSaved({ ingredients: wanted.size, recipes: included.length, menu: includedMenu.length });
       setPhase("done");
@@ -263,6 +318,16 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
       </div>
     );
   }
+
+  // The recipe's own yield: what "per batch" means when left blank.
+  const yieldOf = (value: string) => {
+    if (value.startsWith("draft:")) {
+      const d = drafts.find((x) => x.key === value.slice(6));
+      return d?.yieldQty ? `${d.yieldQty} ${d.yieldUnit}` : "";
+    }
+    const r = recipes.find((x) => `id:${x.id}` === value);
+    return r?.yieldQty != null ? `${r.yieldQty} ${r.yieldUnit ?? ""}`.trim() : "";
+  };
 
   const recipeOptions = [
     ...drafts.filter((d) => d.include).map((d) => ({ value: `draft:${d.key}`, label: `${d.name || "Untitled"} (new)` })),
@@ -366,9 +431,10 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
                               </td>
                               <td className="px-2 py-1.5 text-[13px] text-stone-800">
                                 {l.raw}
-                                <span className={`ml-1.5 rounded px-1 text-[10px] font-semibold ${l.choice === "new" ? "bg-orange-50 text-orange-700" : l.status === "auto_matched" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                                  {l.choice === "new" ? "New ingredient?" : l.status === "auto_matched" ? "Matched" : "Check"}
+                                <span className={`ml-1.5 rounded px-1 text-[10px] font-semibold ${l.status === "free" ? "bg-stone-100 text-stone-600" : l.choice === "new" ? "bg-orange-50 text-orange-700" : l.status === "auto_matched" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                                  {l.status === "free" ? "No cost" : l.choice === "new" ? "New ingredient?" : l.status === "auto_matched" ? "Matched" : "Check"}
                                 </span>
+                                {l.note && <span data-testid="line-note" className="mt-0.5 block text-[11px] text-stone-500">{l.note}</span>}
                               </td>
                               <td className="px-2 py-1.5">
                                 <select
@@ -426,7 +492,7 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
                         })}
                       </tbody>
                     </table>
-                    <button type="button" onClick={() => setDraft(d.key, { lines: [...d.lines, { key: newKey(), include: true, raw: "(added)", qtyGuess: null, unitGuess: null, choice: "", status: "confirmed", candidates: [], qty: "", newName: "", newUnit: "lb", newCategory: "" }] })} className="mt-1 text-xs font-medium text-amber-700">
+                    <button type="button" onClick={() => setDraft(d.key, { lines: [...d.lines, { key: newKey(), include: true, raw: "(added)", qtyGuess: null, unitGuess: null, choice: "", status: "confirmed", candidates: [], qty: "", newName: "", newUnit: "lb", newCategory: "", note: "" }] })} className="mt-1 text-xs font-medium text-amber-700">
                       + Add an ingredient line
                     </button>
                   </div>
@@ -440,20 +506,24 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
 
           <section aria-label="Menu items to add" className="overflow-hidden rounded-lg border border-stone-200 bg-white">
             <header className="flex items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3 py-2">
-              <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">Menu items · {includedMenu.length}</h2>
-              <button type="button" onClick={() => setMenu((ms) => [...ms, { key: newKey(), include: true, name: "", price: "", recipe: "" }])} className="text-xs font-medium text-amber-700">+ Add a menu item</button>
+              <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">
+                Menu items · {includedMenu.length}
+                {linking && <span className="ml-2 font-normal tracking-normal text-amber-700 normal-case">matching to recipes…</span>}
+              </h2>
+              <button type="button" onClick={() => setMenu((ms) => [...ms, { key: newKey(), include: true, name: "", price: "", recipe: "", servings: "", note: "" }])} className="text-xs font-medium text-amber-700">+ Add a menu item</button>
             </header>
             {menu.length === 0 ? (
               <p className="px-3 py-4 text-sm text-stone-500">No menu items read. Add them above, or skip — you can add them on Menu any time.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px]">
+                <table className="w-full min-w-[680px]">
                   <thead>
                     <tr>
                       <th className={`${th} w-8`} />
                       <th className={th}>Name</th>
                       <th className={`${th} w-28 text-right`}>Price</th>
                       <th className={th}>Made from recipe</th>
+                      <th className={`${th} w-32 text-right`}>Per batch</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -465,10 +535,22 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
                           <td className="px-2 py-1.5"><input aria-label="Menu item name" className={`${cell} ${err === "Name" ? "border-red-400 bg-red-50" : ""}`} value={m.name} onChange={(e) => setRow(m.key, { name: e.target.value })} /></td>
                           <td className="px-2 py-1.5"><input aria-label={`Price for ${m.name}`} inputMode="decimal" className={`${cell} text-right tabular-nums ${err === "Price" ? "border-red-400 bg-red-50" : ""}`} value={m.price} onChange={(e) => setRow(m.key, { price: e.target.value })} /></td>
                           <td className="px-2 py-1.5">
-                            <select aria-label={`Recipe for ${m.name}`} className={cell} value={m.recipe} onChange={(e) => setRow(m.key, { recipe: e.target.value })}>
+                            <select aria-label={`Recipe for ${m.name}`} className={cell} value={m.recipe} onChange={(e) => setRow(m.key, { recipe: e.target.value, note: "" })}>
                               <option value="">No recipe yet</option>
                               {recipeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
+                            {m.note && <span data-testid="menu-note" className="mt-0.5 block text-[11px] text-stone-500">{m.note}</span>}
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <input
+                              aria-label={`Servings per batch for ${m.name}`}
+                              inputMode="decimal"
+                              disabled={!m.recipe}
+                              className={`${cell} text-right tabular-nums disabled:bg-stone-50 ${err === "Servings" ? "border-red-400 bg-red-50" : ""}`}
+                              value={m.servings}
+                              placeholder={yieldOf(m.recipe)}
+                              onChange={(e) => setRow(m.key, { servings: e.target.value })}
+                            />
                           </td>
                         </tr>
                       );
@@ -480,7 +562,7 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
           </section>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={save} disabled={phase === "saving" || (!included.length && !includedMenu.length)} className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-40">
+            <button type="button" onClick={save} disabled={phase === "saving" || linking || (!included.length && !includedMenu.length)} className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-40">
               {phase === "saving" ? "Saving…" : `Save ${included.length} recipe${included.length === 1 ? "" : "s"} and ${includedMenu.length} menu item${includedMenu.length === 1 ? "" : "s"}`}
             </button>
             <button type="button" onClick={() => setPhase("pick")} disabled={phase === "saving"} className="text-sm text-stone-600 underline">

@@ -15,7 +15,7 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
   if (!orgId) redirect("/login");
   const [{ data: ingredients }, { data: recipes }, { data: org }] = await Promise.all([
     supabase.from("ingredients").select("id, name, base_unit").order("name"),
-    supabase.from("recipes").select("id, name").order("name"),
+    supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit, recipe_ingredients(ingredients(name))").order("name"),
     supabase.from("organizations").select("name").eq("id", orgId).single(),
   ]);
 
@@ -41,7 +41,17 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
           <li className="rounded-lg border border-stone-200 bg-white px-3 py-2"><b className="text-stone-900">3. Save.</b> Then scan an invoice and your margins fill in.</li>
         </ol>
       )}
-      <OnboardingImport orgId={orgId} ingredients={ingredients ?? []} recipes={recipes ?? []} />
+      <OnboardingImport
+        orgId={orgId}
+        ingredients={ingredients ?? []}
+        recipes={(recipes ?? []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          yieldQty: r.batch_yield_qty == null ? null : Number(r.batch_yield_qty),
+          yieldUnit: r.batch_yield_unit,
+          ingredients: r.recipe_ingredients.map((ri) => ri.ingredients?.name).filter((n): n is string => !!n),
+        }))}
+      />
     </>
   );
 }
