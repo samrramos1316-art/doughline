@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { localDateFrom } from "@/lib/dates/localDate";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { createIngredientSchema } from "@/lib/validators/ingredient";
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       unit_cost: current_unit_cost,
       unit: rest.base_unit,
       source: "manual",
+      effective_date: localDateFrom(request),
     });
   }
 

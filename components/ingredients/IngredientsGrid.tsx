@@ -10,6 +10,7 @@ import {
   type GridColumn,
   type GridRow,
 } from "@/components/grid/EditableGrid";
+import { LOCAL_DATE_HEADER, browserLocalDate } from "@/lib/dates/localDate";
 
 export type IngredientRecord = {
   id: string;
@@ -75,7 +76,7 @@ function IngredientsGridForm({
   });
 
   async function post(body: BodyInit, contentType: string) {
-    const res = await fetch("/api/ingredients/import", { method: "POST", headers: { "Content-Type": contentType }, body });
+    const res = await fetch("/api/ingredients/import", { method: "POST", headers: { "Content-Type": contentType, [LOCAL_DATE_HEADER]: browserLocalDate() }, body });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       const details = (json.row_errors ?? []).map((e: { row: number; message: string }) => `Row ${e.row}: ${e.message}`);

@@ -30,6 +30,7 @@ export async function bulkUpsertIngredients(
   supabase: Client,
   orgId: string,
   input: IngredientRowInput[],
+  effectiveDate: string, // the business's local date (lib/dates/localDate.ts)
 ): Promise<{ errors: RowError[] } | { outcomes: RowOutcome[]; embeddingError: string | null }> {
   const { data: existing, error: loadErr } = await supabase
     .from("ingredients")
@@ -108,7 +109,7 @@ export async function bulkUpsertIngredients(
     if (error) throw new Error(error.message);
     inserts.forEach((r, i) => {
       outcomes.push({ row: r.row, id: created[i].id, name: r.name, action: "inserted", changes: [] });
-      if (r.cost != null) history.push({ org_id: orgId, ingredient_id: created[i].id, unit_cost: r.cost, unit: r.base_unit, source: "manual" });
+      if (r.cost != null) history.push({ org_id: orgId, ingredient_id: created[i].id, unit_cost: r.cost, unit: r.base_unit, source: "manual", effective_date: effectiveDate });
     });
   }
 
@@ -138,7 +139,7 @@ export async function bulkUpsertIngredients(
       update.current_unit_cost = r.cost;
       update.current_unit_cost_updated_at = now;
       changes.push(`cost ${t.current_unit_cost ?? "—"} → ${r.cost}`);
-      history.push({ org_id: orgId, ingredient_id: t.id, unit_cost: r.cost, unit: r.base_unit, source: "manual" });
+      history.push({ org_id: orgId, ingredient_id: t.id, unit_cost: r.cost, unit: r.base_unit, source: "manual", effective_date: effectiveDate });
     }
     if (changes.length) {
       update.updated_at = now;

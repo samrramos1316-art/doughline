@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { parseCsv } from "@/lib/csv";
+import { localDateFrom } from "@/lib/dates/localDate";
 import { bulkUpsertIngredients, type IngredientRowInput } from "@/lib/ingredients/bulkUpsert";
 
 // One Voyage call for every new/renamed ingredient, retried on 429s.
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
   }
   if (rows.length > 2000) return NextResponse.json({ error: "At most 2000 rows per import" }, { status: 400 });
 
-  const result = await bulkUpsertIngredients(supabase, orgId, rows);
+  const result = await bulkUpsertIngredients(supabase, orgId, rows, localDateFrom(request));
   if ("errors" in result) {
     return NextResponse.json({ error: "Nothing was saved — fix these rows first", row_errors: result.errors }, { status: 400 });
   }

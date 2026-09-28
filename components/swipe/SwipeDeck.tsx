@@ -67,7 +67,7 @@ export function SwipeDeck({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<NewIngredientForm | null>(null);
-  const [tally, setTally] = useState({ confirmed: 0, created: 0, skipped: 0 });
+  const [tally, setTally] = useState({ confirmed: 0, created: 0, skipped: 0, ignored: 0 });
 
   const current = queue[index];
   const candidates = visibleCandidates(current);
@@ -129,6 +129,14 @@ export function SwipeDeck({
     }
   }
 
+  // Gloves, sanitizer, deposits: resolve the line without an ingredient.
+  function notAnIngredient() {
+    return run(async () => {
+      await postJson(`/api/line-items/${current.id}/not-ingredient`, {});
+      advance("ignored");
+    });
+  }
+
   function createIngredient(e: React.FormEvent) {
     e.preventDefault();
     if (!form) return;
@@ -147,7 +155,8 @@ export function SwipeDeck({
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center">
         <p className="text-lg font-medium text-zinc-900">All caught up</p>
         <p className="text-sm text-zinc-500">
-          {tally.confirmed} confirmed · {tally.created} added as new · {tally.skipped} skipped for now
+          {tally.confirmed} confirmed · {tally.created} added as new
+          {tally.ignored > 0 && ` · ${tally.ignored} not ingredients`} · {tally.skipped} skipped for now
         </p>
         <Link href={doneHref} className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white">
           {doneLabel}
@@ -269,6 +278,17 @@ export function SwipeDeck({
             ))}
           </select>
         </label>
+      )}
+
+      {!form && (
+        <button
+          type="button"
+          onClick={notAnIngredient}
+          disabled={busy}
+          className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900 disabled:opacity-50"
+        >
+          Not an ingredient (supplies, fees) — don&apos;t track it
+        </button>
       )}
 
       <p className="text-xs text-zinc-400">Drag the card, or use the buttons</p>

@@ -7,6 +7,7 @@ const STATUS_MAP: Record<string, { key: StatusKey; label: string }> = {
   needs_review: { key: "warning", label: "Needs review" },
   new_ingredient: { key: "serious", label: "New ingredient?" },
   rejected: { key: "critical", label: "Rejected" },
+  not_ingredient: { key: "neutral", label: "Not an ingredient" },
 };
 
 export function LineItemStatusBadge({ status }: { status: string }) {
