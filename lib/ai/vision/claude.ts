@@ -6,6 +6,9 @@ import type { VisionProvider, VisionExtractionResult, MenuExtractionResult, Reci
 // §5.3's extraction contract, as Zod. Structured outputs constrain sampling to
 // this schema, so the response is guaranteed to parse — no retry loop.
 const ExtractionSchema = z.object({
+  document_type: z
+    .enum(["invoice", "menu", "recipe", "other"])
+    .describe("What this page is; only an invoice has line items"),
   vendor_name_guess: z.string().nullable(),
   invoice_date_guess: z.string().nullable().describe("ISO 8601 date (YYYY-MM-DD)"),
   invoice_number_guess: z.string().nullable(),
@@ -31,6 +34,16 @@ const ExtractionSchema = z.object({
 });
 
 const SYSTEM_PROMPT = `You extract line items from supplier invoices, packing slips, and receipts for a small food business. The input is usually a phone photo: it may be skewed, crumpled, or partly shadowed.
+
+First decide document_type:
+- "invoice": a record of goods the business BOUGHT from a supplier — invoice, packing slip, delivery ticket, or store receipt. It names a seller and lists purchased items with quantities and prices.
+- "menu": items the business SELLS to its own customers, with customer prices (a menu board, price list, or catering menu). No supplier, no quantities bought.
+- "recipe": ingredients and amounts for making something, usually with a yield or method.
+- "other": anything else (a letter, a statement or price quote with nothing bought, a blank or unreadable page).
+If document_type is not "invoice", return every other field null and line_items empty — do not force a menu or recipe into invoice shape.
+
+For an invoice:
+- vendor_name_guess: the SELLER (the supplier whose name heads the invoice), never the "bill to" / "ship to" customer.
 
 - raw_text: copy each item description exactly as printed, abbreviations and codes included (e.g. "ORG CHKN BRST 40# CS"). Do not expand or correct it — it is matched against the vendor's past wording later.
 - item_name: the plain-English, generic name of the product as a cook would write it on an ingredient list — abbreviations expanded, no brand, pack size, case count, or item code (e.g. "ORG CHKN BRST 40# CS" -> "organic chicken breast"). null if you can't tell what the product is.

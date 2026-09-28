@@ -18,7 +18,13 @@ export interface ExtractedLineItem {
   pack_unit: string | null;
 }
 
+// What the uploaded page actually is. Only an invoice gets line items: a
+// menu or recipe sent to the invoice importer is turned away with a pointer
+// to its own import (§9.3) instead of being misread as a purchase.
+export type DocumentType = "invoice" | "menu" | "recipe" | "other";
+
 export interface VisionExtractionResult {
+  document_type: DocumentType;
   vendor_name_guess: string | null;
   invoice_date_guess: string | null; // ISO date
   invoice_number_guess: string | null;

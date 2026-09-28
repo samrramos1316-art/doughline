@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/media/compressImage";
@@ -14,6 +15,8 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Set when the photo turned out to be a menu or recipe (§9.3).
+  const [importUrl, setImportUrl] = useState<string | null>(null);
 
   function handleCapture(capturedFile: File, url: string) {
     setFile(capturedFile);
@@ -26,6 +29,7 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
     setFile(null);
     setPreviewUrl(null);
     setErrorMessage(null);
+    setImportUrl(null);
   }
 
   async function handleUpload() {
@@ -59,6 +63,7 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
       setStage("reading");
       const scanRes = await fetch(`/api/invoices/${invoiceId}/scan`, { method: "POST" });
       const scan = await scanRes.json().catch(() => ({}));
+      if (scanRes.status === 422 && scan.not_invoice) setImportUrl(scan.import_url ?? null);
       if (!scanRes.ok) throw new Error(scan.error ?? "Couldn't read this invoice");
 
       setStage("done");
@@ -125,6 +130,11 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
       {stage === "error" && (
         <div className="flex flex-col items-center gap-3">
           <p className="text-sm font-medium text-red-600">{errorMessage}</p>
+          {importUrl && (
+            <Link href={importUrl} className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white">
+              Go to menu &amp; recipe import
+            </Link>
+          )}
           <button
             type="button"
             onClick={reset}

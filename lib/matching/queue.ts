@@ -10,7 +10,7 @@ export async function loadReviewQueue(supabase: SupabaseClient<Database>, invoic
   let query = supabase
     .from("invoice_line_items")
     .select(
-      "id, raw_text, parsed_item_name, parsed_quantity, parsed_unit, parsed_unit_cost, match_status, candidate_matches, invoices(invoice_number, vendors(name))",
+      "id, raw_text, parsed_item_name, parsed_quantity, parsed_unit, parsed_unit_cost, parsed_pack_quantity, parsed_pack_unit, match_status, candidate_matches, invoices(invoice_number, vendors(name))",
     )
     .in("match_status", [...UNRESOLVED_STATUSES])
     .order("created_at", { ascending: true })
@@ -31,6 +31,8 @@ export async function loadReviewQueue(supabase: SupabaseClient<Database>, invoic
     parsed_quantity: r.parsed_quantity,
     parsed_unit: r.parsed_unit,
     parsed_unit_cost: r.parsed_unit_cost,
+    pack_quantity: r.parsed_pack_quantity,
+    pack_unit: r.parsed_pack_unit,
     match_status: r.match_status,
     candidate_matches: parseCandidates(r.candidate_matches),
     context: invoiceId

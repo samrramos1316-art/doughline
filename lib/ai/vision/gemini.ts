@@ -15,6 +15,7 @@ export class GeminiVisionProvider implements VisionProvider {
     // passing fileBuffer as inline image/pdf data, and map its response into
     // VisionExtractionResult.
     return {
+      document_type: "invoice",
       vendor_name_guess: null,
       invoice_date_guess: null,
       invoice_number_guess: null,

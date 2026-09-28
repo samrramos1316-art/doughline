@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getVisionProvider } from "@/lib/ai/vision";
 import { resolveVendorId } from "@/lib/matching/vendors";
 import { insertAndMatchLines } from "@/lib/invoices/lines";
+import type { DocumentType } from "@/lib/ai/vision/types";
+
+const ONBOARDING_IMPORT_URL = "/onboarding/import";
 
 // Claude and Voyage calls (Voyage retries 429s on its free tier) can take
 // most of a minute; don't let the platform's default timeout cut them off.
@@ -13,6 +16,12 @@ const EXT_TO_MIME: Record<string, string> = {
   jpeg: "image/jpeg",
   png: "image/png",
   pdf: "application/pdf",
+};
+
+const NOT_INVOICE: Record<Exclude<DocumentType, "invoice">, { message: string; importUrl: string | null }> = {
+  menu: { message: "This looks like a menu, not an invoice. Add menus with the menu & recipe import.", importUrl: ONBOARDING_IMPORT_URL },
+  recipe: { message: "This looks like a recipe, not an invoice. Add recipes with the menu & recipe import.", importUrl: ONBOARDING_IMPORT_URL },
+  other: { message: "This doesn't look like an invoice or receipt — nothing was imported.", importUrl: null },
 };
 
 // §5.2 step 4: fetch the file from Storage, run it through the configured
@@ -68,13 +77,25 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Vision extraction failed" }, { status: 502 });
   }
 
+  // A menu or recipe sent here by mistake: don't keep it as a failed invoice
+  // (or worse, as a purchase from the business itself). Drop the row and
+  // point at the import that reads it properly (§9.3).
+  if (extraction.document_type !== "invoice") {
+    await supabase.from("invoices").delete().eq("id", id);
+    const kind = NOT_INVOICE[extraction.document_type];
+    return NextResponse.json(
+      { error: kind.message, not_invoice: true, document_type: extraction.document_type, import_url: kind.importUrl },
+      { status: 422 },
+    );
+  }
+
   if (extraction.line_items.length === 0) {
     await supabase
       .from("invoices")
       .update({
         status: "failed",
         raw_extraction: JSON.parse(JSON.stringify(extraction)),
-        error_message: "No line items extracted",
+        error_message: "no purchased items could be read from it",
       })
       .eq("id", id);
     return NextResponse.json({ invoice_id: id, status: "failed", extraction });

@@ -38,6 +38,25 @@ export function canonicalUnit(unit: string | null | undefined): string | null {
   return ALIASES[u] ?? null;
 }
 
+// Kitchen units compare by canonical form; anything else (case, bag, flat,
+// tub…) by its lowercased singular, so "Cases" on an invoice is the same
+// unit as an ingredient costed per "case".
+function unitKey(unit: string | null | undefined): string | null {
+  if (!unit) return null;
+  const canonical = canonicalUnit(unit);
+  if (canonical) return canonical;
+  const u = unit.trim().toLowerCase().replace(/\.$/, "").replace(/\s+/g, " ");
+  if (!u) return null;
+  if (/(ch|sh|x|ss)es$/.test(u)) return u.slice(0, -2); // boxes → box
+  if (u.endsWith("s") && !u.endsWith("ss")) return u.slice(0, -1); // cases → case
+  return u;
+}
+
+export function sameUnit(a: string | null | undefined, b: string | null | undefined): boolean {
+  const ka = unitKey(a);
+  return ka != null && ka === unitKey(b);
+}
+
 // How many `to` are in one `from` (lb → oz = 16), or null if either unit is
 // unknown or they measure different things (a case of lb is not in gallons).
 export function conversionFactor(from: string | null | undefined, to: string | null | undefined): number | null {
@@ -77,6 +96,7 @@ export function toBaseUnitCost(
     cost: round4(unitCost / factor),
     basis: `$${unitCost} per ${line.unit}`,
   });
+  if (!canonicalUnit(line.unit) && sameUnit(line.unit, baseUnit)) return { ok: true, cost: round4(unitCost), basis: `$${unitCost} per ${line.unit}` };
   if (direct && unitDim !== "count") return byDirect(direct);
 
   const packFactor = conversionFactor(line.pack_unit, baseUnit);

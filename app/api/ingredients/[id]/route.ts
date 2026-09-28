@@ -5,6 +5,7 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { updateIngredientSchema } from "@/lib/validators/ingredient";
 import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
+import { retryUnappliedPrices } from "@/lib/costing/retryPrices";
 
 // Claude and Voyage calls (Voyage retries 429s on its free tier) can take
 // most of a minute; don't let the platform's default timeout cut them off.
@@ -50,6 +51,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("id", id)
     .select(INGREDIENT_COLUMNS)
     .single();
+  if (error?.code === "23505") {
+    return NextResponse.json({ error: "You already have an ingredient with that name" }, { status: 409 });
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   if (current_unit_cost != null) {
@@ -63,7 +67,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
   }
 
-  return NextResponse.json({ ingredient });
+  // A new base unit may be one this ingredient's stuck invoice prices can
+  // now convert to.
+  const prices = rest.base_unit != null ? await retryUnappliedPrices(supabase, [id]) : [];
+
+  return NextResponse.json({ ingredient, prices_applied: prices.filter((p) => p.applied).length });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {

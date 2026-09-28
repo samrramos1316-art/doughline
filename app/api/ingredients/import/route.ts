@@ -4,6 +4,7 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { parseCsv } from "@/lib/csv";
 import { localDateFrom } from "@/lib/dates/localDate";
 import { bulkUpsertIngredients, type IngredientRowInput } from "@/lib/ingredients/bulkUpsert";
+import { retryUnappliedPrices } from "@/lib/costing/retryPrices";
 
 // One Voyage call for every new/renamed ingredient, retried on 429s.
 export const maxDuration = 300;
@@ -52,6 +53,9 @@ export async function POST(request: Request) {
   if ("errors" in result) {
     return NextResponse.json({ error: "Nothing was saved — fix these rows first", row_errors: result.errors }, { status: 400 });
   }
+  // Rows whose base unit changed may now convert their stuck invoice prices.
+  const unitChanged = result.outcomes.filter((o) => o.changes.some((c) => c.startsWith("base unit"))).map((o) => o.id);
+  const prices = await retryUnappliedPrices(supabase, unitChanged);
   const count = (a: string) => result.outcomes.filter((o) => o.action === a).length;
   return NextResponse.json({
     inserted: count("inserted"),
@@ -59,5 +63,6 @@ export async function POST(request: Request) {
     unchanged: count("unchanged"),
     outcomes: result.outcomes,
     embedding_error: result.embeddingError,
+    prices_applied: prices.filter((p) => p.applied).length,
   });
 }

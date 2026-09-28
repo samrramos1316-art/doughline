@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SwipeCard } from "./SwipeCard";
 import { SUGGESTION_DISPLAY_THRESHOLD } from "@/lib/matching/thresholds";
+import { canonicalUnit } from "@/lib/costing/units";
 
 type Candidate = { ingredient_id: string; name: string; similarity: number };
 
@@ -15,6 +16,8 @@ export type ReviewLineItem = {
   parsed_quantity: number | null;
   parsed_unit: string | null;
   parsed_unit_cost: number | null;
+  pack_quantity?: number | null;
+  pack_unit?: string | null;
   match_status: string;
   candidate_matches: Candidate[] | null;
   context?: string; // e.g. "Sysco · 7719-204583" in the org-wide queue
@@ -34,6 +37,18 @@ async function postJson(path: string, body: unknown) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
   return json;
+}
+
+// A starting point for "Create new": the product without its pack size
+// ("Unsalted Butter, 36 lb case" → "Unsalted Butter"), costed in the unit
+// recipes measure in — the pack's (lb), not the container's (case). The
+// invoice's case price is converted to it when the price is applied.
+function suggestNewIngredient(li: ReviewLineItem): NewIngredientForm {
+  const name = (li.item_name ?? "").replace(/,\s*(\d|flat|case|bag|box|each).*$/i, "").trim();
+  const pack = canonicalUnit(li.pack_unit);
+  const unit = canonicalUnit(li.parsed_unit);
+  const base_unit = pack === "dozen" ? "each" : (pack ?? (unit === "dozen" ? "each" : unit) ?? "");
+  return { name, base_unit, category: "" };
 }
 
 // Candidates worth putting in front of the user. Display only: a line's
@@ -65,6 +80,9 @@ export function SwipeDeck({
   const [index, setIndex] = useState(0);
   const [cardVersion, setCardVersion] = useState(0);
   const [busy, setBusy] = useState(false);
+  // Set synchronously, so a second click in the same tick can't send a
+  // second request before React re-renders the button as disabled.
+  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<NewIngredientForm | null>(null);
   const [tally, setTally] = useState({ confirmed: 0, created: 0, skipped: 0, ignored: 0 });
@@ -84,6 +102,8 @@ export function SwipeDeck({
   }
 
   async function run(action: () => Promise<void>) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -92,6 +112,7 @@ export function SwipeDeck({
       setError(err instanceof Error ? err.message : "Something went wrong");
       setCardVersion((v) => v + 1); // bring the card back after its exit animation
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -122,7 +143,7 @@ export function SwipeDeck({
       });
     }
     if (direction === "right") {
-      setForm({ name: "", base_unit: "", category: "" });
+      setForm(suggestNewIngredient(current));
       setCardVersion((v) => v + 1);
     } else {
       advance("skipped");
@@ -208,6 +229,9 @@ export function SwipeDeck({
               ))}
             </datalist>
           </label>
+          <p className="-mt-1 text-xs text-zinc-500">
+            Use the unit your recipes measure in (lb, oz, each). A case or bag price is converted for you.
+          </p>
           <label className="flex flex-col gap-1 text-sm text-zinc-700">
             Category (optional)
             <input
@@ -258,6 +282,7 @@ export function SwipeDeck({
         </div>
       )}
 
+      {busy && form && <p className="text-xs text-zinc-500">Saving… this can take a few seconds.</p>}
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
 
       {!form && (

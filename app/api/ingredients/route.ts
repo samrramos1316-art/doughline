@@ -50,6 +50,9 @@ export async function POST(request: Request) {
     })
     .select(INGREDIENT_COLUMNS)
     .single();
+  if (error?.code === "23505") {
+    return NextResponse.json({ error: `You already have an ingredient called "${rest.name}"` }, { status: 409 });
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   // Cost is never just a stored number — every value is backed by a

@@ -9,7 +9,7 @@ import { compressImage } from "@/lib/media/compressImage";
 const MAX_FILES = 25; // matches BULK_IMPORT_MAX on the server
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
-type ItemStatus = "ready" | "uploading" | "queued" | "reading" | "needs_review" | "completed" | "failed" | "error";
+type ItemStatus = "ready" | "uploading" | "queued" | "reading" | "needs_review" | "completed" | "failed" | "not_invoice" | "error";
 
 type Item = {
   key: string;
@@ -20,6 +20,7 @@ type Item = {
   status: ItemStatus;
   lines?: number;
   message?: string;
+  importUrl?: string | null;
 };
 
 export type WaitingInvoice = { id: string; file_type: string; created_at: string };
@@ -32,6 +33,7 @@ const STATUS_TEXT: Record<ItemStatus, string> = {
   needs_review: "Needs review",
   completed: "Done",
   failed: "Couldn't read it",
+  not_invoice: "Not an invoice",
   error: "Error",
 };
 
@@ -43,6 +45,7 @@ const STATUS_CLASS: Record<ItemStatus, string> = {
   needs_review: "text-amber-700",
   completed: "text-green-700",
   failed: "text-red-700",
+  not_invoice: "text-amber-700",
   error: "text-red-700",
 };
 
@@ -91,6 +94,11 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
       try {
         const res = await fetch(`/api/invoices/${invoiceId}/scan`, { method: "POST" });
         const body = await res.json().catch(() => ({}));
+        if (res.status === 422 && body.not_invoice) {
+          // A menu or recipe: the route dropped the invoice row.
+          update(key, { status: "not_invoice", invoiceId: undefined, message: body.error, importUrl: body.import_url });
+          continue;
+        }
         if (!res.ok) {
           // 502 = extraction threw; the route has already marked it 'failed'.
           update(key, res.status === 502 ? { status: "failed", message: body.error } : { status: "error", message: body.error ?? `HTTP ${res.status}` });
@@ -99,7 +107,7 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
         update(key, {
           status: body.status === "failed" ? "failed" : body.status === "completed" ? "completed" : "needs_review",
           lines: body.line_items?.length ?? 0,
-          message: body.status === "failed" ? "No line items found" : undefined,
+          message: body.status === "failed" ? "No purchased items found on it" : undefined,
         });
       } catch (err) {
         update(key, { status: "error", message: err instanceof Error ? err.message : "Network error" });
@@ -168,7 +176,7 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
   }
 
   const readyCount = items.filter((i) => i.status === "ready").length;
-  const finished = items.filter((i) => ["needs_review", "completed", "failed", "error"].includes(i.status));
+  const finished = items.filter((i) => ["needs_review", "completed", "failed", "not_invoice", "error"].includes(i.status));
 
   return (
     <div className="flex flex-col gap-4">
@@ -242,6 +250,11 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
                     Enter by hand
                   </Link>
                 )}
+                {it.status === "not_invoice" && it.importUrl && (
+                  <Link href={it.importUrl} className="font-medium text-zinc-900 underline">
+                    Import it there
+                  </Link>
+                )}
                 {it.invoiceId && it.status === "needs_review" && (
                   <Link href={`/invoices/${it.invoiceId}/review`} className="font-medium text-zinc-900 underline">
                     Review
@@ -280,7 +293,8 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
         {!running && finished.length > 0 && (
           <p className="text-sm text-zinc-600" role="status">
             {finished.length} processed — {finished.filter((i) => i.status === "needs_review").length} need review,{" "}
-            {finished.filter((i) => i.status === "failed").length} to enter by hand.
+            {finished.filter((i) => i.status === "failed").length} to enter by hand
+            {finished.some((i) => i.status === "not_invoice") && `, ${finished.filter((i) => i.status === "not_invoice").length} not invoices`}.
           </p>
         )}
       </div>
