@@ -217,17 +217,28 @@ days); screenshots in `test-output/market/`.
   SW active, Chrome reports no installability errors, offline screen from
   cache then auto-reload on reconnect, only `/offline` cached, install card.
 
+## Security fix — costing views leaked across orgs (migration `021`)
+
+- `recipe_costs` and `menu_item_margins` were plain views owned by
+  `postgres`, so they skipped RLS: any signed-in user could read every org's
+  recipe costs and menu margins. Found when a brand-new signup's dashboard
+  showed the demo org's menu. Both are now `security_invoker`; a fresh
+  account sees 0 rows, owners still see theirs.
+- `scripts/test-rls-isolation.mjs` now checks both views both ways.
+- Supabase "Confirm email" is off (Supabase's mailer couldn't deliver to
+  real users); signup → dashboard → log out → log in verified on the live site.
+
 ## Not started yet
 
 - Gemini vision provider (needs `GEMINI_API_KEY`).
 
 ## Known issues
 
-- Signup confirmation emails: Supabase's built-in email service only
-  delivers to the Supabase project's team members, and ~2 emails/hour. Real
-  signups need either custom SMTP (Supabase → Authentication → Emails) or
-  email confirmation turned off. The app now handles all three cases
-  (check-email screen, unconfirmed-login message + resend, /auth/confirm).
+- Email confirmation is off, so anyone can sign up with an address they
+  don't own. Before real customers: set up custom SMTP (Supabase →
+  Authentication → Emails) and turn "Confirm email" back on. The app already
+  handles that flow (check-email screen, unconfirmed-login message + resend,
+  /auth/confirm).
 
 - Voyage account has no payment method → 3 requests/min. Scans and "Add
   new" wait on 429 retries (a re-scan took ~53s instead of ~10s).

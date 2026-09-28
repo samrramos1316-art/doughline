@@ -92,6 +92,21 @@ try {
   assert(res.data.length === 1 && res.data[0].name === "RLS Test Chicken Breast",
     "org A's ingredient survived untouched after org B's attempted hijack");
 
+  // 12. The costing views. Views run as their owner (bypassing RLS) unless
+  // they're security_invoker — migration 021 fixed exactly this leak.
+  await clientA.from("ingredients").update({ current_unit_cost: 0.01 }).eq("id", ingredientAId);
+  const { data: recipeA } = await clientA.from("recipes")
+    .insert({ org_id: orgAId, name: "RLS Test Recipe", batch_yield_qty: 10, batch_yield_unit: "each" }).select().single();
+  await clientA.from("recipe_ingredients").insert({ org_id: orgAId, recipe_id: recipeA.id, ingredient_id: ingredientAId, quantity: 100, unit: "g" });
+  await clientA.from("menu_items").insert({ org_id: orgAId, recipe_id: recipeA.id, name: "RLS Test Menu Item", selling_price: 5 });
+  for (const view of ["recipe_costs", "menu_item_margins"]) {
+    const own = await clientA.from(view).select("*");
+    const other = await clientB.from(view).select("*");
+    console.log(`${view}: user A sees ${own.data?.length}, user B sees ${other.data?.length}`);
+    assert(!own.error && own.data.length === 1 && own.data[0].org_id === orgAId, `user A sees their own row in ${view}`);
+    assert(!other.error && other.data.length === 0, `user B sees zero rows in ${view} (no other org's costs or margins)`);
+  }
+
   console.log("\nAll RLS isolation checks passed.");
 } finally {
   console.log("\nCleaning up test fixtures...");
