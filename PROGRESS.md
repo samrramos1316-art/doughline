@@ -276,6 +276,22 @@ days); screenshots in `test-output/market/`.
   "Not an ingredient" for supplies (remembered per vendor, migration 022);
   invoice totals now read and saved.
 
+## Fixes from outside testing (after the DoughTally rebrand)
+
+- Container units: an invoice line priced per case/bag/flat for an
+  ingredient costed in that same unit is applied as printed
+  (`lib/costing/units.ts` step 0) instead of "Can't convert 36 lb to case".
+  Changing a base unit (single edit or grid/CSV) retries that ingredient's
+  stuck invoice prices (`lib/costing/retryPrices.ts`).
+- "Add & match": embedding moved to `after()`, route is idempotent (resolved
+  line → its ingredient, existing name → reused, 23505 race → reused),
+  client guards double submits; migration `024` merged duplicates and adds a
+  unique `(org_id, lower(trim(name)))` index. The form is prefilled with the
+  product name and the pack's unit (lb, not case).
+- Invoice reading returns `document_type`; a menu/recipe/other page is
+  deleted and answered 422 with a link to `/onboarding/import`.
+- Tested: `scripts/test-import-guards-e2e.mjs`.
+
 ## Not started yet
 
 - Gemini vision provider (needs `GEMINI_API_KEY`).
@@ -311,6 +327,7 @@ days); screenshots in `test-output/market/`.
 - `scripts/test-auth-e2e.mjs [--base=https://…]` (login/signup/confirm flows, landing page)
 - `scripts/test-business-e2e.mjs [--base=…] [--keep]` (a whole bakery, live Claude/Voyage)
 - `scripts/test-onboarding-e2e.mjs [--base=…] [--keep]` (§9.3 import)
+- `scripts/test-import-guards-e2e.mjs [--base=…] [--keep]` (menus/recipes turned away, case pricing, no duplicate ingredients)
 - `scripts/screenshot-app.mjs --email=… --password=…` (every screen, desktop + phone)
 - `scripts/test-pwa-e2e.mjs [--base=https://…]` (after `npm run build`; manifest, icons, service worker, offline, install card)
 - `scripts/make-icons.mjs` (regenerates the app icons, not a test)

@@ -36,10 +36,10 @@ const ExtractionSchema = z.object({
 const SYSTEM_PROMPT = `You extract line items from supplier invoices, packing slips, and receipts for a small food business. The input is usually a phone photo: it may be skewed, crumpled, or partly shadowed.
 
 First decide document_type:
-- "invoice": a record of goods the business BOUGHT from a supplier — invoice, packing slip, delivery ticket, or store receipt. It names a seller and lists purchased items with quantities and prices.
+- "invoice": a record of goods the business BOUGHT from a supplier — invoice, packing slip, delivery ticket, or store receipt. It names a seller and lists purchased items with quantities and prices. A receipt or invoice that is blurry, torn, or only partly legible is still "invoice" — return whatever lines you can read, even none.
 - "menu": items the business SELLS to its own customers, with customer prices (a menu board, price list, or catering menu). No supplier, no quantities bought.
 - "recipe": ingredients and amounts for making something, usually with a yield or method.
-- "other": anything else (a letter, a statement or price quote with nothing bought, a blank or unreadable page).
+- "other": clearly something else (a letter, a flyer, a photo of food, a price quote with nothing bought). When unsure, say "invoice".
 If document_type is not "invoice", return every other field null and line_items empty — do not force a menu or recipe into invoice shape.
 
 For an invoice:

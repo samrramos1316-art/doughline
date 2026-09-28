@@ -18,10 +18,9 @@ const EXT_TO_MIME: Record<string, string> = {
   pdf: "application/pdf",
 };
 
-const NOT_INVOICE: Record<Exclude<DocumentType, "invoice">, { message: string; importUrl: string | null }> = {
+const NOT_INVOICE: Record<Extract<DocumentType, "menu" | "recipe">, { message: string; importUrl: string }> = {
   menu: { message: "This looks like a menu, not an invoice. Add menus with the menu & recipe import.", importUrl: ONBOARDING_IMPORT_URL },
   recipe: { message: "This looks like a recipe, not an invoice. Add recipes with the menu & recipe import.", importUrl: ONBOARDING_IMPORT_URL },
-  other: { message: "This doesn't look like an invoice or receipt — nothing was imported.", importUrl: null },
 };
 
 // §5.2 step 4: fetch the file from Storage, run it through the configured
@@ -80,7 +79,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   // A menu or recipe sent here by mistake: don't keep it as a failed invoice
   // (or worse, as a purchase from the business itself). Drop the row and
   // point at the import that reads it properly (§9.3).
-  if (extraction.document_type !== "invoice") {
+  if (extraction.document_type === "menu" || extraction.document_type === "recipe") {
     await supabase.from("invoices").delete().eq("id", id);
     const kind = NOT_INVOICE[extraction.document_type];
     return NextResponse.json(
@@ -89,13 +88,19 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  if (extraction.line_items.length === 0) {
+  // Anything else that isn't an invoice fails like an unreadable scan, with
+  // the reason — it may still be a receipt the model misjudged, and a failed
+  // invoice keeps "Enter by hand".
+  if (extraction.document_type === "other" || extraction.line_items.length === 0) {
     await supabase
       .from("invoices")
       .update({
         status: "failed",
         raw_extraction: JSON.parse(JSON.stringify(extraction)),
-        error_message: "no purchased items could be read from it",
+        error_message:
+          extraction.document_type === "other"
+            ? "it doesn't look like an invoice or receipt"
+            : "no purchased items could be read from it",
       })
       .eq("id", id);
     return NextResponse.json({ invoice_id: id, status: "failed", extraction });

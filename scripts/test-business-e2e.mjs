@@ -160,7 +160,7 @@ async function bulkImport(page, files, label) {
   await page.getByRole("button", { name: /^Import \d+ files?$/ }).click();
   const t0 = Date.now();
   await page.waitForFunction(
-    (n) => [...document.querySelectorAll("[data-testid=import-item]")].filter((e) => ["needs_review", "completed", "failed", "error"].includes(e.dataset.status)).length >= n,
+    (n) => [...document.querySelectorAll("[data-testid=import-item]")].filter((e) => ["needs_review", "completed", "failed", "not_invoice", "error"].includes(e.dataset.status)).length >= n,
     files.length,
     { timeout: 15 * 60_000, polling: 1000 },
   );
