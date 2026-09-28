@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { BulkImportClient } from "@/components/invoices/BulkImportClient";
+import { PageHeader, Panel } from "@/components/ui/dash";
 
 export default async function ImportInvoicesPage() {
   const supabase = await createClient();
@@ -18,19 +19,24 @@ export default async function ImportInvoicesPage() {
     .order("created_at");
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Import past invoices</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Backfill your price history from old invoices. Each one is read and matched like a scan, and older prices
-          are saved to history without changing today&apos;s costs. For today&apos;s delivery,{" "}
-          <Link href="/invoices/scan" className="underline">
-            scan it
-          </Link>{" "}
-          instead.
-        </p>
+    <>
+      <PageHeader
+        title="Import invoices"
+        subtitle={<><Link href="/invoices" className="underline">Invoices</Link> · emailed PDFs, scans or photos, up to 25 at a time</>}
+      />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-8">
+          <BulkImportClient orgId={orgId} waiting={waiting ?? []} />
+        </div>
+        <Panel title="Good to know" className="xl:col-span-4">
+          <ul className="space-y-2 text-[13px] text-stone-600">
+            <li>Each file is read and matched to your ingredients exactly like a scan.</li>
+            <li><b className="text-stone-800">Older invoices</b> go into price history without changing today&apos;s costs or raising alerts.</li>
+            <li>Anything unreadable is flagged so you can type it in by hand.</li>
+            <li>For today&apos;s delivery on your phone, use <Link href="/invoices/scan" className="font-medium text-amber-700 underline">Scan</Link>.</li>
+          </ul>
+        </Panel>
       </div>
-      <BulkImportClient orgId={orgId} waiting={waiting ?? []} />
-    </div>
+    </>
   );
 }

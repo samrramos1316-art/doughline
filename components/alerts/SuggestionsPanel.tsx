@@ -13,20 +13,20 @@ export function SuggestionsPanel({ suggestions }: { suggestions: AlertSuggestion
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border border-zinc-200 bg-white p-4">
-        <p className="mb-3 text-sm font-medium text-zinc-700">Suggestions</p>
-        <ul className="flex flex-col gap-3">
+      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <p className="border-b border-stone-200 bg-stone-50/80 px-3 py-2 text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">Suggestions — what to do</p>
+        <ul className="flex flex-col divide-y divide-stone-100">
           {items.map((i) => (
-            <li key={i.menu_item_id} data-testid="suggestion" className="rounded-lg bg-zinc-50 p-3 text-sm text-zinc-800">
-              <p className="font-medium text-zinc-900">{i.menu_item_name}</p>
-              <p className="text-xs text-zinc-500">
+            <li key={i.menu_item_id} data-testid="suggestion" className="px-3 py-3 text-[13px] text-stone-800">
+              <p className="font-medium text-stone-900">{i.menu_item_name}</p>
+              <p className="text-xs text-stone-500">
                 {i.previous_margin_pct}% &rarr; {i.new_margin_pct}% margin ·{" "}
                 {i.target_check.meets_target
                   ? `still above your ${target_margin_pct}% target`
                   : `below your ${target_margin_pct}% target`}
               </p>
               {!i.goal ? (
-                <p className="mt-2 text-zinc-600">Margin didn&apos;t drop — nothing to do.</p>
+                <p className="mt-2 text-stone-600">Margin didn&apos;t drop — nothing to do.</p>
               ) : (
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {i.raise_price && (
@@ -47,7 +47,7 @@ export function SuggestionsPanel({ suggestions }: { suggestions: AlertSuggestion
                         the same price.
                       </li>
                     ) : (
-                      <li className="text-zinc-500">
+                      <li className="text-stone-500">
                         Cutting {ingredient} alone can&apos;t get there — {i.reduce_portion.reason}.
                       </li>
                     ))}

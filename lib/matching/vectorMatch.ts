@@ -11,7 +11,7 @@ export type CandidateMatch = { ingredient_id: string; name: string; similarity: 
 export type LineMatch = {
   raw_text_normalized: string;
   embedding: string; // pgvector text form, ready to insert
-  match_status: "auto_matched" | "needs_review" | "new_ingredient";
+  match_status: "auto_matched" | "needs_review" | "new_ingredient" | "not_ingredient";
   matched_ingredient_id: string | null;
   match_confidence: number | null;
   candidate_matches: CandidateMatch[] | null;
@@ -20,7 +20,8 @@ export type LineMatch = {
 
 // Matches a batch of invoice lines (same invoice, so same vendor) against
 // the caller's ingredients, in §5.2 step 5's order:
-//   a. exact vendor alias → auto_matched at confidence 1.0
+//   a. exact vendor alias → auto_matched at confidence 1.0 (or
+//      not_ingredient, when the owner said this vendor's line isn't one)
 //   b. otherwise vector search → top CANDIDATE_COUNT ingredients
 //   c. route on the top similarity.
 // The alias key is the verbatim print (normalized); the embedding is of the
@@ -36,7 +37,7 @@ export async function matchLines(
 
   let aliasQuery = supabase
     .from("vendor_ingredient_aliases")
-    .select("id, raw_text_normalized, ingredient_id, times_used")
+    .select("id, raw_text_normalized, ingredient_id, is_not_ingredient, times_used")
     .in("raw_text_normalized", normalized);
   aliasQuery = vendorId ? aliasQuery.eq("vendor_id", vendorId) : aliasQuery.is("vendor_id", null);
   const { data: aliases, error: aliasErr } = await aliasQuery;
@@ -53,6 +54,17 @@ export async function matchLines(
           .from("vendor_ingredient_aliases")
           .update({ times_used: alias.times_used + 1 })
           .eq("id", alias.id);
+        if (alias.is_not_ingredient || !alias.ingredient_id) {
+          return {
+            raw_text_normalized: text,
+            embedding,
+            match_status: "not_ingredient",
+            matched_ingredient_id: null,
+            match_confidence: 1,
+            candidate_matches: null,
+            matched_by: "alias",
+          };
+        }
         return {
           raw_text_normalized: text,
           embedding,

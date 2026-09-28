@@ -1,81 +1,91 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { STATUS_COLORS, type StatusKey } from "@/lib/visual/statusColors";
+import { Panel, Kpi, PageHeader, Pill, Delta, Empty, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
-// Unit costs below $1 (an egg, an ounce) need the extra places to show a move.
-function unitMoney(n: number | string) {
-  return `$${Number(n).toFixed(Number(n) < 1 ? 4 : 2)}`;
-}
+const TABS = [
+  { key: "open", label: "Open" },
+  { key: "handled", label: "Handled" },
+  { key: "all", label: "All" },
+] as const;
 
-// Price-alert severity uses the same status language as margin health
-// (§10), but only the warning/critical/neutral tiers — a price going up is
-// never "good" the way an on-target margin is. A price drop is shown
-// neutral: it's worth knowing, not worth alarming about.
-function severityFor(pctChange: number, acknowledged: boolean): StatusKey {
-  if (acknowledged || pctChange < 0) return "neutral";
-  return pctChange >= 20 ? "critical" : "warning";
-}
-
-export default async function AlertsPage() {
+export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab = "open" } = await searchParams;
   const supabase = await createClient();
-  const { data: alerts, error } = await supabase
-    .from("price_alerts")
-    .select(
-      "id, previous_unit_cost, new_unit_cost, pct_change, acknowledged, created_at, ingredients(name, base_unit), menu_item_margin_impacts(id, menu_items(name))",
-    )
-    .order("created_at", { ascending: false });
+  const [{ data: alerts, error }, { data: org }] = await Promise.all([
+    supabase
+      .from("price_alerts")
+      .select("id, previous_unit_cost, new_unit_cost, pct_change, acknowledged, created_at, ingredients(name, base_unit), invoices(invoice_number, invoice_date, vendors(name)), menu_item_margin_impacts(id, margin_pct_delta, menu_items(name))")
+      .order("created_at", { ascending: false }),
+    supabase.from("organizations").select("price_alert_threshold_pct").maybeSingle(),
+  ]);
   if (error) throw new Error("loading price alerts failed: " + error.message);
+  const all = alerts ?? [];
+  const isOpen = (a: (typeof all)[number]) => !a.acknowledged && Number(a.pct_change) > 0;
+  const shown = all.filter((a) => (tab === "all" ? true : tab === "handled" ? !isOpen(a) : isOpen(a)));
+  const open = all.filter(isOpen);
+  const worst = [...open].sort((a, b) => Number(b.pct_change) - Number(a.pct_change))[0];
+  const hit = new Set(open.flatMap((a) => a.menu_item_margin_impacts.map((i) => i.menu_items?.name)));
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Price Alerts</h1>
-
-      {alerts.length === 0 && (
-        <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-sm text-zinc-500">
-          No price alerts yet. When a confirmed invoice price moves more than your alert threshold, it shows up
-          here with the menu items it affects.
-        </p>
-      )}
-
-      <ul className="flex flex-col gap-3">
-        {alerts.map((alert) => {
-          const pct = Number(alert.pct_change);
-          const severity = severityFor(pct, alert.acknowledged);
-          const { color, bg } = STATUS_COLORS[severity];
-          const impacts = alert.menu_item_margin_impacts;
-          const unit = alert.ingredients?.base_unit ? `/${alert.ingredients.base_unit}` : "";
-
-          return (
-            <li key={alert.id}>
-              <Link
-                href={`/alerts/${alert.id}`}
-                className="block rounded-xl border p-4"
-                style={{ borderColor: bg, backgroundColor: bg }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium text-zinc-900">
-                    {alert.ingredients?.name ?? "Ingredient"} {unitMoney(alert.previous_unit_cost)}
-                    {unit} &rarr; {unitMoney(alert.new_unit_cost)}
-                    {unit}
-                  </p>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold" style={{ color }}>
-                    {pct > 0 ? "+" : ""}
-                    {pct.toFixed(1)}%
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-zinc-600">
-                  {impacts.length === 0
-                    ? "No active menu items use it"
-                    : `Affects ${impacts.length} menu item${impacts.length === 1 ? "" : "s"}: ${impacts
-                        .map((mi) => mi.menu_items?.name)
-                        .join(", ")}`}
-                </p>
-                {alert.acknowledged && <p className="mt-1 text-xs text-zinc-400">Acknowledged</p>}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <>
+      <PageHeader
+        title="Price alerts"
+        subtitle={`An alert fires when a confirmed invoice moves an ingredient more than ${Number(org?.price_alert_threshold_pct ?? 8)}% — change that in Settings`}
+        tabs={TABS.map((t) => ({ href: t.key === "open" ? "/alerts" : `/alerts?tab=${t.key}`, label: t.label, active: t.key === tab, count: t.key === "open" ? open.length : t.key === "handled" ? all.length - open.length : all.length }))}
+      />
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Kpi label="Open alerts" value={open.length} tone={open.length ? "critical" : "good"} />
+        <Kpi label="Biggest rise" value={worst ? `+${Number(worst.pct_change).toFixed(1)}%` : "—"} sub={worst?.ingredients?.name ?? "nothing open"} tone={worst ? "critical" : "neutral"} />
+        <Kpi label="Menu items hit" value={hit.size} sub={[...hit].slice(0, 3).join(", ") || "none"} tone={hit.size ? "warning" : "neutral"} />
+        <Kpi label="All time" value={all.length} />
+      </div>
+      <Panel title={`${TABS.find((t) => t.key === tab)?.label ?? "Open"} alerts`} flush>
+        {shown.length === 0 ? (
+          <Empty>{all.length ? "Nothing here." : "No price alerts yet. When a confirmed invoice moves a price past your threshold, it lands here with the menu items it affects."}</Empty>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className={th}>Ingredient</th>
+                  <th className={thNum}>Change</th>
+                  <th className={thNum}>Price</th>
+                  <th className={th}>Menu items hit</th>
+                  <th className={thNum}>Worst hit</th>
+                  <th className={th}>From</th>
+                  <th className={th}>Status</th>
+                  <th className={th} />
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((a) => {
+                  const pct = Number(a.pct_change);
+                  const worstHit = Math.min(0, ...a.menu_item_margin_impacts.map((i) => Number(i.margin_pct_delta)));
+                  const u = a.ingredients?.base_unit ? `/${a.ingredients.base_unit}` : "";
+                  return (
+                    <tr key={a.id} className={row}>
+                      <td className={td}>
+                        <Link href={`/alerts/${a.id}`} className="font-medium text-stone-900 hover:underline">{a.ingredients?.name ?? "Ingredient"}</Link>
+                      </td>
+                      <td className={tdNum}><Delta value={pct} /></td>
+                      <td className={tdNum}>{unitMoney(Number(a.previous_unit_cost))} → {unitMoney(Number(a.new_unit_cost))}{u}</td>
+                      <td className={`${td} max-w-64 truncate text-stone-600`}>
+                        {a.menu_item_margin_impacts.length ? a.menu_item_margin_impacts.map((i) => i.menu_items?.name).join(", ") : <span className="text-stone-400">none</span>}
+                      </td>
+                      <td className={tdNum}>{worstHit < 0 ? <Delta value={worstHit} suffix="pp" goodWhenUp /> : "—"}</td>
+                      <td className={`${td} text-stone-500`}>{a.invoices ? `${a.invoices.vendors?.name ?? "Invoice"} · ${a.invoices.invoice_date ?? ""}` : "—"}</td>
+                      <td className={td}>{isOpen(a) ? <Pill tone={pct >= 20 ? "critical" : "warning"}>Open</Pill> : <Pill tone="neutral">{pct < 0 ? "Price drop" : "Handled"}</Pill>}</td>
+                      <td className={`${td} text-right`}>
+                        <Link href={`/alerts/${a.id}`} className="text-xs font-medium text-amber-700 hover:underline">What to do →</Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+    </>
   );
 }

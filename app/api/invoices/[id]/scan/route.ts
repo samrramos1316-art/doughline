@@ -96,6 +96,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       vendor_id: vendorId,
       invoice_number: extraction.invoice_number_guess,
       invoice_date: extraction.invoice_date_guess,
+      total_amount: extraction.invoice_total_guess,
     })
     .eq("id", id);
 

@@ -16,7 +16,7 @@ export function LineItemStatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold"
       style={{ backgroundColor: bg, color }}
     >
       <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />

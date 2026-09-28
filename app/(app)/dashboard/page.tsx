@@ -1,71 +1,299 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
-import { getMenuItemMarginHistory } from "@/lib/costing/marginHistory";
-import { MenuItemCard } from "@/components/visual/MenuItemCard";
+import { getOverview } from "@/lib/dashboard/overview";
 import { getMarketTrends, DEFAULT_WINDOW_DAYS } from "@/lib/market/trends";
-import { MarketWatchPanel } from "@/components/market/MarketWatchPanel";
+import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
+import {
+  Panel, Kpi, PageHeader, ButtonLink, Pill, Delta, MarginBar, Spark, HBar, Empty,
+  marginTone, money, unitMoney, th, thNum, td, tdNum, row,
+} from "@/components/ui/dash";
+
+const TONE_TEXT = { good: "On target", warning: "Watch", critical: "Below target", serious: "Watch", neutral: "No cost" } as const;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
-
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("target_margin_pct")
-    .eq("id", orgId ?? "")
-    .maybeSingle();
-  const targetPct = Number(org?.target_margin_pct ?? 65);
-
-  const { data: margins } = await supabase.from("menu_item_margins").select("*").order("name");
-  const menuItemRows = (margins ?? []).filter(
-    (m): m is typeof m & { menu_item_id: string; name: string } => m.menu_item_id != null && m.name != null,
-  );
-
-  const trends = await getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS });
-
-  const cards = await Promise.all(
-    menuItemRows.map(async (m) => {
-      const history = await getMenuItemMarginHistory(supabase, m.menu_item_id);
-      return {
-        menuItemId: m.menu_item_id,
-        name: m.name,
-        sellingPrice: Number(m.selling_price),
-        costPerServing: m.cost_per_serving != null ? Number(m.cost_per_serving) : null,
-        marginPct: m.margin_pct != null ? Number(m.margin_pct) : null,
-        history: history.map((h) => ({ date: h.date, value: h.marginPct ?? 0 })),
-      };
-    }),
-  );
+  if (!orgId) redirect("/login");
+  const [o, trends] = await Promise.all([getOverview(supabase, orgId), getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS })]);
+  const { kpis, org } = o;
+  const setupLeft = [
+    !o.counts.ingredients && { href: "/ingredients", label: "Add your ingredients (or import a spreadsheet)" },
+    !o.counts.recipes && { href: "/recipes", label: "Build a recipe" },
+    !o.counts.menuItems && { href: "/menu", label: "Put an item on the menu with its price" },
+    !o.counts.invoices && { href: "/invoices/scan", label: "Scan your first invoice" },
+  ].filter(Boolean) as { href: string; label: string }[];
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const watched = trends.filter((t) => t.exposed_ingredients.length > 0).slice(0, 4);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Dashboard</h1>
-        <p className="text-sm text-zinc-500">Target margin: {targetPct}%</p>
-      </div>
+    <>
+      <PageHeader
+        title="Overview"
+        subtitle={`${today} · target margin ${org.target}%`}
+        actions={
+          <>
+            <ButtonLink href="/invoices/import">Import invoices</ButtonLink>
+            <ButtonLink href="/invoices/scan" primary>
+              Scan invoice
+            </ButtonLink>
+          </>
+        }
+      />
 
-      {cards.length === 0 && (
-        <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-sm text-zinc-500">
-          No menu items yet — add ingredients, build a recipe, then add a menu item to see
-          margins here.
-        </p>
+      {setupLeft.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-900">Finish setting up — {4 - setupLeft.length} of 4 done</p>
+          <ol className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            {setupLeft.map((s) => (
+              <li key={s.href}>
+                <Link href={s.href} className="font-medium text-amber-800 underline underline-offset-2">
+                  {s.label}
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((c) => (
-          <MenuItemCard
-            key={c.menuItemId}
-            name={c.name}
-            sellingPrice={c.sellingPrice}
-            costPerServing={c.costPerServing}
-            marginPct={c.marginPct}
-            targetPct={targetPct}
-            history={c.history}
-          />
-        ))}
+      {/* Headline figures */}
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Kpi
+          label="Avg menu margin"
+          value={kpis.avgMargin == null ? "—" : `${kpis.avgMargin.toFixed(1)}%`}
+          tone={marginTone(kpis.avgMargin, org.target)}
+          sub={<><Delta value={kpis.marginChange30d} suffix="pp" goodWhenUp /> vs 30 days ago</>}
+          href="/menu"
+        />
+        <Kpi
+          label="Below target"
+          value={`${kpis.belowTarget}/${kpis.activeItems}`}
+          tone={kpis.belowTarget ? "critical" : kpis.activeItems ? "good" : "neutral"}
+          sub={kpis.belowTarget ? "menu items under " + org.target + "%" : "every item on target"}
+          href="/menu"
+        />
+        <Kpi
+          label="Cost to make"
+          value={money(kpis.basketNow)}
+          tone={kpis.basketChangePct != null && kpis.basketChangePct > 2 ? "warning" : "neutral"}
+          sub={<><Delta value={kpis.basketChangePct} /> one of each item, 30d</>}
+          href="/ingredients?tab=movers"
+        />
+        <Kpi
+          label="Price alerts"
+          value={kpis.openAlerts}
+          tone={kpis.openAlerts ? "critical" : "good"}
+          sub={kpis.openAlerts ? "open — costs went up" : "nothing open"}
+          href="/alerts"
+        />
+        <Kpi
+          label="To review"
+          value={`${kpis.toReview}/${org.cap}`}
+          tone={kpis.toReview > org.cap ? "critical" : kpis.toReview ? "warning" : "good"}
+          sub={kpis.toReview ? "invoice lines waiting" : "all caught up"}
+          href="/review"
+        />
+        <Kpi label="Spend, 30 days" value={money(kpis.spend30, 0)} sub={`${kpis.invoices30} invoice${kpis.invoices30 === 1 ? "" : "s"}`} href="/invoices" />
       </div>
 
-      <MarketWatchPanel trends={trends} windowDays={DEFAULT_WINDOW_DAYS} compact />
-    </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        {/* Menu margins: the squad list */}
+        <Panel title="Menu margins — worst first" action={{ href: "/menu", label: "Menu" }} flush className="xl:col-span-8">
+          {o.menu.length === 0 ? (
+            <Empty>No menu items yet. Add one on the Menu tab to see its margin here.</Empty>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className={th}>Item</th>
+                    <th className={thNum}>Sells</th>
+                    <th className={thNum}>Cost</th>
+                    <th className={thNum}>Margin</th>
+                    <th className={th}>vs {org.target}% target</th>
+                    <th className={thNum}>30d</th>
+                    <th className={th}>90-day trend</th>
+                    <th className={th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {o.menu.map((m) => {
+                    const tone = marginTone(m.marginPct, org.target);
+                    return (
+                      <tr key={m.id} className={row}>
+                        <td className={td}>
+                          <span className="font-medium text-stone-900">{m.name}</span>
+                          {m.recipeName && <span className="block text-[11px] text-stone-500">{m.recipeName}</span>}
+                        </td>
+                        <td className={tdNum}>{money(m.price)}</td>
+                        <td className={tdNum}>{m.costPerServing == null ? "—" : `$${m.costPerServing.toFixed(2)}`}</td>
+                        <td className={`${tdNum} font-semibold`}>{m.marginPct == null ? "—" : `${m.marginPct.toFixed(1)}%`}</td>
+                        <td className={td}><MarginBar pct={m.marginPct} target={org.target} /></td>
+                        <td className={tdNum}>
+                          <Delta value={m.marginPct != null && m.marginPct30dAgo != null ? m.marginPct - m.marginPct30dAgo : null} suffix="pp" goodWhenUp />
+                        </td>
+                        <td className={td}><Spark values={m.history.map((p) => p.value)} /></td>
+                        <td className={td}>{m.isActive ? <Pill tone={tone}>{TONE_TEXT[tone]}</Pill> : <Pill tone="neutral">Inactive</Pill>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+
+        {/* Inbox */}
+        <Panel title={`Inbox${o.inbox.length ? ` · ${o.inbox.length}` : ""}`} flush className="xl:col-span-4">
+          {o.inbox.length === 0 ? (
+            <Empty>Nothing needs you. New invoices, price rises and anything to check land here.</Empty>
+          ) : (
+            <ul className="divide-y divide-stone-100">
+              {o.inbox.slice(0, 8).map((it, i) => (
+                <li key={`${it.href}-${i}`}>
+                  <Link href={it.href} className="flex gap-3 px-3 py-2.5 hover:bg-amber-50/50">
+                    <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${it.tone === "critical" ? "bg-red-500" : it.tone === "warning" ? "bg-amber-400" : "bg-stone-300"}`} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-stone-900">{it.title}</span>
+                      <span className="block truncate text-xs text-stone-500">{it.detail}</span>
+                    </span>
+                    <span className="ml-auto shrink-0 self-center text-xs text-stone-400">→</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        {/* Cost movers */}
+        <Panel title="Ingredient cost movers · 90 days" action={{ href: "/ingredients?tab=movers", label: "All prices" }} flush className="xl:col-span-4">
+          {o.movers.length === 0 ? (
+            <Empty>No price changes yet. They appear as invoices come in.</Empty>
+          ) : (
+            <table className="w-full">
+              <tbody>
+                {o.movers.slice(0, 7).map((m) => (
+                  <tr key={m.id} className={row}>
+                    <td className={td}>
+                      <span className="font-medium text-stone-900">{m.name}</span>
+                      <span className="block text-[11px] text-stone-500">
+                        {unitMoney(m.from)} → {unitMoney(m.to)}/{m.unit}
+                        {m.menuItems ? ` · in ${m.menuItems} item${m.menuItems === 1 ? "" : "s"}` : ""}
+                      </span>
+                    </td>
+                    <td className={tdNum}><Delta value={m.pct} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Panel>
+
+        {/* Where the cost goes */}
+        <Panel title="Where your food cost goes" action={{ href: "/recipes", label: "Recipes" }} className="xl:col-span-4">
+          {o.drivers.length === 0 ? (
+            <Empty>Build recipes and menu items to see which ingredients drive your cost.</Empty>
+          ) : (
+            <>
+              <p className="mb-2 text-xs text-stone-500">Share of the cost of making one of each menu item.</p>
+              <ul className="space-y-2">
+                {o.drivers.slice(0, 7).map((d) => (
+                  <li key={d.name}>
+                    <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                      <span className="truncate text-stone-800">{d.name}</span>
+                      <span className="shrink-0 text-stone-500 tabular-nums">
+                        {(d.share * 100).toFixed(0)}% · ${d.perRound.toFixed(2)}
+                      </span>
+                    </div>
+                    <HBar share={d.share} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Panel>
+
+        {/* Spend by vendor */}
+        <Panel title="Spend by supplier · 90 days" action={{ href: "/invoices", label: "Invoices" }} className="xl:col-span-4">
+          {o.vendorSpend.length === 0 ? (
+            <Empty>Invoice totals by supplier show up after your first scan.</Empty>
+          ) : (
+            <ul className="space-y-2">
+              {o.vendorSpend.slice(0, 6).map((v) => (
+                <li key={v.name}>
+                  <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                    <span className="truncate text-stone-800">{v.name}</span>
+                    <span className="shrink-0 text-stone-600 tabular-nums">{money(v.total)}</span>
+                  </div>
+                  <HBar share={v.total / (o.vendorSpend[0].total || 1)} color="#57534e" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        {/* Recent invoices */}
+        <Panel title="Recent invoices" action={{ href: "/invoices", label: "All invoices" }} flush className="xl:col-span-8">
+          {o.recent.length === 0 ? (
+            <Empty>No invoices yet — snap one on your phone or import PDFs.</Empty>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className={th}>Date</th>
+                    <th className={th}>Supplier</th>
+                    <th className={th}>Invoice #</th>
+                    <th className={thNum}>Lines</th>
+                    <th className={thNum}>Total</th>
+                    <th className={th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {o.recent.map((inv) => (
+                    <tr key={inv.id} className={row}>
+                      <td className={`${td} tabular-nums`}>{inv.date ?? "—"}</td>
+                      <td className={td}>
+                        <Link href={`/invoices/${inv.id}`} className="font-medium text-stone-900 hover:underline">
+                          {inv.vendor}
+                        </Link>
+                      </td>
+                      <td className={`${td} text-stone-500`}>{inv.number ?? "—"}</td>
+                      <td className={tdNum}>{inv.lines}</td>
+                      <td className={tdNum}>{money(inv.total)}</td>
+                      <td className={td}><InvoiceStatusBadge status={inv.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+
+        {/* Market */}
+        <Panel title={`Market watch · ${DEFAULT_WINDOW_DAYS} days`} action={{ href: "/market", label: "Market" }} flush className="xl:col-span-4">
+          {watched.length === 0 ? (
+            <Empty>{trends.length ? "None of your ingredients follow a tracked commodity yet." : "Market data loads once a day from USDA and FAO."}</Empty>
+          ) : (
+            <table className="w-full">
+              <tbody>
+                {watched.map((t) => (
+                  <tr key={t.commodity_code} className={row}>
+                    <td className={`${td} whitespace-normal`}>
+                      <span className="font-medium text-stone-900">{t.label}</span>
+                      <span className="block text-[11px] text-stone-500">Your {t.exposed_ingredients.join(", ")}</span>
+                    </td>
+                    <td className={`${td} hidden px-1 sm:table-cell`}><Spark values={t.points.map((p) => p.value)} width={52} goodWhenUp={false} /></td>
+                    <td className={tdNum}><Delta value={t.pct_change} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="border-t border-stone-100 px-3 py-2 text-[11px] text-stone-400">Wholesale context, not a forecast of your next invoice.</p>
+        </Panel>
+      </div>
+    </>
   );
 }

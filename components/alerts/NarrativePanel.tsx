@@ -26,17 +26,19 @@ export function NarrativePanel({ alertId, initialNarrative }: { alertId: string;
   }, [alertId, initialNarrative]);
 
   return (
-    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-      <p className="mb-2 text-xs font-semibold tracking-wide text-blue-700 uppercase">AI summary</p>
+    <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <p className="border-b border-stone-200 bg-stone-50/80 px-3 py-2 text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">✦ AI summary</p>
+      <div className="px-3 py-3">
       {narrative ? (
-        <p data-testid="ai-narrative" className="text-sm leading-relaxed text-blue-950">
+        <p data-testid="ai-narrative" className="text-[13px] leading-relaxed text-stone-800">
           {narrative}
         </p>
       ) : failed ? (
-        <p className="text-sm text-blue-900/70">Couldn&apos;t write a summary right now — the suggestions above still stand.</p>
+        <p className="text-sm text-stone-500">Couldn&apos;t write a summary right now — the suggestions above still stand.</p>
       ) : (
-        <p className="text-sm text-blue-900/70">Writing a summary…</p>
+        <p className="text-sm text-stone-500">Writing a summary…</p>
       )}
+      </div>
     </div>
   );
 }

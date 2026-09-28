@@ -1,28 +1,80 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewRecipeForm } from "@/components/recipes/NewRecipeForm";
+import { Panel, Kpi, PageHeader, Empty, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 export default async function RecipesPage() {
   const supabase = await createClient();
-  const { data: recipes } = await supabase.from("recipes").select("*").order("name");
+  const [{ data: recipes }, { data: costs }, { data: lines }, { data: menu }] = await Promise.all([
+    supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit").order("name"),
+    supabase.from("recipe_costs").select("recipe_id, batch_total_cost, cost_per_serving"),
+    supabase.from("recipe_ingredients").select("recipe_id"),
+    supabase.from("menu_items").select("name, recipe_id, is_active"),
+  ]);
+  const costBy = new Map((costs ?? []).map((c) => [c.recipe_id, c]));
+  const countBy = new Map<string, number>();
+  for (const l of lines ?? []) countBy.set(l.recipe_id, (countBy.get(l.recipe_id) ?? 0) + 1);
+  const menuBy = new Map<string, string[]>();
+  for (const m of menu ?? []) if (m.recipe_id && m.is_active) menuBy.set(m.recipe_id, [...(menuBy.get(m.recipe_id) ?? []), m.name]);
+  const list = recipes ?? [];
+  const unused = list.filter((r) => !menuBy.has(r.id)).length;
+  const empty = list.filter((r) => !countBy.has(r.id)).length;
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Recipes</h1>
-      <NewRecipeForm />
-      <ul className="flex flex-col gap-2">
-        {(recipes ?? []).map((r) => (
-          <li key={r.id} className="rounded-lg border border-zinc-200 bg-white px-4 py-3">
-            <Link href={`/recipes/${r.id}`} className="text-sm font-medium text-zinc-900 underline">
-              {r.name}
-            </Link>
-            <span className="ml-2 text-sm text-zinc-500">
-              {r.batch_yield_qty} {r.batch_yield_unit}
-            </span>
-          </li>
-        ))}
-        {(recipes ?? []).length === 0 && <p className="text-sm text-zinc-400">No recipes yet.</p>}
-      </ul>
-    </div>
+    <>
+      <PageHeader title="Recipes" subtitle="What each batch costs to make, live from today's ingredient prices" />
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Kpi label="Recipes" value={list.length} />
+        <Kpi label="On the menu" value={list.length - unused} sub={unused ? `${unused} not sold yet` : "all in use"} tone={unused ? "warning" : "neutral"} />
+        <Kpi label="Missing ingredients" value={empty} tone={empty ? "warning" : "good"} sub={empty ? "no cost until filled in" : "every recipe costed"} />
+        <Kpi label="Menu items" value={(menu ?? []).filter((m) => m.is_active).length} href="/menu" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <Panel title="All recipes" flush className="xl:col-span-9">
+          {list.length === 0 ? (
+            <Empty>No recipes yet. Create one on the right, then list what goes into a batch.</Empty>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className={th}>Recipe</th>
+                    <th className={thNum}>Batch makes</th>
+                    <th className={thNum}>Ingredients</th>
+                    <th className={thNum}>Batch cost</th>
+                    <th className={thNum}>Cost/serving</th>
+                    <th className={th}>Sold as</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((r) => {
+                    const c = costBy.get(r.id);
+                    return (
+                      <tr key={r.id} className={row}>
+                        <td className={td}>
+                          <Link href={`/recipes/${r.id}`} className="font-medium text-stone-900 hover:underline">
+                            {r.name}
+                          </Link>
+                        </td>
+                        <td className={tdNum}>
+                          {r.batch_yield_qty} {r.batch_yield_unit}
+                        </td>
+                        <td className={tdNum}>{countBy.get(r.id) ?? <span className="text-amber-700">none yet</span>}</td>
+                        <td className={tdNum}>{money(c?.batch_total_cost == null ? null : Number(c.batch_total_cost))}</td>
+                        <td className={`${tdNum} font-semibold`}>{c?.cost_per_serving == null ? "—" : `$${Number(c.cost_per_serving).toFixed(4)}`}</td>
+                        <td className={`${td} text-stone-500`}>{menuBy.get(r.id)?.join(", ") ?? <span className="text-stone-400">Not on the menu</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+        <Panel title="New recipe" className="xl:col-span-3">
+          <NewRecipeForm />
+        </Panel>
+      </div>
+    </>
   );
 }

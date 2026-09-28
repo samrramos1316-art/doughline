@@ -18,6 +18,7 @@ export class GeminiVisionProvider implements VisionProvider {
       vendor_name_guess: null,
       invoice_date_guess: null,
       invoice_number_guess: null,
+      invoice_total_guess: null,
       line_items: [],
     };
   }

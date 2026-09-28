@@ -97,7 +97,7 @@ export async function confirmLineItem(
   const aliasWrite = found
     ? supabase
         .from("vendor_ingredient_aliases")
-        .update({ ingredient_id: ingredientId, confirmed_by: userId, times_used: found.times_used + 1 })
+        .update({ ingredient_id: ingredientId, is_not_ingredient: false, confirmed_by: userId, times_used: found.times_used + 1 })
         .eq("id", found.id)
     : supabase.from("vendor_ingredient_aliases").insert({
         org_id: line.org_id,
@@ -112,4 +112,54 @@ export async function confirmLineItem(
   const price = await applyLinePrice(supabase, lineItemId);
   const invoiceStatus = await refreshInvoiceStatus(supabase, line.invoice_id);
   return { lineItem: updated, alias, price, invoiceStatus };
+}
+
+// "Not an ingredient" (supplies, fees): resolve the line without a price and
+// remember it for this vendor's wording, so the next invoice clears it
+// without asking (migration 022).
+export async function markNotIngredient(
+  supabase: Client,
+  { lineItemId, userId }: { lineItemId: string; userId: string },
+) {
+  const { data: line, error: lineErr } = await supabase
+    .from("invoice_line_items")
+    .select("id, org_id, invoice_id, raw_text, match_status, invoices(vendor_id)")
+    .eq("id", lineItemId)
+    .single();
+  if (lineErr || !line) return { error: "Line item not found", status: 404 as const };
+  if (!(UNRESOLVED_STATUSES as readonly string[]).includes(line.match_status)) {
+    return { error: `Line item is '${line.match_status}', not awaiting review`, status: 409 as const };
+  }
+
+  const { data: updated, error } = await supabase
+    .from("invoice_line_items")
+    .update({ match_status: "not_ingredient", matched_ingredient_id: null, match_confidence: null })
+    .eq("id", lineItemId)
+    .select()
+    .single();
+  if (error || !updated) return { error: error?.message ?? "Update failed", status: 400 as const };
+
+  const vendorId = line.invoices?.vendor_id ?? null;
+  const rawTextNormalized = normalizeRawText(line.raw_text);
+  let existingAlias = supabase.from("vendor_ingredient_aliases").select("id, times_used").eq("raw_text_normalized", rawTextNormalized);
+  existingAlias = vendorId ? existingAlias.eq("vendor_id", vendorId) : existingAlias.is("vendor_id", null);
+  const { data: found } = await existingAlias.maybeSingle();
+  const aliasWrite = found
+    ? supabase
+        .from("vendor_ingredient_aliases")
+        .update({ ingredient_id: null, is_not_ingredient: true, confirmed_by: userId, times_used: found.times_used + 1 })
+        .eq("id", found.id)
+    : supabase.from("vendor_ingredient_aliases").insert({
+        org_id: line.org_id,
+        vendor_id: vendorId,
+        raw_text_normalized: rawTextNormalized,
+        ingredient_id: null,
+        is_not_ingredient: true,
+        confirmed_by: userId,
+      });
+  const { error: aliasErr } = await aliasWrite;
+  if (aliasErr) return { error: "Saving vendor alias failed: " + aliasErr.message, status: 400 as const };
+
+  const invoiceStatus = await refreshInvoiceStatus(supabase, line.invoice_id);
+  return { lineItem: updated, invoiceStatus };
 }

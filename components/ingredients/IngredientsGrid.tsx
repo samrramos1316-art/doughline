@@ -133,7 +133,7 @@ function IngredientsGridForm({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <a href="/api/ingredients/export" download className="rounded-full border border-zinc-300 px-4 py-2 font-medium text-zinc-700">
+        <a href="/api/ingredients/export" download className="rounded-md border border-stone-300 bg-white px-3 py-1.5 font-medium text-stone-700 hover:border-stone-400">
           Export CSV
         </a>
         <input
@@ -152,7 +152,7 @@ function IngredientsGridForm({
           type="button"
           disabled={!!busy}
           onClick={() => fileRef.current?.click()}
-          className="rounded-full border border-zinc-300 px-4 py-2 font-medium text-zinc-700 disabled:opacity-40"
+          className="rounded-md border border-stone-300 bg-white px-3 py-1.5 font-medium text-stone-700 hover:border-stone-400 disabled:opacity-40"
         >
           {busy === "importing" ? "Importing…" : "Import CSV"}
         </button>
@@ -174,7 +174,7 @@ function IngredientsGridForm({
           type="button"
           onClick={save}
           disabled={!!busy || pending.length === 0}
-          className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-40"
         >
           {busy === "saving" ? "Saving…" : pending.length ? `Save ${pending.length} change${pending.length === 1 ? "" : "s"}` : "No changes"}
         </button>

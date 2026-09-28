@@ -1,0 +1,4 @@
+# Rendered by scripts/make-business-fixtures.mjs on every run (dates follow today).
+*.pdf
+*.jpg
+ingredients.csv

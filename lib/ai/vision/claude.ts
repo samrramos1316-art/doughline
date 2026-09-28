@@ -9,6 +9,7 @@ const ExtractionSchema = z.object({
   vendor_name_guess: z.string().nullable(),
   invoice_date_guess: z.string().nullable().describe("ISO 8601 date (YYYY-MM-DD)"),
   invoice_number_guess: z.string().nullable(),
+  invoice_total_guess: z.number().nullable().describe("The grand total due, as printed"),
   line_items: z.array(
     z.object({
       raw_text: z.string().describe("The item description exactly as printed"),
@@ -36,7 +37,8 @@ const SYSTEM_PROMPT = `You extract line items from supplier invoices, packing sl
 - quantity / unit / unit_cost / line_total: the numbers printed on that line. Use null for anything not printed or not legible; never compute or guess a missing value.
 - pack_quantity / pack_unit: the size of ONE invoice unit (one case, bag, each…) as printed in the description, as a single total. Multiply a printed count × size: "50#" -> 50 lb; "36/1#" -> 36 lb; "15DZ" -> 15 dozen; "4/1 GAL" -> 4 gal; "12/QT" -> 12 qt; "32OZ" -> 32 oz; "6/#10" -> null (can size, not a measure). Ignore numbers that aren't a pack size (chip counts like "1M", fat % like "40%"). Use "lb" for "#". null for both if no pack size is printed.
 - Skip subtotal, tax, delivery-fee, deposit, and total rows — only purchased items.
-- invoice_date_guess: ISO 8601 (YYYY-MM-DD), or null if absent.`;
+- invoice_date_guess: ISO 8601 (YYYY-MM-DD), or null if absent.
+- invoice_total_guess: the grand total due as printed (after fees and tax), or null if not printed or not legible.`;
 
 const MODEL = "claude-opus-5";
 

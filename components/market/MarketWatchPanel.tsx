@@ -39,7 +39,7 @@ export function MarketWatchPanel({
   const shown = compact ? trends.filter((t) => t.exposed_ingredients.length > 0).slice(0, 3) : trends;
 
   return (
-    <section aria-label="Market Watch" className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <section aria-label="Market Watch" className="flex flex-col gap-3 rounded-lg border border-stone-200 bg-white p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-wide text-slate-600 uppercase">Market Watch</h2>
         <p className="text-xs text-slate-500">
@@ -62,11 +62,11 @@ export function MarketWatchPanel({
             : "None of your ingredients follow a tracked commodity yet."}
         </p>
       ) : (
-        <ul className={`grid gap-3 ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        <ul className={`grid gap-3 ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3"}`}>
           {shown.map((t) => {
             const monthly = t.source === "fao_fpi";
             return (
-              <li key={t.commodity_code} data-testid="market-trend" data-code={t.commodity_code} className="rounded-xl border border-slate-200 bg-white p-3">
+              <li key={t.commodity_code} data-testid="market-trend" data-code={t.commodity_code} className="rounded-md border border-stone-200 bg-stone-50/60 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-medium text-slate-900">{t.label}</p>
                   <span className="text-slate-600">

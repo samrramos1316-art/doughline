@@ -767,7 +767,8 @@ export type Database = {
           confirmed_by: string | null
           created_at: string
           id: string
-          ingredient_id: string
+          ingredient_id: string | null
+          is_not_ingredient: boolean
           org_id: string
           raw_text_normalized: string
           times_used: number
@@ -777,7 +778,8 @@ export type Database = {
           confirmed_by?: string | null
           created_at?: string
           id?: string
-          ingredient_id: string
+          ingredient_id?: string | null
+          is_not_ingredient?: boolean
           org_id: string
           raw_text_normalized: string
           times_used?: number
@@ -787,7 +789,8 @@ export type Database = {
           confirmed_by?: string | null
           created_at?: string
           id?: string
-          ingredient_id?: string
+          ingredient_id?: string | null
+          is_not_ingredient?: boolean
           org_id?: string
           raw_text_normalized?: string
           times_used?: number

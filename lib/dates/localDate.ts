@@ -25,3 +25,8 @@ export function localDateFrom(request: Request, now = new Date()) {
   if (Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== sent) return utc;
   return Math.abs(t - Date.parse(`${utc}T00:00:00Z`)) <= 86_400_000 ? sent : utc;
 }
+
+// The UTC date N days ago, as YYYY-MM-DD — window starts for "last 30 days".
+export function isoDaysAgo(days: number, now = Date.now()) {
+  return new Date(now - days * 86_400_000).toISOString().slice(0, 10);
+}

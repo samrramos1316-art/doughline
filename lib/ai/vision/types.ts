@@ -22,6 +22,7 @@ export interface VisionExtractionResult {
   vendor_name_guess: string | null;
   invoice_date_guess: string | null; // ISO date
   invoice_number_guess: string | null;
+  invoice_total_guess: number | null; // grand total due, as printed
   line_items: ExtractedLineItem[];
 }
 
