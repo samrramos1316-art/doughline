@@ -29,7 +29,7 @@ import { BUSINESS, INGREDIENTS, RECIPES, MENU, INVOICES } from "./fixtures/maple
 loadEnv();
 // Invoice dates follow today, so render this run's paperwork first.
 execFileSync(process.execPath, ["scripts/make-business-fixtures.mjs"], { stdio: "inherit" });
-const BASE = process.argv.find((a) => a.startsWith("--base="))?.slice(7) ?? "https://doughline-three.vercel.app";
+const BASE = process.argv.find((a) => a.startsWith("--base="))?.slice(7) ?? "https://doughtally.app";
 const KEEP = process.argv.includes("--keep");
 const OUT = "test-output/business";
 const FIX = "scripts/fixtures/maple-rye";
