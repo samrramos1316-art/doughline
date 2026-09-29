@@ -66,7 +66,8 @@ try {
   const { data: users } = await admin.auth.admin.listUsers({ perPage: 1000 });
   userId = users.users.find((u) => u.email === email).id;
   orgId = (await admin.from("profiles").select("org_id").eq("id", userId).single()).data.org_id;
-  check(true, `signed up ${email}`);
+  const meta = users.users.find((u) => u.email === email).user_metadata;
+  check(meta.terms_version && !Number.isNaN(Date.parse(meta.terms_accepted_at)), `signed up ${email}, agreeing to terms version ${meta.terms_version} at ${meta.terms_accepted_at}`);
 
   log("\n=== 1. menu + recipe + invoice through the invoice importer ===");
   await page.goto(`${BASE}/invoices/import`);
