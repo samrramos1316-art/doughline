@@ -172,8 +172,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 
           // …and gets pulled apart as you scroll away from it
           gsap.timeline({ scrollTrigger: { trigger: q(".hero")[0], start: "top top", end: "bottom top", scrub: 0.6 } })
-            .to(q(".mh-row-1"), { xPercent: -18, ease: "none" }, 0)
-            .to(q(".mh-row-2"), { xPercent: 14, ease: "none" }, 0)
+            .to(q(".mh-row-1"), { xPercent: -10, ease: "none" }, 0)
             .to(q(".mh-char"), { yPercent: (i) => (i % 2 ? -30 : 25), rotate: (i) => (i % 2 ? -6 : 5), ease: "none" }, 0)
             .to(q(".hero-line"), { yPercent: -60, opacity: 0, ease: "none" }, 0)
             .to(q(".hero-ticker"), { y: -120, rotate: 3, ease: "none" }, 0);
@@ -241,63 +240,19 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
               onUpdate: () => (el.textContent = CHAIN[i].fmt(o.n)),
             });
           };
-          if (desktop) {
-            const story = gsap.timeline({
-              scrollTrigger: { trigger: q(".story")[0], start: "top top", end: "+=260%", scrub: 0.8, pin: true, anticipatePin: 1 },
-            });
-            story
-              .from(q(".rc-paper"), { yPercent: -102, ease: "none", duration: 2 })
-              .from(q(".rc-row"), { opacity: 0, x: -10, stagger: 0.18, duration: 0.3 }, 0.6)
-              .to(q(".rc-hit"), { backgroundColor: "#ff5b1f", color: "#0c0b09", duration: 0.3 })
-              .from(q(".chain-wire"), { scaleY: 0, transformOrigin: "top", ease: "none", duration: 3 }, ">-0.1");
-            q(".chain-step").forEach((el: Element, i: number) => {
-              story.from(el, { opacity: 0.08, x: 40, duration: 0.5 }, `<${i === 0 ? "" : "+0.25"}`);
-              story.add(runCounter(counters[i], i), "<");
-            });
-            story.from(q(".chain-stamp"), { scale: 2.6, rotate: -25, opacity: 0, ease: "back.out(2)", duration: 0.6 });
-          } else {
-            gsap.from(q(".rc-row"), { opacity: 0, x: -10, stagger: 0.08, scrollTrigger: { trigger: q(".rc-paper")[0], start: "top 80%", once: true } });
-            q(".chain-step").forEach((el: Element, i: number) => {
-              ScrollTrigger.create({
-                trigger: el,
-                start: "top 85%",
-                once: true,
-                onEnter: () => {
-                  gsap.from(el, { opacity: 0, y: 40, duration: 0.8, ease: "expo.out" });
-                  runCounter(counters[i], i);
-                },
-              });
-            });
-          }
-
-          // ---- product tour: sideways on a desktop, stacked on a phone
-          const track = q(".tour-track")[0] as HTMLElement;
-          if (desktop) {
-            const distance = () => track.scrollWidth - window.innerWidth;
-            const slide = gsap.to(track, {
-              x: () => -distance(),
-              ease: "none",
-              scrollTrigger: {
-                trigger: q(".tour")[0],
-                start: "top top",
-                end: () => `+=${distance()}`,
-                scrub: 0.7,
-                pin: true,
-                anticipatePin: 1,
-                invalidateOnRefresh: true,
-              },
-            });
-            gsap.to(q(".tour-progress"), { scaleX: 1, ease: "none", scrollTrigger: { trigger: q(".tour")[0], start: "top top", end: () => `+=${distance()}`, scrub: true } });
-            q(".tour-panel").forEach((panel: Element) => {
-              const p = gsap.utils.selector(panel);
-              gsap.from(p(".tour-mock"), { scale: 0.82, rotate: 4, opacity: 0.3, ease: "none", scrollTrigger: { trigger: panel, containerAnimation: slide, start: "left 95%", end: "left 35%", scrub: true } });
-              gsap.from(p(".tour-num"), { xPercent: -60, opacity: 0, ease: "none", scrollTrigger: { trigger: panel, containerAnimation: slide, start: "left 90%", end: "left 40%", scrub: true } });
-            });
-          } else {
-            q(".tour-panel").forEach((panel: Element) => {
-              gsap.from(panel, { y: 80, opacity: 0, duration: 1, ease: "expo.out", scrollTrigger: { trigger: panel, start: "top 88%", once: true } });
-            });
-          }
+          // Plays once as it comes into view: no pinning, so the page keeps moving.
+          const story = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+          story
+            .from(q(".rc-paper"), { yPercent: -102, duration: 0.9, ease: "power2.inOut" })
+            .from(q(".rc-row"), { opacity: 0, x: -10, stagger: 0.07, duration: 0.3 }, 0.45)
+            .to(q(".rc-hit"), { backgroundColor: "#ff5b1f", color: "#0c0b09", duration: 0.25 })
+            .from(q(".chain-wire"), { scaleY: 0, transformOrigin: "top", ease: "none", duration: 1.6 }, "<");
+          q(".chain-step").forEach((el: Element, i: number) => {
+            story.from(el, { opacity: 0.08, x: desktop ? 40 : 0, y: desktop ? 0 : 24, duration: 0.45 }, i === 0 ? "<" : "<+0.24");
+            story.add(runCounter(counters[i], i), "<");
+          });
+          story.from(q(".chain-stamp"), { scale: 2.4, rotate: -22, opacity: 0, ease: "back.out(2)", duration: 0.55 });
+          ScrollTrigger.create({ trigger: q(".story")[0], start: "top 72%", once: true, onEnter: () => story.play() });
 
           // ---- steps: giant outline numerals fill as they pass
           q(".step").forEach((el: Element) => {
@@ -443,7 +398,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
       <main className="flex-1">
         {/* ---------------------------------------------------------- hero */}
         <section
-          className="hero relative min-h-[100svh] overflow-hidden pt-24 [--mx:70] [--my:30]"
+          className="hero relative overflow-hidden pt-24 [--mx:70] [--my:30]"
           style={{ backgroundImage: "radial-gradient(38rem 30rem at calc(var(--mx) * 1%) calc(var(--my) * 1%), rgba(255,91,31,0.16), transparent 70%)" }}
         >
           <svg className="hero-line pointer-events-none absolute inset-x-0 top-[34%] hidden h-[46%] w-full sm:block" viewBox="0 0 1600 400" preserveAspectRatio="none" aria-hidden>
@@ -465,41 +420,54 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
               <span className="text-[#ff5b1f]">● Live on doughtally.app</span>
             </div>
 
-            <h1 className="relative mt-6 font-display leading-[0.8] font-extrabold tracking-[-0.055em] text-white uppercase sm:mt-8">
-              <span className="sr-only">DoughTally Software: every invoice, traced to your menu.</span>
-              <span aria-hidden className="mh-row-1 block text-[25vw] sm:text-[19vw] lg:text-[17.5vw]">
+            <p className="sr-only">DoughTally Software</p>
+            <div aria-hidden className="mh-row-1 mt-6 flex flex-wrap items-end gap-x-[1.6vw] gap-y-3 font-display text-[13vw] leading-[0.8] font-extrabold tracking-[-0.055em] text-white uppercase sm:mt-8 sm:text-[11.5vw] lg:text-[10vw]">
+              <span className="whitespace-nowrap">
                 {masthead("Dough")}
+                <span className="text-[#ff5b1f]">{masthead("Tally")}</span>
               </span>
-              <span aria-hidden className="mh-row-2 flex flex-wrap items-end gap-x-[2vw] gap-y-4 text-[25vw] sm:pl-[8vw] sm:text-[19vw] lg:pl-[14vw] lg:text-[17.5vw]">
-                <span className="whitespace-nowrap text-[#ff5b1f]">{masthead("Tally")}</span>
-                <span className="mh-soft mb-[0.16em] inline-flex items-center gap-[0.5em] rounded-sm border-2 border-[#ece4d6] px-[0.55em] py-[0.35em] font-ledger text-[5.2vw] leading-none font-semibold tracking-[0.22em] text-[#ece4d6] sm:text-[2.6vw] lg:text-[2vw]">
-                  <span className="h-[0.5em] w-[0.5em] rounded-full bg-[#ff5b1f]" />
-                  SOFTWARE
-                </span>
+              <span className="mh-soft mb-[0.12em] inline-flex items-center gap-[0.5em] rounded-sm border-2 border-[#ece4d6] px-[0.55em] py-[0.35em] font-ledger text-[4.2vw] leading-none font-semibold tracking-[0.22em] text-[#ece4d6] sm:text-[2.1vw] lg:text-[1.6vw]">
+                <span className="h-[0.5em] w-[0.5em] rounded-full bg-[#ff5b1f]" />
+                SOFTWARE
               </span>
-            </h1>
+            </div>
 
-            <div className="relative mt-10 grid gap-10 pb-20 lg:mt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+            <div className="relative mt-10 grid gap-12 pb-16 lg:mt-14 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div>
-                <p className="hero-fade max-w-xl text-[19px] leading-[1.55] text-[#cfc6b7] sm:text-[21px]">
-                  Your supplier raised butter again. Did your croissant price move?{" "}
-                  <span className="text-white">DoughTally reads every invoice, keeps each ingredient&apos;s real cost, and shows what it did to the margin on everything you sell.</span>
+                <h1 className="hero-fade max-w-[19ch] font-display text-[2.35rem] leading-[1.02] font-bold tracking-[-0.03em] text-white sm:text-5xl lg:text-[3.5rem]">
+                  Snap the supplier invoice. See what it did to your <span className="text-[#ff5b1f]">margins.</span>
+                </h1>
+                <p className="hero-fade mt-5 max-w-xl text-[17px] leading-relaxed text-[#b5ad9f] sm:text-[19px]">
+                  DoughTally reads every delivery slip, keeps what each ingredient really costs, and tells you which menu items just got less profitable, and what to charge instead.
                 </p>
-                <div className="hero-fade mt-9 flex flex-wrap items-center gap-3">
+                <ol className="hero-fade mt-8 grid max-w-xl gap-px overflow-hidden rounded-md border border-white/10 bg-white/10 sm:grid-cols-3">
+                  {[
+                    ["01", "Snap the invoice", "photo or PDF"],
+                    ["02", "Costs update", "per lb, dozen, gal"],
+                    ["03", "Get the fix", "new price or portion"],
+                  ].map(([n, what, how]) => (
+                    <li key={n} className="flex items-baseline gap-3 bg-[#0c0b09] px-4 py-3 sm:block">
+                      <span className="font-ledger text-[11px] text-[#ff5b1f]">{n}</span>
+                      <span className="block text-[15px] font-semibold text-white sm:mt-1">{what}</span>
+                      <span className="block font-ledger text-[11px] text-[#8f877b]">{how}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="hero-fade mt-8 flex flex-wrap items-center gap-3">
                   <Link data-magnet href={startHref} className="group inline-flex items-center gap-2.5 rounded-full bg-[#ff5b1f] px-7 py-4 text-[15px] font-semibold text-[#0c0b09] transition-colors hover:bg-[#ff7a45]">
                     {signedIn ? "Open your dashboard" : "Start tracking margins"}
                     <Arrow className="h-4 w-4 transition group-hover:translate-x-1" />
                   </Link>
                   <a href="#numbers" className="rounded-full border border-white/15 px-6 py-4 text-[15px] font-medium text-white transition hover:border-white/40">
-                    Follow one invoice line
+                    See it on a real invoice
                   </a>
                 </div>
-                <p className="hero-fade mt-6 font-ledger text-[11px] tracking-wide text-[#7d766b]">phone at the delivery door · photos or PDFs · export any time</p>
+                <p className="hero-fade mt-5 font-ledger text-[11px] tracking-wide text-[#7d766b]">free to use right now · no card · works on your phone</p>
               </div>
 
               <div className="relative flex justify-center lg:justify-end">
                 <Ticker />
-                <div className="dt-spin pointer-events-none absolute -top-14 -left-4 hidden h-32 w-32 sm:block lg:-left-10" aria-hidden>
+                <div className="dt-spin pointer-events-none absolute -top-14 -left-4 hidden h-28 w-28 sm:block lg:-left-10" aria-hidden>
                   <svg viewBox="0 0 120 120" className="h-full w-full">
                     <defs>
                       <path id="badge-circle" d="M60 60 m-46 0 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0" />
@@ -522,7 +490,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
               {[0, 1].map((k) => (
                 <div key={k} aria-hidden={k === 1} className="flex items-center">
                   {["Home bakeries", "Food trucks", "Caterers", "Coffee carts", "Market stalls", "Ghost kitchens", "Pop-ups"].map((w) => (
-                    <span key={w} className="flex items-center font-display text-4xl font-extrabold tracking-tight uppercase sm:text-6xl">
+                    <span key={w} className="flex items-center font-display text-3xl font-extrabold tracking-tight uppercase sm:text-5xl">
                       <span className="px-6">{w}</span>
                       <span className="text-2xl sm:text-4xl">✺</span>
                     </span>
@@ -534,9 +502,9 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
         </section>
 
         {/* ------------------------------------------------------- problem */}
-        <section className="relative mx-auto max-w-[1400px] px-4 py-28 sm:px-8 sm:py-40">
+        <section className="relative mx-auto max-w-[1400px] px-4 py-24 sm:px-8 sm:py-32">
           <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">The quiet leak</p>
-          <p className="lit mt-8 max-w-[22ch] font-display text-[11vw] leading-[0.98] font-semibold tracking-[-0.035em] text-white sm:text-[7.2vw] lg:text-[5.6vw]">
+          <p className="lit mt-8 max-w-[22ch] font-display text-[9.5vw] leading-[1] font-semibold tracking-[-0.035em] text-white sm:text-[6vw] lg:text-[4.4vw]">
             {"A case of butter went up twenty dollars last month. Your croissants still cost".split(" ").map((w, i) => (
               <span key={i} className="lit-word">
                 {w}{" "}
@@ -556,11 +524,11 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
         </section>
 
         {/* ---------------------------------------------- receipt → margin */}
-        <section id="numbers" className="story relative scroll-mt-16 border-t border-white/10 lg:h-[100svh]">
-          <div className="mx-auto grid h-full max-w-[1400px] gap-12 px-4 py-24 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-0">
+        <section id="numbers" className="story relative scroll-mt-16 border-t border-white/10">
+          <div className="mx-auto grid max-w-[1400px] gap-12 px-4 py-24 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-28">
             <div>
               <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">Follow one line</p>
-              <h2 data-lines className="mt-4 font-display text-5xl leading-[0.95] font-bold tracking-[-0.035em] text-white sm:text-6xl">
+              <h2 data-lines className="mt-4 font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-5xl">
                 From the slip to the menu board.
               </h2>
               <div className="relative mt-10 max-w-md">
@@ -598,7 +566,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
                     <span className="font-ledger text-[11px] tracking-[0.2em] text-[#8f877b] uppercase">
                       {String(i + 1).padStart(2, "0")} / {c.k}
                     </span>
-                    <span className="chain-val font-display text-5xl font-bold tracking-tight text-white tabular-nums sm:text-6xl">{c.fmt(c.v)}</span>
+                    <span className="chain-val font-display text-4xl font-bold tracking-tight text-white tabular-nums sm:text-5xl">{c.fmt(c.v)}</span>
                   </div>
                   <p className="mt-2 text-[15px] text-[#a79f92]">{c.d}</p>
                 </li>
@@ -611,49 +579,13 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
         </section>
 
         {/* ------------------------------------------------- product tour */}
-        <section id="product" className="tour relative scroll-mt-16 overflow-hidden border-t border-white/10 bg-[#11100d] lg:h-[100svh]">
-          <div className="pointer-events-none absolute top-6 right-4 left-4 z-10 hidden items-center gap-4 sm:right-8 sm:left-8 lg:flex">
-            <span className="font-ledger text-[11px] tracking-[0.25em] text-[#8f877b] uppercase">The product</span>
-            <span className="h-px flex-1 bg-white/10">
-              <span className="tour-progress block h-px origin-left scale-x-0 bg-[#ff5b1f]" />
-            </span>
-            <span className="font-ledger text-[11px] tracking-[0.25em] text-[#8f877b] uppercase">05 things</span>
-          </div>
-          <div className="tour-track flex flex-col gap-24 px-4 py-24 sm:px-8 lg:h-full lg:w-max lg:flex-row lg:items-center lg:gap-0 lg:px-0 lg:py-0">
-            <div className="flex flex-col justify-center lg:w-[42vw] lg:shrink-0 lg:px-[6vw]">
-              <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase lg:hidden">The product</p>
-              <h2 data-lines className="mt-4 font-display text-6xl leading-[0.9] font-extrabold tracking-[-0.045em] text-white uppercase sm:text-7xl lg:text-[6.2vw]">
-                Door to <span className="dt-outline-ember">menu</span> board.
-              </h2>
-              <p className="mt-6 max-w-sm text-[17px] text-[#a79f92]">Five jobs, built for a kitchen that doesn&apos;t have a bookkeeper. Keep scrolling.</p>
-            </div>
-            {TOUR.map((t) => (
-              <article key={t.n} className="tour-panel relative grid gap-10 lg:h-full lg:w-[88vw] lg:shrink-0 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:gap-14 lg:border-l lg:border-white/10 lg:px-[5vw] xl:w-[78vw]">
-                <div className="relative">
-                  <span aria-hidden className="tour-num pointer-events-none absolute -top-16 -left-2 font-display text-[9rem] leading-none font-extrabold text-white/[0.05] sm:text-[12rem]">
-                    {t.n}
-                  </span>
-                  <p className="relative font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">
-                    {t.n} / {t.tag}
-                  </p>
-                  <h3 className="relative mt-4 font-display text-4xl leading-[0.98] font-bold tracking-[-0.03em] text-white sm:text-5xl">{t.title}</h3>
-                  <p className="relative mt-5 max-w-md text-[16px] leading-relaxed text-[#b5ad9f]">{t.body}</p>
-                  <p className="relative mt-6 max-w-md border-l-2 border-[#ff5b1f] pl-3 font-ledger text-[12px] leading-relaxed text-[#8f877b]">{t.fine}</p>
-                </div>
-                <div className="tour-mock relative max-h-[74svh] overflow-hidden rounded-2xl">
-                  {t.frame === "phone" ? <PhoneFrame>{t.mock}</PhoneFrame> : t.frame === "browser" ? <BrowserFrame url={t.url ?? "doughtally.app"}>{t.mock}</BrowserFrame> : t.mock}
-                </div>
-              </article>
-            ))}
-            <div aria-hidden className="hidden lg:block lg:w-[8vw] lg:shrink-0" />
-          </div>
-        </section>
+        <TourStrip />
 
         {/* ------------------------------------------------- how it works */}
         <section id="how" className="relative scroll-mt-16 border-t border-white/10">
-          <div className="mx-auto max-w-[1400px] px-4 py-28 sm:px-8 sm:py-36">
+          <div className="mx-auto max-w-[1400px] px-4 py-24 sm:px-8 sm:py-28">
             <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-end">
-              <h2 data-lines className="font-display text-5xl leading-[0.95] font-bold tracking-[-0.035em] text-white sm:text-7xl">
+              <h2 data-lines className="font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-6xl">
                 Set up in one afternoon.
               </h2>
               <p className="max-w-md text-[17px] text-[#a79f92] lg:justify-self-end">No accountant, no integrations, no card. Already keep a spreadsheet? Paste it straight in. Have a menu and recipe cards? Photograph them.</p>
@@ -665,13 +597,13 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
                 ["Watch the margins", "When a price moves past your threshold you get the affected items and two ways to fix each one."],
               ].map(([title, body], i) => (
                 <li key={title} className="step grid items-center gap-4 border-t border-white/10 py-10 last:border-b sm:grid-cols-[auto_1fr_1fr] sm:gap-12">
-                  <span className="relative font-display text-[7rem] leading-none font-extrabold tracking-tighter sm:text-[10rem]">
+                  <span className="relative font-display text-[5.5rem] leading-none font-extrabold tracking-tighter sm:text-[8rem]">
                     <span className="dt-outline text-white/30">{i + 1}</span>
                     <span aria-hidden className="step-fill absolute inset-0 text-[#ff5b1f]">
                       {i + 1}
                     </span>
                   </span>
-                  <h3 className="font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h3>
+                  <h3 className="font-display text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</h3>
                   <p className="text-[16px] leading-relaxed text-[#a79f92]">{body}</p>
                 </li>
               ))}
@@ -684,7 +616,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
           <div className="mx-auto grid max-w-[1400px] gap-12 px-4 py-28 sm:px-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-center">
             <div>
               <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">The control room</p>
-              <h2 data-lines className="mt-4 font-display text-5xl leading-[0.95] font-bold tracking-[-0.035em] text-white sm:text-6xl">
+              <h2 data-lines className="mt-4 font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-5xl">
                 Every item, every margin, one screen.
               </h2>
               <p className="mt-6 max-w-sm text-[17px] text-[#a79f92]">What moved, what it touched, what needs a decision today. Built for a quick look between batches.</p>
@@ -701,7 +633,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
         <section id="faq" className="scroll-mt-16 border-t border-white/10">
           <div className="mx-auto grid max-w-[1400px] gap-12 px-4 py-28 sm:px-8 lg:grid-cols-[0.8fr_1.2fr]">
             <div>
-              <h2 data-lines className="font-display text-5xl leading-[0.95] font-bold tracking-[-0.035em] text-white sm:text-6xl">
+              <h2 data-lines className="font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-5xl">
                 Fair questions.
               </h2>
               <p className="mt-5 max-w-xs text-[#a79f92]">
@@ -717,7 +649,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
                 <details key={q} className="group border-b border-white/10">
                   <summary className="flex cursor-pointer list-none items-center gap-5 py-6 [&::-webkit-details-marker]:hidden">
                     <span className="font-ledger text-[11px] text-[#ff5b1f]">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="flex-1 font-display text-xl font-semibold tracking-tight text-white sm:text-2xl">{q}</span>
+                    <span className="flex-1 font-display text-lg font-semibold tracking-tight text-white sm:text-xl">{q}</span>
                     <span aria-hidden className="relative h-4 w-4 shrink-0">
                       <span className="absolute top-1/2 left-0 h-px w-4 bg-white" />
                       <span className="absolute top-1/2 left-0 h-px w-4 rotate-90 bg-white transition duration-300 group-open:rotate-0" />
@@ -731,9 +663,9 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
         </section>
 
         {/* ----------------------------------------------------------- cta */}
-        <section className="cta relative overflow-hidden border-t border-white/10 px-4 py-32 sm:px-8 sm:py-44">
+        <section className="cta relative overflow-hidden border-t border-white/10 px-4 py-24 sm:px-8 sm:py-32">
           <div className="mx-auto max-w-[1400px]">
-            <p className="relative font-display text-[13vw] leading-[0.88] font-extrabold tracking-[-0.05em] uppercase sm:text-[9.5vw]">
+            <p className="relative font-display text-[11vw] leading-[0.9] font-extrabold tracking-[-0.05em] uppercase sm:text-[7.5vw]">
               <span className="dt-outline block text-white/40">Stop hearing about price hikes from your bank.</span>
               <span aria-hidden className="cta-fill absolute inset-0 block text-white">
                 Stop hearing about price hikes from your <span className="text-[#ff5b1f]">bank.</span>
@@ -784,9 +716,128 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
             </span>
           ))}
         </p>
-        <p className="border-t border-white/10 py-5 text-center font-ledger text-[11px] tracking-wider text-[#6d665c]">© 2026 DoughTally Software</p>
+        <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-white/10 py-5 text-center font-ledger text-[11px] tracking-wider text-[#6d665c]">
+          <span>© 2026 DoughTally Software</span>
+          <Link href="/privacy" className="hover:text-white">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-white">Terms of Service</Link>
+        </p>
       </footer>
     </div>
+  );
+}
+
+// The product tour as its own sideways strip: swipe, drag, or use the
+// arrows. It never hijacks the page's vertical scroll.
+function TourStrip() {
+  const track = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; left: number } | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [active, setActive] = useState(0);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const card = e.target as HTMLElement;
+          card.dataset.in = e.intersectionRatio > 0.35 ? "1" : "0";
+          if (e.intersectionRatio > 0.6) setActive(Number(card.dataset.card));
+        }
+      },
+      { root: el, threshold: [0, 0.35, 0.6, 0.9] },
+    );
+    el.querySelectorAll("[data-card]").forEach((c) => io.observe(c));
+    return () => io.disconnect();
+  }, []);
+
+  const step = (dir: 1 | -1) => {
+    const el = track.current;
+    const card = el?.querySelector<HTMLElement>("[data-card]");
+    if (el && card) el.scrollBy({ left: dir * (card.offsetWidth + 24), behavior: "smooth" });
+  };
+
+  return (
+    <section id="product" aria-label="The product" className="relative scroll-mt-16 border-t border-white/10 bg-[#11100d] py-20 sm:py-24">
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-end justify-between gap-6 px-4 sm:px-8">
+        <div>
+          <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">The product</p>
+          <h2 data-lines className="mt-3 font-display text-4xl leading-[0.95] font-extrabold tracking-[-0.04em] text-white uppercase sm:text-5xl">
+            Door to <span className="dt-outline-ember">menu</span> board.
+          </h2>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="font-ledger text-[12px] text-[#8f877b] tabular-nums">
+            <span className="text-white">{String(active + 1).padStart(2, "0")}</span> / {String(TOUR.length).padStart(2, "0")}
+          </span>
+          <button type="button" aria-label="Previous" onClick={() => step(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#ff5b1f] hover:text-[#ff5b1f] disabled:opacity-30" disabled={progress < 0.01}>
+            <Arrow className="h-4 w-4 rotate-180" />
+          </button>
+          <button type="button" aria-label="Next" onClick={() => step(1)} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff5b1f] text-[#0c0b09] transition hover:bg-[#ff7a45] disabled:opacity-30" disabled={progress > 0.99}>
+            <Arrow className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={track}
+        tabIndex={0}
+        aria-label="Product tour, scroll sideways"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setProgress(el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth));
+        }}
+        onPointerDown={(e) => {
+          if (e.pointerType !== "mouse" || !track.current) return;
+          drag.current = { x: e.clientX, left: track.current.scrollLeft };
+          setDragging(true);
+        }}
+        onPointerMove={(e) => {
+          if (drag.current && track.current) track.current.scrollLeft = drag.current.left - (e.clientX - drag.current.x);
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+          setDragging(false);
+        }}
+        onPointerLeave={() => {
+          drag.current = null;
+          setDragging(false);
+        }}
+        className={`mt-10 flex scroll-px-4 gap-6 overflow-x-auto px-4 pb-4 outline-none [scrollbar-width:none] sm:scroll-px-8 sm:px-8 xl:scroll-px-[max(2rem,calc((100vw-1400px)/2+2rem))] xl:px-[max(2rem,calc((100vw-1400px)/2+2rem))] [&::-webkit-scrollbar]:hidden ${dragging ? "cursor-grabbing select-none" : "cursor-grab snap-x snap-mandatory"}`}
+      >
+        {TOUR.map((t, i) => (
+          <article
+            key={t.n}
+            data-card={i}
+            className="group relative grid w-[86vw] shrink-0 snap-start gap-8 overflow-hidden rounded-xl border border-white/10 bg-[#0c0b09] p-6 sm:w-[76vw] sm:p-8 lg:w-[min(1080px,74vw)] lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-10 lg:p-10"
+          >
+            <div className="relative transition duration-700 ease-out group-data-[in=0]:translate-y-3 group-data-[in=0]:opacity-40">
+              <span aria-hidden className="pointer-events-none absolute -top-10 -left-1 font-display text-[7rem] leading-none font-extrabold text-white/[0.05] sm:text-[9rem]">
+                {t.n}
+              </span>
+              <p className="relative font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">
+                {t.n} / {t.tag}
+              </p>
+              <h3 className="relative mt-3 font-display text-3xl leading-[1] font-bold tracking-[-0.03em] text-white sm:text-4xl">{t.title}</h3>
+              <p className="relative mt-4 max-w-md text-[16px] leading-relaxed text-[#b5ad9f]">{t.body}</p>
+              <p className="relative mt-5 max-w-md border-l-2 border-[#ff5b1f] pl-3 font-ledger text-[12px] leading-relaxed text-[#8f877b]">{t.fine}</p>
+            </div>
+            <div className="pointer-events-none relative max-h-[58svh] overflow-hidden rounded-2xl transition duration-700 ease-out group-data-[in=0]:scale-90 group-data-[in=0]:rotate-2 group-data-[in=0]:opacity-30">
+              {t.frame === "phone" ? <PhoneFrame>{t.mock}</PhoneFrame> : t.frame === "browser" ? <BrowserFrame url={t.url ?? "doughtally.app"}>{t.mock}</BrowserFrame> : t.mock}
+            </div>
+          </article>
+        ))}
+        <div aria-hidden className="w-px shrink-0" />
+      </div>
+
+      <div className="mx-auto mt-6 flex max-w-[1400px] items-center gap-4 px-4 sm:px-8">
+        <span className="h-px flex-1 bg-white/10">
+          <span className="block h-px origin-left bg-[#ff5b1f] transition-transform duration-200" style={{ transform: `scaleX(${Math.max(0.04, progress)})` }} />
+        </span>
+        <span className="font-ledger text-[11px] tracking-[0.2em] text-[#6d665c] uppercase">drag · swipe · arrows</span>
+      </div>
+    </section>
   );
 }
 

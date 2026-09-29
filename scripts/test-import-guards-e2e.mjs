@@ -60,6 +60,7 @@ try {
   await page.getByLabel("Your name").fill(BUSINESS.owner);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.locator("#acceptTerms").check();
   await page.getByRole("button", { name: /sign up|create/i }).click();
   await page.waitForURL(/\/onboarding\/import/, { timeout: 60_000 });
   const { data: users } = await admin.auth.admin.listUsers({ perPage: 1000 });

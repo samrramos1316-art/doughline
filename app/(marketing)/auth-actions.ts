@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validators/auth";
 import { ONBOARDING_URL } from "@/lib/onboarding/paths";
+import { LEGAL_VERSION } from "@/lib/legal";
 
 export type AuthActionState =
   | { error: string; unconfirmedEmail?: string }
@@ -33,6 +34,7 @@ export async function signUpAction(_prevState: AuthActionState, formData: FormDa
     businessName: formData.get("businessName"),
     businessType: formData.get("businessType") || undefined,
     fullName: formData.get("fullName") || undefined,
+    acceptTerms: formData.get("acceptTerms"),
   });
 
   if (!parsed.success) {
@@ -48,7 +50,14 @@ export async function signUpAction(_prevState: AuthActionState, formData: FormDa
     email,
     password,
     options: {
-      data: { business_name: businessName, business_type: businessType, full_name: fullName },
+      // terms_*: a record of what this person agreed to, and when.
+      data: {
+        business_name: businessName,
+        business_type: businessType,
+        full_name: fullName,
+        terms_version: LEGAL_VERSION,
+        terms_accepted_at: new Date().toISOString(),
+      },
       emailRedirectTo: await confirmUrl(),
     },
   });

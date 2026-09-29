@@ -153,6 +153,31 @@ try {
   assert(/you@yourbakery\.com/.test(await p8.locator("main").innerText()), "check-email page names the address");
   await p8.goto(`${BASE}/signup`);
   await p8.screenshot({ path: `${OUT}/06-signup.png`, fullPage: true });
+
+  banner("9. signing up needs the terms box ticked");
+  const blockedEmail = `auth-noterms-${stamp}@example.com`;
+  await p8.getByLabel("Business name").fill("No Terms Bakery");
+  await p8.getByLabel("Email").fill(blockedEmail);
+  await p8.getByLabel("Password", { exact: true }).fill(password);
+  const box = p8.locator("#acceptTerms");
+  assert((await box.isVisible()) && !(await box.isChecked()) && (await box.getAttribute("required")) !== null, "signup shows an unticked, required terms checkbox");
+  const legalLinks = await p8.locator("form").getByRole("link").evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+  assert(legalLinks.includes("/terms") && legalLinks.includes("/privacy"), "the checkbox links to the Terms and the Privacy Policy");
+  await p8.getByRole("button", { name: "Create account" }).click();
+  await p8.waitForTimeout(1500);
+  assert(p8.url().endsWith("/signup") && !(await box.evaluate((el) => el.validity.valid)), "the browser won't submit without it");
+  // Past the browser check: the server must refuse too.
+  await box.evaluate((el) => el.removeAttribute("required"));
+  await p8.getByRole("button", { name: "Create account" }).click();
+  const err9 = await p8.locator("p[role=alert]").innerText({ timeout: 30_000 });
+  const { data: all } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  assert(/agree to the Terms/.test(err9) && !all.users.some((u) => u.email === blockedEmail), `the server refuses too, and no account is made ("${err9}")`);
+  for (const path of ["/privacy", "/terms"]) {
+    await p8.goto(`${BASE}${path}`);
+    const h = await p8.getByRole("heading", { level: 1 }).innerText();
+    assert(/Privacy Policy|Terms of Service/.test(h), `${path} is public: "${h}"`);
+  }
+  await p8.screenshot({ path: `${OUT}/07-terms.png`, fullPage: false });
   await page.goto(BASE);
   const openApp = page.getByRole("banner").getByRole("link", { name: "Open app" });
   assert((await openApp.isVisible()) && (await openApp.getAttribute("href")) === "/dashboard", "signed-in visitors get an Open app tab straight into /dashboard");

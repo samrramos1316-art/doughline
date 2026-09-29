@@ -26,6 +26,20 @@ export function SignUpForm() {
       <Field id="fullName" label="Your name" autoComplete="name" placeholder="Optional" />
       <Field id="email" label="Email" type="email" required autoComplete="email" placeholder="you@yourbakery.com" />
       <PasswordField autoComplete="new-password" required minLength={8} hint="At least 8 characters." />
+      <label htmlFor="acceptTerms" className="flex items-start gap-2.5 text-sm leading-snug text-stone-700">
+        <input id="acceptTerms" name="acceptTerms" type="checkbox" value="yes" required className="mt-0.5 h-4 w-4 shrink-0 accent-stone-900" />
+        <span>
+          I agree to the{" "}
+          <Link href="/terms" target="_blank" className="font-medium text-stone-900 underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" target="_blank" className="font-medium text-stone-900 underline">
+            Privacy Policy
+          </Link>
+          .
+        </span>
+      </label>
       <SubmitButton pending={pending} pendingText="Creating your account…">
         Create account
       </SubmitButton>

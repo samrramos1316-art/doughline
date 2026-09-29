@@ -187,6 +187,7 @@ try {
   await page.getByLabel("Your name").fill(BUSINESS.owner);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.locator("#acceptTerms").check();
   await page.getByRole("button", { name: /sign up|create/i }).click();
   // New signups land on the menu/recipe import (§9.3); this owner types
   // theirs in by hand, so they skip it.

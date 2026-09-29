@@ -40,7 +40,17 @@ async function tour(name, opts, stops) {
   return { ctx, page };
 }
 
-await tour("desktop", { viewport: { width: 1440, height: 900 } }, [0.5, 1, 1.6, 2.3, 3, 3.8, 4.6, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 13, 15, 17, 19]);
+const { page: desk } = await tour("desktop", { viewport: { width: 1440, height: 900 } }, [0.5, 1, 1.6, 2.3, 3, 3.8, 4.6, 5.5, 6.5, 7.5, 8.5, 9.5]);
+const total = await desk.evaluate(() => document.documentElement.scrollHeight);
+console.log(`desktop page height: ${total}px (${(total / 900).toFixed(1)} screens)`);
+await desk.locator("#product").scrollIntoViewIfNeeded();
+await desk.waitForTimeout(800);
+for (let i = 0; i < 2; i++) {
+  await desk.getByRole("button", { name: "Next", exact: true }).click();
+  await desk.waitForTimeout(900);
+}
+await desk.locator("#product").screenshot({ path: `${OUT}/desktop-tour-after-2-nexts.png` });
+console.log(`tour counter after 2 × Next: ${await desk.locator("#product").getByText(/\/ 05/).innerText()}`);
 const { page: phone } = await tour(
   "phone",
   { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
