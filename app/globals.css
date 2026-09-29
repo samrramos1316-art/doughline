@@ -10,7 +10,10 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-serif: var(--ff-display), Georgia, serif;
+  --font-display: var(--ff-display), system-ui, sans-serif;
+  --font-body: var(--ff-body), system-ui, sans-serif;
+  --font-ledger: var(--ff-ledger), ui-monospace, monospace;
 }
 
 /* Light-only design. (The create-next-app dark-mode override that used to be
@@ -31,4 +34,75 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* ---- marketing site (dark ledger look) --------------------------------- */
+
+/* Film grain over the whole page: an SVG turbulence tile, slightly animated. */
+.dt-grain::after {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: dt-grain 1.2s steps(6) infinite;
+}
+@keyframes dt-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-4%, 3%); }
+  40% { transform: translate(3%, -5%); }
+  60% { transform: translate(-6%, -2%); }
+  80% { transform: translate(5%, 4%); }
+  100% { transform: translate(0, 0); }
+}
+
+.dt-outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px currentColor;
+}
+.dt-outline-ember {
+  color: transparent;
+  -webkit-text-stroke: 1.5px #ff5b1f;
+}
+
+@keyframes dt-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.dt-marquee {
+  animation: dt-marquee 38s linear infinite;
+}
+
+@keyframes dt-spin {
+  to { transform: rotate(360deg); }
+}
+.dt-spin {
+  animation: dt-spin 22s linear infinite;
+}
+
+/* Receipt paper: a torn/perforated bottom edge. */
+.dt-receipt {
+  --tooth: 10px;
+  -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / var(--tooth) 100%;
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / var(--tooth) 100%;
+}
+
+@keyframes dt-blink {
+  50% { opacity: 0; }
+}
+.dt-caret::after {
+  content: "▍";
+  margin-left: 2px;
+  animation: dt-blink 1s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt-grain::after,
+  .dt-marquee,
+  .dt-spin,
+  .dt-caret::after {
+    animation: none;
+  }
 }

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Bricolage_Grotesque, Geist, Geist_Mono, Hanken_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
 
@@ -13,12 +13,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Display face for the marketing pages' headlines.
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
+// The marketing site's own voice (the app keeps Geist): a condensed,
+// characterful grotesque for display, a plain grotesque for reading, and a
+// typewriter-ish mono for the ledger/receipt details.
+const display = Bricolage_Grotesque({
+  variable: "--ff-display",
   subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
+});
+
+const body = Hanken_Grotesk({
+  variable: "--ff-body",
+  subsets: ["latin"],
+});
+
+const ledger = IBM_Plex_Mono({
+  variable: "--ff-ledger",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -39,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full scroll-smooth antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${display.variable} ${body.variable} ${ledger.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}
