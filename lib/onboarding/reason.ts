@@ -8,7 +8,7 @@ import { z } from "zod";
 // many slices that is. Text only (the pages were already read); one call per
 // recipe, one for the whole menu. Callers fall back to the plain matcher if
 // a call fails, so the import never depends on this working.
-const MODEL = "claude-opus-5";
+const MODEL = "claude-opus-5-5";
 
 function client() {
   const apiKey = process.env.CLAUDE_API_KEY;
@@ -22,7 +22,8 @@ async function ask<T extends z.ZodType>(schema: T, system: string, input: unknow
     thinking: { type: "adaptive" },
     system,
     messages: [{ role: "user", content: JSON.stringify(input) }],
-    output_config: { format: zodOutputFormat(schema) },
+    // Opus 5.5 defaults to medium; high is what Opus 5 ran at.
+    output_config: { effort: "high", format: zodOutputFormat(schema) },
   });
   if (response.stop_reason === "refusal") throw new Error("Claude declined");
   if (response.stop_reason === "max_tokens") throw new Error("Claude's answer was cut off");

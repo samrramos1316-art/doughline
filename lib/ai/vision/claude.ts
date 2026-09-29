@@ -53,7 +53,7 @@ For an invoice:
 - invoice_date_guess: ISO 8601 (YYYY-MM-DD), or null if absent.
 - invoice_total_guess: the grand total due as printed (after fees and tax), or null if not printed or not legible.`;
 
-const MODEL = "claude-opus-5";
+const MODEL = "claude-opus-5-5";
 
 // §9.3: a menu → items and prices.
 const MenuSchema = z.object({
@@ -139,7 +139,8 @@ export class ClaudeVisionProvider implements VisionProvider {
       max_tokens: 16000,
       system,
       messages: [{ role: "user", content: [fileBlock, { type: "text", text: `Extract this ${what}.` }] }],
-      output_config: { format: zodOutputFormat(schema) },
+      // Opus 5.5 defaults to medium; high is what Opus 5 ran at.
+      output_config: { effort: "high", format: zodOutputFormat(schema) },
     });
 
     // Opt-in debugging: print Claude's response text verbatim, before the

@@ -82,7 +82,7 @@ persisted.
 
 ## Real Claude vision (`c822426`, `90791d6`)
 
-`lib/ai/vision/claude.ts` calls `claude-opus-5` with structured outputs
+`lib/ai/vision/claude.ts` calls `claude-opus-5-5` (effort high) with structured outputs
 (§5.3 schema as Zod). `VISION_PROVIDER=claude`; Gemini is still a stub.
 
 Tested: `scripts/test-claude-vision-scan.mjs` — photographed Sysco invoice

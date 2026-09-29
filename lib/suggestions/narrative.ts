@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AlertSuggestions } from "./engine";
 
-export const NARRATIVE_MODEL = "claude-opus-5";
+export const NARRATIVE_MODEL = "claude-opus-5-5";
 
 const SYSTEM_PROMPT = `You write the short "what should I do about this?" note on a price alert inside a food-costing app for a small bakery or restaurant owner. They read it on a phone between tasks.
 
@@ -25,6 +25,7 @@ export async function generateAlertNarrative(s: AlertSuggestions): Promise<strin
     model: NARRATIVE_MODEL,
     max_tokens: 4000,
     thinking: { type: "adaptive" },
+    output_config: { effort: "high" },
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: JSON.stringify(narrativeFacts(s), null, 2) }],
   });
