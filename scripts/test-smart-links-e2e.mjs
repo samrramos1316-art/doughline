@@ -178,7 +178,7 @@ try {
 
   const drafts = await page.getByTestId("recipe-draft").evaluateAll((els) =>
     els.map((d) => ({
-      name: d.querySelector("input")?.value,
+      name: d.querySelector("input:not([type=checkbox])")?.value,
       lines: [...d.querySelectorAll("[data-testid=recipe-line]")].map((tr) => {
         const sel = tr.querySelector("select");
         return {

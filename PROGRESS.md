@@ -291,6 +291,13 @@ days); screenshots in `test-output/market/`.
 - Invoice reading returns `document_type`; a menu/recipe/other page is
   deleted and answered 422 with a link to `/onboarding/import`.
 - Tested: `scripts/test-import-guards-e2e.mjs`.
+- Import reasoning (`lib/onboarding/reason.ts`): after reading, one
+  text-only Claude pass per recipe picks the ingredient that recipe really
+  uses and its amount in the ingredient's unit (exact conversions and
+  container pack sizes computed in `import-recipe`, densities by the model),
+  and one pass links menu items to recipes with servings per batch
+  (`POST /api/onboarding/link-menu`). Falls back to the matcher / name
+  overlap. Tested: `scripts/test-smart-links-e2e.mjs` (74/74 on prod).
 
 ## Not started yet
 
