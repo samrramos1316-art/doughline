@@ -743,7 +743,6 @@ function TourStrip() {
         for (const e of entries) {
           const card = e.target as HTMLElement;
           card.dataset.in = e.intersectionRatio > 0.35 ? "1" : "0";
-          if (e.intersectionRatio > 0.6) setActive(Number(card.dataset.card));
         }
       },
       { root: el, threshold: [0, 0.35, 0.6, 0.9] },
@@ -786,7 +785,13 @@ function TourStrip() {
         aria-label="Product tour, scroll sideways"
         onScroll={(e) => {
           const el = e.currentTarget;
-          setProgress(el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth));
+          const max = Math.max(1, el.scrollWidth - el.clientWidth);
+          setProgress(el.scrollLeft / max);
+          // The card at the left edge is the current one; at the very end,
+          // the last card (it can't scroll all the way to the edge).
+          const card = el.querySelector<HTMLElement>("[data-card]");
+          const stride = card ? card.offsetWidth + 24 : el.clientWidth;
+          setActive(el.scrollLeft >= max - 2 ? TOUR.length - 1 : Math.min(TOUR.length - 1, Math.round(el.scrollLeft / stride)));
         }}
         onPointerDown={(e) => {
           if (e.pointerType !== "mouse" || !track.current) return;
