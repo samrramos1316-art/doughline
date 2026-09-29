@@ -29,12 +29,12 @@ export class GeminiVisionProvider implements VisionProvider {
   async extractMenu(fileBuffer: Buffer, mimeType: string): Promise<MenuExtractionResult> {
     void fileBuffer;
     void mimeType;
-    return { items: [] };
+    return { document_type: "menu", items: [] };
   }
 
   async extractRecipe(fileBuffer: Buffer, mimeType: string): Promise<RecipeExtractionResult> {
     void fileBuffer;
     void mimeType;
-    return { name_guess: null, yield_qty_guess: null, yield_unit_guess: null, ingredient_lines: [] };
+    return { document_type: "recipe", name_guess: null, yield_qty_guess: null, yield_unit_guess: null, ingredient_lines: [] };
   }
 }

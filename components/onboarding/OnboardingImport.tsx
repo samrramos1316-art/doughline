@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
@@ -11,7 +11,21 @@ import { LOCAL_DATE_HEADER, browserLocalDate } from "@/lib/dates/localDate";
 type Ingredient = { id: string; name: string; base_unit: string };
 type Recipe = { id: string; name: string; yieldQty: number | null; yieldUnit: string | null; ingredients: string[] };
 type Kind = "menu" | "recipe";
-type FileItem = { key: string; file: File; kind: Kind; status: "ready" | "reading" | "done" | "failed"; note?: string };
+// `path` is set once the file is in Storage (or when it arrives already
+// uploaded, from the invoice scanner). `movedFrom`: it was dropped in the
+// other box and read as what it really is. "invoice": it's a supplier
+// invoice, offered "Read it as an invoice".
+type FileItem = {
+  key: string;
+  name: string;
+  file?: File;
+  path?: string;
+  kind: Kind;
+  status: "ready" | "reading" | "done" | "failed" | "invoice" | "sending" | "sent";
+  note?: string;
+  movedFrom?: Kind;
+  invoiceId?: string;
+};
 
 type Candidate = { ingredient_id: string; name: string; similarity: number };
 type ApiLine = {
@@ -85,12 +99,22 @@ function bestRecipe(name: string, options: { value: string; label: string }[]) {
   return score >= 0.6 ? best : "";
 }
 
+class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly body: Record<string, unknown>) {
+    super(message);
+  }
+}
+
 async function postJson(url: string, body: unknown, method = "POST") {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json", [LOCAL_DATE_HEADER]: browserLocalDate() }, body: JSON.stringify(body) });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+  if (!res.ok) throw new ApiError(json.error ?? `Request failed (${res.status})`, res.status, json);
   return json;
 }
+
+// The reader said this upload is something else (import-menu / import-recipe 422).
+const wrongKind = (err: unknown) => (err instanceof ApiError && err.body.wrong_kind ? (err.body.document_type as "invoice" | "menu" | "recipe" | "other") : null);
+const KIND_WORD: Record<Kind, string> = { menu: "a menu", recipe: "a recipe" };
 
 // §9.3: upload menus and recipes (photos or PDFs), let the vision model do
 // the first pass, then confirm everything in one editable review screen —
@@ -99,9 +123,25 @@ async function postJson(url: string, body: unknown, method = "POST") {
 // "Save", and then only through the existing ingredient/recipe/menu APIs.
 // `only` narrows the screen to one kind (Menu → "Import menu", Recipes →
 // "Import recipes"); without it both drop zones show, as on first run.
-export function OnboardingImport({ orgId, ingredients, recipes, only }: { orgId: string; ingredients: Ingredient[]; recipes: Recipe[]; only?: Kind }) {
+// `preloaded`: files already in the onboarding folder (a menu or recipe the
+// invoice scanner turned away) — read as soon as the screen opens.
+export function OnboardingImport({
+  orgId,
+  ingredients,
+  recipes,
+  only,
+  preloaded = [],
+}: {
+  orgId: string;
+  ingredients: Ingredient[];
+  recipes: Recipe[];
+  only?: Kind;
+  preloaded?: { path: string; kind: Kind }[];
+}) {
   const router = useRouter();
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [files, setFiles] = useState<FileItem[]>(() =>
+    preloaded.map((p) => ({ key: newKey(), name: `The file from Invoices (${p.path.split(".").pop()?.toUpperCase()})`, path: p.path, kind: p.kind, status: "ready" as const })),
+  );
   const [drafts, setDrafts] = useState<RecipeDraft[]>([]);
   const [menu, setMenu] = useState<MenuDraft[]>([]);
   const [phase, setPhase] = useState<"pick" | "reading" | "review" | "saving" | "done">("pick");
@@ -115,72 +155,133 @@ export function OnboardingImport({ orgId, ingredients, recipes, only }: { orgId:
   function addFiles(list: FileList | null, kind: Kind) {
     if (!list) return;
     const accepted = Array.from(list).filter((f) => f.type.startsWith("image/") || f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
-    setFiles((cur) => [...cur, ...accepted.map((file) => ({ key: newKey(), file, kind, status: "ready" as const }))].slice(0, 30));
+    setFiles((cur) => [...cur, ...accepted.map((file) => ({ key: newKey(), name: file.name, file, kind, status: "ready" as const }))].slice(0, 30));
   }
+
+  async function upload(f: FileItem) {
+    if (f.path) return f.path;
+    const file = f.file!;
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    const path = `${orgId}/onboarding/${newKey()}.${isPdf ? "pdf" : "jpg"}`;
+    const { error: upErr } = await createClient().storage.from("invoices").upload(path, isPdf ? file : await compressImage(file), { contentType: isPdf ? "application/pdf" : "image/jpeg" });
+    if (upErr) throw new Error(upErr.message);
+    return path;
+  }
+
+  async function readMenu(path: string): Promise<MenuDraft[]> {
+    const { items } = await postJson("/api/onboarding/import-menu", { file_storage_path: path });
+    return (items as { name_guess: string; price_guess: number | null }[]).map((it) => ({
+      key: newKey(), include: true, name: it.name_guess, price: it.price_guess == null ? "" : String(it.price_guess), recipe: "", servings: "", note: "",
+    }));
+  }
+
+  async function readRecipe(path: string, source: string): Promise<RecipeDraft> {
+    const { recipe, lines } = await postJson("/api/onboarding/import-recipe", { file_storage_path: path });
+    const draftLines: LineDraft[] = (lines as ApiLine[]).map((l) => {
+      const matched = l.matched_ingredient_id && ingById.has(l.matched_ingredient_id) ? l.matched_ingredient_id : "";
+      const fresh = l.new_ingredient
+        ? { unit: l.new_ingredient.unit, qty: l.new_ingredient.quantity }
+        : newIngredientUnit(l.unit_guess, l.quantity_guess);
+      const free = l.match_status === "free"; // water: no cost, left out
+      return {
+        key: newKey(),
+        include: !free,
+        raw: l.raw_text,
+        qtyGuess: l.quantity_guess,
+        unitGuess: l.unit_guess,
+        choice: free ? "" : matched || "new",
+        status: free ? "free" : matched ? l.match_status : "new_ingredient",
+        candidates: l.candidates,
+        qty: free ? "" : matched ? (l.base_quantity == null ? "" : String(l.base_quantity)) : fresh.qty == null ? "" : String(fresh.qty),
+        newName: l.new_ingredient?.name ?? titleCase(l.item_name_guess ?? l.raw_text),
+        newUnit: fresh.unit,
+        newCategory: "",
+        note: l.note ?? "",
+      };
+    });
+    return {
+      key: newKey(),
+      include: true,
+      source,
+      name: recipe.name_guess ?? source.replace(/\.[^.]+$/, ""),
+      yieldQty: recipe.yield_qty_guess == null ? "" : String(recipe.yield_qty_guess),
+      yieldUnit: recipe.yield_unit_guess ?? "servings",
+      lines: draftLines,
+    };
+  }
+
+  const patchFile = (key: string, patch: Partial<FileItem>) => setFiles((cur) => cur.map((x) => (x.key === key ? { ...x, ...patch } : x)));
 
   async function readAll() {
     setPhase("reading");
     setError(null);
-    const supabase = createClient();
     const newDrafts: RecipeDraft[] = [];
     const newMenu: MenuDraft[] = [];
     for (const f of files.filter((x) => x.status === "ready")) {
-      setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, status: "reading" } : x)));
+      patchFile(f.key, { status: "reading" });
       try {
-        const isPdf = f.file.type === "application/pdf" || f.file.name.toLowerCase().endsWith(".pdf");
-        const path = `${orgId}/onboarding/${newKey()}.${isPdf ? "pdf" : "jpg"}`;
-        const body = isPdf ? f.file : await compressImage(f.file);
-        const { error: upErr } = await supabase.storage.from("invoices").upload(path, body, { contentType: isPdf ? "application/pdf" : "image/jpeg" });
-        if (upErr) throw new Error(upErr.message);
-        if (f.kind === "menu") {
-          const { items } = await postJson("/api/onboarding/import-menu", { file_storage_path: path });
-          for (const it of items as { name_guess: string; price_guess: number | null }[]) {
-            newMenu.push({ key: newKey(), include: true, name: it.name_guess, price: it.price_guess == null ? "" : String(it.price_guess), recipe: "", servings: "", note: "" });
+        const path = await upload(f);
+        patchFile(f.key, { path });
+        // Read it as what it was dropped in as; if the reader says it's the
+        // other kind, read it again as that and say so.
+        let kind = f.kind;
+        let movedFrom: Kind | undefined;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            if (kind === "menu") {
+              const items = await readMenu(path);
+              newMenu.push(...items);
+              patchFile(f.key, { kind, movedFrom, status: items.length ? "done" : "failed", note: items.length ? `${items.length} items` : "No items found — add them below by hand" });
+            } else {
+              const draft = await readRecipe(path, f.name);
+              newDrafts.push(draft);
+              patchFile(f.key, { kind, movedFrom, status: draft.lines.length ? "done" : "failed", note: draft.lines.length ? `${draft.name} · ${draft.lines.length} ingredients` : "No ingredients found" });
+            }
+            break;
+          } catch (err) {
+            const actual = wrongKind(err);
+            if ((actual === "menu" || actual === "recipe") && attempt === 0) {
+              movedFrom = kind;
+              kind = actual;
+              patchFile(f.key, { note: `This is ${KIND_WORD[actual]}, not ${KIND_WORD[movedFrom]} — reading it as ${KIND_WORD[actual]}…` });
+              continue;
+            }
+            if (actual === "invoice") {
+              patchFile(f.key, { status: "invoice", note: "This is a supplier invoice or receipt, not a menu or recipe." });
+              break;
+            }
+            throw err;
           }
-          setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, status: items.length ? "done" : "failed", note: items.length ? `${items.length} items` : "No items found — add them below by hand" } : x)));
-        } else {
-          const { recipe, lines } = await postJson("/api/onboarding/import-recipe", { file_storage_path: path });
-          const draftLines: LineDraft[] = (lines as ApiLine[]).map((l) => {
-            const matched = l.matched_ingredient_id && ingById.has(l.matched_ingredient_id) ? l.matched_ingredient_id : "";
-            const fresh = l.new_ingredient
-              ? { unit: l.new_ingredient.unit, qty: l.new_ingredient.quantity }
-              : newIngredientUnit(l.unit_guess, l.quantity_guess);
-            const free = l.match_status === "free"; // water: no cost, left out
-            return {
-              key: newKey(),
-              include: !free,
-              raw: l.raw_text,
-              qtyGuess: l.quantity_guess,
-              unitGuess: l.unit_guess,
-              choice: free ? "" : matched || "new",
-              status: free ? "free" : matched ? l.match_status : "new_ingredient",
-              candidates: l.candidates,
-              qty: free ? "" : matched ? (l.base_quantity == null ? "" : String(l.base_quantity)) : fresh.qty == null ? "" : String(fresh.qty),
-              newName: l.new_ingredient?.name ?? titleCase(l.item_name_guess ?? l.raw_text),
-              newUnit: fresh.unit,
-              newCategory: "",
-              note: l.note ?? "",
-            };
-          });
-          newDrafts.push({
-            key: newKey(),
-            include: true,
-            source: f.file.name,
-            name: recipe.name_guess ?? f.file.name.replace(/\.[^.]+$/, ""),
-            yieldQty: recipe.yield_qty_guess == null ? "" : String(recipe.yield_qty_guess),
-            yieldUnit: recipe.yield_unit_guess ?? "servings",
-            lines: draftLines,
-          });
-          setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, status: draftLines.length ? "done" : "failed", note: draftLines.length ? `${recipe.name_guess ?? "Recipe"} · ${draftLines.length} ingredients` : "No ingredients found" } : x)));
         }
       } catch (err) {
-        setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, status: "failed", note: err instanceof Error ? err.message : "Couldn't read it" } : x)));
+        patchFile(f.key, { status: "failed", note: err instanceof Error ? err.message : "Couldn't read it" });
       }
     }
     setDrafts((cur) => [...cur, ...newDrafts]);
     setMenu((cur) => [...cur, ...newMenu]);
     setPhase("review");
     await linkMenu(newMenu, [...drafts, ...newDrafts]);
+  }
+
+  // An invoice dropped here by mistake: make it an invoice from the same
+  // upload and read it, without sending the owner to upload it again.
+  async function sendToInvoices(f: FileItem) {
+    if (!f.path) return;
+    patchFile(f.key, { status: "sending", note: "Reading it as an invoice…" });
+    const invoiceId = crypto.randomUUID();
+    try {
+      await postJson("/api/invoices", { id: invoiceId, file_storage_path: f.path, file_type: f.path.endsWith(".pdf") ? "pdf" : "image" });
+      const res = await fetch(`/api/invoices/${invoiceId}/scan`, { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 502) throw new Error(body.error ?? "Couldn't read it as an invoice");
+      patchFile(f.key, {
+        status: "sent",
+        invoiceId,
+        note: body.status === "needs_review" ? "Added to Invoices — a few lines to check" : res.status === 502 || body.status === "failed" ? "Added to Invoices, but it couldn't be read — enter it by hand there" : "Added to Invoices",
+      });
+    } catch (err) {
+      patchFile(f.key, { status: "invoice", note: err instanceof Error ? err.message : "Couldn't read it as an invoice" });
+    }
   }
 
   // Suggest the recipe each new menu item is made from (and its portion),
@@ -221,6 +322,16 @@ export function OnboardingImport({ orgId, ingredients, recipes, only }: { orgId:
     setMenu((cur) => cur.map((m) => (patch.has(m.key) ? { ...m, ...patch.get(m.key) } : m)));
     setLinking(false);
   }
+
+  // A file handed over from the invoice scanner reads straight away.
+  const autoRead = useRef(false);
+  useEffect(() => {
+    if (autoRead.current || !preloaded.length) return;
+    autoRead.current = true;
+    void readAll();
+    // Once, on arrival; readAll reads the files state this render holds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setDraft = (key: string, patch: Partial<RecipeDraft>) => setDrafts((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   const setLine = (dKey: string, lKey: string, patch: Partial<LineDraft>) =>
@@ -350,13 +461,13 @@ export function OnboardingImport({ orgId, ingredients, recipes, only }: { orgId:
               {files.map((f) => (
                 <li key={f.key} data-testid="onboarding-file" data-status={f.status} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                   <span className="min-w-0">
-                    <span className="block truncate font-medium text-stone-900">{f.file.name}</span>
+                    <span className="block truncate font-medium text-stone-900">{f.name}</span>
                     <span className="text-xs text-stone-500">{f.kind === "menu" ? "Menu" : "Recipe"}{f.note ? ` · ${f.note}` : ""}</span>
                   </span>
                   <span className={`shrink-0 text-xs font-semibold ${f.status === "failed" ? "text-red-600" : f.status === "done" ? "text-emerald-700" : f.status === "reading" ? "text-amber-700" : "text-stone-500"}`}>
                     {f.status === "ready" ? (
-                      <button type="button" aria-label={`Remove ${f.file.name}`} onClick={() => setFiles((cur) => cur.filter((x) => x.key !== f.key))} className="text-stone-400 hover:text-stone-700">✕</button>
-                    ) : f.status === "reading" ? "Reading…" : f.status === "done" ? "Read" : "Couldn't read"}
+                      <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((x) => x.key !== f.key))} className="text-stone-400 hover:text-stone-700">✕</button>
+                    ) : f.status === "reading" ? "Reading…" : f.status === "done" ? "Read" : f.status === "invoice" || f.status === "sending" || f.status === "sent" ? "An invoice" : "Couldn't read"}
                   </span>
                 </li>
               ))}
@@ -377,9 +488,36 @@ export function OnboardingImport({ orgId, ingredients, recipes, only }: { orgId:
 
       {(phase === "review" || phase === "saving") && (
         <>
+          {files.some((f) => f.movedFrom || f.status === "invoice" || f.status === "sending" || f.status === "sent") && (
+            <section aria-label="Uploaded to the wrong place" data-testid="wrong-place" className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+              <p className="font-semibold">Some files weren&apos;t what they were uploaded as</p>
+              <ul className="mt-1.5 flex flex-col gap-1.5">
+                {files.filter((f) => f.movedFrom).map((f) => (
+                  <li key={f.key} data-testid="moved-file">
+                    <b>{f.name}</b> was uploaded as {KIND_WORD[f.movedFrom!]}, but it&apos;s {KIND_WORD[f.kind]} — we read it as {KIND_WORD[f.kind]}{f.kind === "recipe" ? " (under Recipes below)" : " (under Menu items below)"}.
+                  </li>
+                ))}
+                {files.filter((f) => f.status === "invoice" || f.status === "sending" || f.status === "sent").map((f) => (
+                  <li key={f.key} data-testid="invoice-file" className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span><b>{f.name}</b>: {f.status === "invoice" ? "this is a supplier invoice or receipt, not a menu or recipe." : f.note}</span>
+                    {f.status === "invoice" && (
+                      <button type="button" onClick={() => sendToInvoices(f)} className="rounded-md bg-stone-900 px-3 py-1 text-xs font-semibold text-white hover:bg-stone-800">
+                        Read it as an invoice
+                      </button>
+                    )}
+                    {f.status === "sent" && f.invoiceId && (
+                      <Link href={`/invoices/${f.invoiceId}`} className="text-xs font-semibold text-amber-800 underline">
+                        Open it in Invoices →
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {files.some((f) => f.status === "failed") && (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              {files.filter((f) => f.status === "failed").map((f) => `${f.file.name}: ${f.note}`).join(" · ")}
+              {files.filter((f) => f.status === "failed").map((f) => `${f.name}: ${f.note}`).join(" · ")}
             </p>
           )}
 

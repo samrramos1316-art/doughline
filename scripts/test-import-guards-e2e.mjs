@@ -80,8 +80,8 @@ try {
     const r = row(file);
     const status = await r.getAttribute("data-status");
     const text = await r.innerText();
-    const link = await r.getByRole("link", { name: "Import it there" }).getAttribute("href").catch(() => null);
-    check(status === "not_invoice" && new RegExp(`looks like a ${kind}`).test(text) && link === `/onboarding/import?kind=${kind}`, `${kind} PDF → "Not an invoice", links to the ${kind} import`, { status, text, link });
+    const link = await r.getByRole("link", { name: `Import it as a ${kind}` }).getAttribute("href").catch(() => null);
+    check(status === "not_invoice" && new RegExp(`looks like a ${kind}`).test(text) && link?.startsWith(`/onboarding/import?kind=${kind}&file=`), `${kind} PDF → "Not an invoice", links to the ${kind} import with the same file`, { status, text, link });
   }
   const invStatus = await row(INVOICE_FILE).getAttribute("data-status");
   check(["needs_review", "completed"].includes(invStatus), `the real invoice in the same batch is still read (${invStatus})`);

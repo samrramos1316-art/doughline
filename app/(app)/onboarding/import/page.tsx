@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { OnboardingImport } from "@/components/onboarding/OnboardingImport";
 import { PageHeader } from "@/components/ui/dash";
+import { ONBOARDING_FOLDER } from "@/lib/onboarding/upload";
 
 // §9.3: shown once right after signup (the signup action lands here with
 // ?welcome=1, both kinds at once), and any time after from Add from a photo,
@@ -14,12 +15,17 @@ const COPY = {
   recipe: { title: "Import recipes", subtitle: "Photos or PDFs of your recipes, one per file. We read the ingredients and amounts and match them to your price list; you check them before anything is saved.", back: "/recipes" },
 } as const;
 
-export default async function OnboardingImportPage({ searchParams }: { searchParams: Promise<{ welcome?: string; kind?: string }> }) {
-  const { welcome, kind: kindParam } = await searchParams;
-  const kind = !welcome && (kindParam === "menu" || kindParam === "recipe") ? kindParam : undefined;
+export default async function OnboardingImportPage({ searchParams }: { searchParams: Promise<{ welcome?: string; kind?: string; file?: string | string[] }> }) {
+  const { welcome, kind: kindParam, file } = await searchParams;
+  const kind: "menu" | "recipe" | undefined = !welcome && (kindParam === "menu" || kindParam === "recipe") ? kindParam : undefined;
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
+  // ?file=: a menu or recipe the invoice scanner turned away, already in this
+  // org's onboarding folder — read it straight away as `kind`.
+  const handedOver = kind
+    ? [file ?? []].flat().filter((p) => p.startsWith(`${orgId}/${ONBOARDING_FOLDER}/`) && !p.includes("..")).map((path) => ({ path, kind }))
+    : [];
   const [{ data: ingredients }, { data: recipes }, { data: org }] = await Promise.all([
     supabase.from("ingredients").select("id, name, base_unit").order("name"),
     supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit, recipe_ingredients(ingredients(name))").order("name"),
@@ -51,8 +57,9 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
         </ol>
       )}
       <OnboardingImport
-        key={kind ?? "both"}
+        key={`${kind ?? "both"}:${handedOver.map((h) => h.path).join(",")}`}
         only={kind}
+        preloaded={handedOver}
         orgId={orgId}
         ingredients={ingredients ?? []}
         recipes={(recipes ?? []).map((r) => ({

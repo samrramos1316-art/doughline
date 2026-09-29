@@ -95,7 +95,9 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
         const res = await fetch(`/api/invoices/${invoiceId}/scan`, { method: "POST" });
         const body = await res.json().catch(() => ({}));
         if (res.status === 422 && body.not_invoice) {
-          // A menu or recipe: the route dropped the invoice row.
+          // Not an invoice (a menu, a recipe, something else): the route
+          // dropped the invoice row; menus and recipes get a link that reads
+          // the same file in their own import.
           update(key, { status: "not_invoice", invoiceId: undefined, message: body.error, importUrl: body.import_url });
           continue;
         }
@@ -252,7 +254,7 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
                 )}
                 {it.status === "not_invoice" && it.importUrl && (
                   <Link href={it.importUrl} className="font-medium text-zinc-900 underline">
-                    Import it there
+                    {it.importUrl.includes("kind=recipe") ? "Import it as a recipe" : "Import it as a menu"}
                   </Link>
                 )}
                 {it.invoiceId && it.status === "needs_review" && (

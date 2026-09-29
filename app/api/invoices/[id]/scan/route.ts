@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getVisionProvider } from "@/lib/ai/vision";
 import { resolveVendorId } from "@/lib/matching/vendors";
 import { insertAndMatchLines } from "@/lib/invoices/lines";
-import type { DocumentType } from "@/lib/ai/vision/types";
+import { ONBOARDING_FOLDER } from "@/lib/onboarding/upload";
+import { wrongKindMessage } from "@/lib/onboarding/wrongKind";
 
 const ONBOARDING_IMPORT_URL = "/onboarding/import";
 
@@ -16,11 +17,6 @@ const EXT_TO_MIME: Record<string, string> = {
   jpeg: "image/jpeg",
   png: "image/png",
   pdf: "application/pdf",
-};
-
-const NOT_INVOICE: Record<Extract<DocumentType, "menu" | "recipe">, { message: string; importUrl: string }> = {
-  menu: { message: "This looks like a menu, not an invoice. Add menus with the menu import.", importUrl: `${ONBOARDING_IMPORT_URL}?kind=menu` },
-  recipe: { message: "This looks like a recipe, not an invoice. Add recipes with the recipe import.", importUrl: `${ONBOARDING_IMPORT_URL}?kind=recipe` },
 };
 
 // §5.2 step 4: fetch the file from Storage, run it through the configured
@@ -76,31 +72,38 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Vision extraction failed" }, { status: 502 });
   }
 
-  // A menu or recipe sent here by mistake: don't keep it as a failed invoice
-  // (or worse, as a purchase from the business itself). Drop the row and
-  // point at the import that reads it properly (§9.3).
-  if (extraction.document_type === "menu" || extraction.document_type === "recipe") {
+  // Not an invoice at all — never keep it as a failed invoice (or worse, as
+  // a purchase from the business itself). A menu or recipe moves to the
+  // onboarding folder so its import can read the same file straight away
+  // (§9.3); anything else is removed. The reader leans to "invoice" when
+  // unsure, so a hard-to-read receipt still lands below as a failed invoice
+  // with "Enter by hand".
+  if (extraction.document_type !== "invoice") {
+    const kind = extraction.document_type;
+    let importUrl: string | null = null;
+    if (kind === "menu" || kind === "recipe") {
+      const moved = `${invoice.org_id}/${ONBOARDING_FOLDER}/${id}.${ext || "jpg"}`;
+      const { error: moveErr } = await supabase.storage.from("invoices").move(invoice.file_storage_path, moved);
+      importUrl = `${ONBOARDING_IMPORT_URL}?kind=${kind}${moveErr ? "" : `&file=${encodeURIComponent(moved)}`}`;
+    } else {
+      await supabase.storage.from("invoices").remove([invoice.file_storage_path]);
+    }
     await supabase.from("invoices").delete().eq("id", id);
-    const kind = NOT_INVOICE[extraction.document_type];
     return NextResponse.json(
-      { error: kind.message, not_invoice: true, document_type: extraction.document_type, import_url: kind.importUrl },
+      { error: wrongKindMessage("invoice", kind), not_invoice: true, document_type: kind, import_url: importUrl },
       { status: 422 },
     );
   }
 
-  // Anything else that isn't an invoice fails like an unreadable scan, with
-  // the reason — it may still be a receipt the model misjudged, and a failed
-  // invoice keeps "Enter by hand".
-  if (extraction.document_type === "other" || extraction.line_items.length === 0) {
+  // A real invoice with nothing legible fails with the reason and keeps
+  // "Enter by hand".
+  if (extraction.line_items.length === 0) {
     await supabase
       .from("invoices")
       .update({
         status: "failed",
         raw_extraction: JSON.parse(JSON.stringify(extraction)),
-        error_message:
-          extraction.document_type === "other"
-            ? "it doesn't look like an invoice or receipt"
-            : "no purchased items could be read from it",
+        error_message: "no purchased items could be read from it",
       })
       .eq("id", id);
     return NextResponse.json({ invoice_id: id, status: "failed", extraction });

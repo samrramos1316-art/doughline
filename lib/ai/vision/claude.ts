@@ -3,12 +3,27 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { VisionProvider, VisionExtractionResult, MenuExtractionResult, RecipeExtractionResult } from "./types";
 
+// What an upload actually is, decided by every reader whichever box the
+// owner dropped it in — so a menu sent to the invoice scanner, or an invoice
+// dropped on the recipe import, is caught and routed instead of misread.
+const DOCUMENT_TYPE = z
+  .enum(["invoice", "menu", "recipe", "other"])
+  .describe("What this page actually is, whatever it was uploaded as");
+
+const DOCUMENT_TYPES = `- "invoice": a record of goods the business BOUGHT from a supplier — invoice, packing slip, delivery ticket, or store receipt. It names a seller and lists purchased items with quantities and prices. A receipt or invoice that is blurry, torn, or only partly legible is still "invoice".
+- "menu": items the business SELLS to its own customers, with customer prices (a menu board, price list, or catering menu). No supplier, no quantities bought.
+- "recipe": ingredients and amounts for making something, usually with a yield or method.
+- "other": clearly none of these (a letter, a flyer, a photo of food, a price quote with nothing bought).`;
+
+const classifyFirst = (expected: "invoice" | "menu" | "recipe", empty: string) => `First decide document_type — what the page really is, even though it was uploaded as a ${expected}:
+${DOCUMENT_TYPES}
+When unsure, say "${expected}". Only choose another type when the page is clearly that type.
+If document_type is not "${expected}", ${empty} — do not force it into ${expected} shape.`;
+
 // §5.3's extraction contract, as Zod. Structured outputs constrain sampling to
 // this schema, so the response is guaranteed to parse — no retry loop.
 const ExtractionSchema = z.object({
-  document_type: z
-    .enum(["invoice", "menu", "recipe", "other"])
-    .describe("What this page is; only an invoice has line items"),
+  document_type: DOCUMENT_TYPE,
   vendor_name_guess: z.string().nullable(),
   invoice_date_guess: z.string().nullable().describe("ISO 8601 date (YYYY-MM-DD)"),
   invoice_number_guess: z.string().nullable(),
@@ -35,12 +50,8 @@ const ExtractionSchema = z.object({
 
 const SYSTEM_PROMPT = `You extract line items from supplier invoices, packing slips, and receipts for a small food business. The input is usually a phone photo: it may be skewed, crumpled, or partly shadowed.
 
-First decide document_type:
-- "invoice": a record of goods the business BOUGHT from a supplier — invoice, packing slip, delivery ticket, or store receipt. It names a seller and lists purchased items with quantities and prices. A receipt or invoice that is blurry, torn, or only partly legible is still "invoice" — return whatever lines you can read, even none.
-- "menu": items the business SELLS to its own customers, with customer prices (a menu board, price list, or catering menu). No supplier, no quantities bought.
-- "recipe": ingredients and amounts for making something, usually with a yield or method.
-- "other": clearly something else (a letter, a flyer, a photo of food, a price quote with nothing bought). When unsure, say "invoice".
-If document_type is not "invoice", return every other field null and line_items empty — do not force a menu or recipe into invoice shape.
+${classifyFirst("invoice", "return every other field null and line_items empty")}
+For a blurry or partly legible invoice, return whatever lines you can read, even none.
 
 For an invoice:
 - vendor_name_guess: the SELLER (the supplier whose name heads the invoice), never the "bill to" / "ship to" customer.
@@ -57,6 +68,7 @@ const MODEL = "claude-opus-5-5";
 
 // §9.3: a menu → items and prices.
 const MenuSchema = z.object({
+  document_type: DOCUMENT_TYPE,
   items: z.array(
     z.object({
       name_guess: z.string().describe("The menu item's name as printed, without its price or description"),
@@ -67,12 +79,15 @@ const MenuSchema = z.object({
 
 const MENU_PROMPT = `You read menus for a small food business — a chalkboard photo, a printed card, a Canva PDF, a screenshot. List every item a customer can buy, in the order printed.
 
+${classifyFirst("menu", "return items empty")}
+
 - name_guess: the item's name as printed (fix obvious photo-reading errors, keep the business's own wording). No price, no description, no allergen codes.
 - price_guess: the price as a number of dollars ("$4.25" -> 4.25, "4.5" -> 4.5). If an item lists several sizes or counts, use the smallest/single one. null if no price is printed for it.
 - Skip section headings, descriptions, opening hours, and add-ons that aren't sold on their own ("add oat milk +0.50").`;
 
 // §9.3: one recipe → name, yield, ingredient lines.
 const RecipeSchema = z.object({
+  document_type: DOCUMENT_TYPE,
   name_guess: z.string().nullable(),
   yield_qty_guess: z.number().nullable().describe("How many servings/pieces one batch makes"),
   yield_unit_guess: z.string().nullable().describe("What the yield counts, e.g. cookies, slices, loaves"),
@@ -87,6 +102,8 @@ const RecipeSchema = z.object({
 });
 
 const RECIPE_PROMPT = `You read recipes for a small food business — a handwritten card, a notebook page, a printed or typed document. Extract ONE recipe (the main one if the page has several).
+
+${classifyFirst("recipe", "return every other field null and ingredient_lines empty")}
 
 - name_guess: the recipe's title.
 - yield_qty_guess / yield_unit_guess: what one batch makes ("Makes 2 dozen cookies" -> 24, "cookies"; "Serves 8" -> 8, "servings"; "One 9-inch cake, 12 slices" -> 12, "slices"). null if not stated.

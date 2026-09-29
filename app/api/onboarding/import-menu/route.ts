@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getVisionProvider } from "@/lib/ai/vision";
 import { readOnboardingUpload } from "@/lib/onboarding/upload";
+import { wrongKindBody } from "@/lib/onboarding/wrongKind";
 
 export const maxDuration = 300;
 
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
   if ("error" in file) return NextResponse.json({ error: file.error }, { status: file.status });
 
   try {
-    const { items } = await getVisionProvider().extractMenu(file.buffer, file.mimeType);
+    const { document_type, items } = await getVisionProvider().extractMenu(file.buffer, file.mimeType);
+    // Not a menu (a recipe, an invoice…): say what it is so the screen can route it.
+    if (document_type !== "menu") return NextResponse.json(wrongKindBody("menu", document_type, file.path), { status: 422 });
     return NextResponse.json({ items: items.filter((i) => i.name_guess.trim()) });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't read this menu" }, { status: 502 });

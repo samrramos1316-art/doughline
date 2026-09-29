@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getVisionProvider } from "@/lib/ai/vision";
 import { readOnboardingUpload } from "@/lib/onboarding/upload";
+import { wrongKindBody } from "@/lib/onboarding/wrongKind";
 import { matchLines } from "@/lib/matching/vectorMatch";
 import { SUGGESTION_DISPLAY_THRESHOLD } from "@/lib/matching/thresholds";
 import { canonicalUnit, conversionFactor } from "@/lib/costing/units";
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't read this recipe" }, { status: 502 });
   }
+  // Not a recipe (a menu, an invoice…): say what it is so the screen can route it.
+  if (recipe.document_type !== "recipe") return NextResponse.json(wrongKindBody("recipe", recipe.document_type, file.path), { status: 422 });
   if (!recipe.ingredient_lines.length) return NextResponse.json({ recipe, lines: [] });
 
   const { data: ingredients } = await supabase.from("ingredients").select("id, name, base_unit");

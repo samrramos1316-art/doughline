@@ -230,7 +230,7 @@ try {
   await snap(page, "recipe-last");
   await page.goto(`${BASE}/menu`);
   for (const [item, recipe, price] of MENU) {
-    await page.locator('input[name="name"]').fill(item);
+    await page.locator("#menu-name").fill(item);
     await page.locator('select[name="recipe_id"]').selectOption({ label: recipe });
     await page.locator('input[name="selling_price"]').fill(String(price));
     await page.getByRole("button", { name: "Add menu item" }).click();
@@ -359,7 +359,8 @@ try {
     await page.goto(`${BASE}/alerts/${butter.id}`);
     await page.getByText("Menu items affected").waitFor();
     await page.waitForFunction(() => /suggest/i.test(document.body.innerText), null, { timeout: 90_000 }).catch(() => {});
-    await page.waitForTimeout(8000);
+    // Claude writes the summary on first view; wait for it rather than a fixed time.
+    await page.getByTestId("ai-narrative").waitFor({ timeout: 90_000 }).catch(() => {});
     const text = await page.locator("main").innerText();
     await snap(page, "alert-butter");
     check(/suggest/i.test(text), "butter alert page shows suggestions");

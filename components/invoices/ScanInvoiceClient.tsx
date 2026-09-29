@@ -132,7 +132,7 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
           <p className="text-sm font-medium text-red-600">{errorMessage}</p>
           {importUrl && (
             <Link href={importUrl} className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white">
-              {importUrl.includes("kind=recipe") ? "Go to the recipe import" : "Go to the menu import"}
+              {importUrl.includes("kind=recipe") ? "Import it as a recipe" : "Import it as a menu"}
             </Link>
           )}
           <button

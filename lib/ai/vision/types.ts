@@ -18,9 +18,9 @@ export interface ExtractedLineItem {
   pack_unit: string | null;
 }
 
-// What the uploaded page actually is. Only an invoice gets line items: a
-// menu or recipe sent to the invoice importer is turned away with a pointer
-// to its own import (§9.3) instead of being misread as a purchase.
+// What the uploaded page actually is. Every reader decides it, whichever
+// box it was uploaded to: only the matching kind is extracted, and a
+// mismatch is routed to the right import (§9.3) instead of being misread.
 export type DocumentType = "invoice" | "menu" | "recipe" | "other";
 
 export interface VisionExtractionResult {
@@ -34,6 +34,7 @@ export interface VisionExtractionResult {
 
 // §9.3 onboarding import: a menu (board, printed card, PDF) → items + prices.
 export interface MenuExtractionResult {
+  document_type: DocumentType;
   items: { name_guess: string; price_guess: number | null }[];
 }
 
@@ -49,6 +50,7 @@ export interface RecipeIngredientLine {
   item_name_guess: string | null;
 }
 export interface RecipeExtractionResult {
+  document_type: DocumentType;
   name_guess: string | null;
   yield_qty_guess: number | null;
   yield_unit_guess: string | null;

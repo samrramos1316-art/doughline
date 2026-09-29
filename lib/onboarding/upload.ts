@@ -18,5 +18,5 @@ export async function readOnboardingUpload(supabase: SupabaseClient<Database>, o
 
   const { data: blob, error } = await supabase.storage.from("invoices").download(path);
   if (error || !blob) return { error: "Could not read the uploaded file", status: 400 as const };
-  return { buffer: Buffer.from(await blob.arrayBuffer()), mimeType };
+  return { buffer: Buffer.from(await blob.arrayBuffer()), mimeType, path };
 }
