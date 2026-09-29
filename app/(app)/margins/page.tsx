@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
-import { getMargins, type ItemMargin } from "@/lib/dashboard/margins";
-import { Panel, Kpi, PageHeader, Pill, MarginBar, HBar, Empty, marginTone, money, unitMoney } from "@/components/ui/dash";
+import { getMargins, type ItemMargin, type IngredientMargin } from "@/lib/dashboard/margins";
+import { Panel, Kpi, PageHeader, Pill, Delta, MarginBar, HBar, Empty, marginTone, money, unitMoney } from "@/components/ui/dash";
 
 const pct = (n: number | null) => (n == null ? "—" : `${n.toFixed(1)}%`);
 const qtyFmt = (n: number) => (n >= 10 ? n.toFixed(1) : n >= 1 ? n.toFixed(2) : n.toFixed(4)).replace(/\.?0+$/, "") || "0";
@@ -15,11 +15,17 @@ const cellL = "px-3 py-2 text-left text-[13px] text-stone-800 whitespace-nowrap"
 const cellR = "px-3 py-2 text-right text-[13px] text-stone-800 tabular-nums whitespace-nowrap";
 const head = "px-3 py-2 text-[11px] font-semibold tracking-wider text-stone-500 uppercase whitespace-nowrap";
 
-export default async function MarginsPage() {
+export default async function MarginsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const { view } = await searchParams;
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
-  const { target, items, total } = await getMargins(supabase, orgId);
+  const { target, items, total, byIngredient } = await getMargins(supabase, orgId);
+  const tabs = [
+    { href: "/margins", label: "Menu items", active: view !== "ingredients", count: items.length },
+    { href: "/margins?view=ingredients", label: "Ingredients", active: view === "ingredients", count: byIngredient.length },
+  ];
+  if (view === "ingredients") return <IngredientsView list={byIngredient} target={target} tabs={tabs} />;
 
   const sorted = [...items].sort((a, b) => (a.marginPct ?? Infinity) - (b.marginPct ?? Infinity));
   const priced = items.filter((m) => m.marginPct != null);
@@ -32,6 +38,7 @@ export default async function MarginsPage() {
       <PageHeader
         title="Margins"
         subtitle={`Every menu item's cost worked out from its recipe, and your menu's total margin · target ${target}%`}
+        tabs={tabs}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi
@@ -210,5 +217,134 @@ function Chevron() {
     <svg viewBox="0 0 20 20" className="h-4 w-4 text-stone-400 transition group-open:rotate-180" aria-hidden>
       <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+// Ingredients: works with no recipes at all (price, movement, spend, history);
+// with recipes, each one also shows what it costs every menu item it's in.
+function IngredientsView({ list, target, tabs }: { list: IngredientMargin[]; target: number; tabs: { href: string; label: string; active: boolean; count: number }[] }) {
+  const spend30 = list.reduce((x, i) => x + i.spend30, 0);
+  const rising = list.filter((i) => (i.change30dPct ?? 0) > 0);
+  const top = [...list].sort((a, b) => Math.abs(b.change90dPct ?? 0) - Math.abs(a.change90dPct ?? 0))[0];
+  const inRecipes = list.filter((i) => i.uses.length).length;
+  return (
+    <>
+      <PageHeader title="Margins" subtitle="What each ingredient costs you and how its price is moving — with or without recipes" tabs={tabs} />
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Kpi label="Spent, 30 days" value={money(spend30, 0)} sub="on matched invoice lines" href="/invoices" />
+        <Kpi label="Rising" value={rising.length} tone={rising.length ? "warning" : "good"} sub={rising.length ? `up in 30 days: ${rising.slice(0, 3).map((i) => i.name).join(", ")}` : "nothing up in 30 days"} />
+        <Kpi label="Biggest move, 90 days" value={top?.change90dPct ? <Delta value={top.change90dPct} /> : "—"} sub={top?.change90dPct ? top.name : "no price changes yet"} />
+        <Kpi label="In a menu item" value={`${inRecipes}/${list.length}`} tone={inRecipes < list.length ? "neutral" : "good"} sub={inRecipes < list.length ? "the rest show price and spend only" : "all linked to what you sell"} />
+      </div>
+      {list.length === 0 ? (
+        <Panel title="Ingredients">
+          <Empty>
+            No ingredients yet. <Link href="/invoices/scan" className="font-medium text-amber-700 underline">Scan an invoice</Link> and every item you buy shows up here with its price.
+          </Empty>
+        </Panel>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-stone-600">
+            Most spent on first. Open one for its price history and — if it&apos;s in a recipe — what it costs each menu item and what its price change did to those margins.
+          </p>
+          {list.map((i) => (
+            <IngredientCard key={i.id} i={i} target={target} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function IngredientCard({ i, target }: { i: IngredientMargin; target: number }) {
+  const worst = i.uses[0];
+  const effect = i.uses.some((u) => u.impact30d != null) ? i.uses.reduce((x, u) => x + (u.impact30d ?? 0), 0) : null;
+  return (
+    <details className="group rounded-lg border border-stone-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,0.04)]" data-testid="margin-ingredient" data-name={i.name}>
+      <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 md:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,0.6fr))_auto]">
+        <span className="min-w-0">
+          <span className="block truncate font-semibold text-stone-900">{i.name}</span>
+          <span className="block truncate text-xs text-stone-500">
+            {i.uses.length
+              ? `in ${i.uses.length} menu item${i.uses.length === 1 ? "" : "s"}${worst?.pctOfPrice != null ? ` · up to ${pct(worst.pctOfPrice)} of ${worst.menuItem}'s price` : ""}`
+              : "not in a menu item's recipe"}
+          </span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-stone-700 md:hidden">
+            {i.costNow == null ? <span className="font-medium text-amber-700">no price</span> : `${unitMoney(i.costNow)}/${i.unit}`}
+            {i.change30dPct != null && <> · <Delta value={i.change30dPct} /></>}
+            {i.spend30 > 0 && <> · {money(i.spend30, 0)} spent</>}
+          </span>
+        </span>
+        <Stat label="Price now" value={i.costNow == null ? <span className="text-amber-700">no price</span> : `${unitMoney(i.costNow)}/${i.unit}`} />
+        <Stat label="30 days" value={<Delta value={i.change30dPct} />} />
+        <Stat label="Spent, 30 days" value={i.spend30 ? money(i.spend30) : "—"} />
+        <Stat label="Margin effect" value={effect == null ? <span className="text-stone-400">—</span> : <Delta value={effect} suffix=" pts" goodWhenUp dp={2} />} />
+        <span className="justify-self-end"><Chevron /></span>
+      </summary>
+      <div className="border-t border-stone-100 pb-3">
+        {i.uses.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full" aria-label={`What ${i.name} costs each menu item`}>
+              <thead>
+                <tr>
+                  <th className={`${head} text-left`}>Menu item</th>
+                  <th className={`${head} text-right`}>Uses per serving</th>
+                  <th className={`${head} text-right`}>Costs</th>
+                  <th className={`${head} text-right`}>Of the price</th>
+                  <th className={`${head} text-right`}>Of its food cost</th>
+                  <th className={`${head} text-right`}>Item margin</th>
+                  <th className={`${head} text-right`}>30-day effect</th>
+                </tr>
+              </thead>
+              <tbody>
+                {i.uses.map((u) => (
+                  <tr key={u.menuItemId} className="border-t border-stone-100">
+                    <td className={cellL}>
+                      <span className="font-medium text-stone-900">{u.menuItem}</span>
+                      <Link href={`/recipes/${u.recipeId}`} className="block text-[11px] text-stone-500 hover:underline">{u.recipe}</Link>
+                    </td>
+                    <td className={cellR}>{qtyFmt(u.qty)} {i.unit}</td>
+                    <td className={cellR}>{cents(u.cost)}</td>
+                    <td className={`${cellR} font-semibold`}>{pct(u.pctOfPrice)}</td>
+                    <td className={cellR}>{u.shareOfCost == null ? "—" : `${(u.shareOfCost * 100).toFixed(0)}%`}</td>
+                    <td className={`${cellR} ${marginTone(u.marginPct, target) === "critical" ? "font-semibold text-red-600" : ""}`}>{pct(u.marginPct)}</td>
+                    <td className={cellR}><Delta value={u.impact30d} suffix=" pts" goodWhenUp dp={2} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {i.costNow != null && worst?.pctOfPrice != null && (
+              <p className="px-3 pt-2 text-xs text-stone-500">
+                If {i.name.toLowerCase()} goes up 10%, {worst.menuItem} loses {(worst.pctOfPrice * 0.1).toFixed(2)} margin points.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="px-3 pt-3 text-sm text-stone-600">
+            {i.otherRecipes.length ? `In ${i.otherRecipes.join(", ")}, which isn't sold as a menu item yet.` : "Not in any recipe yet."} Its price is still tracked from every invoice.{" "}
+            <Link href="/recipes" className="font-medium text-amber-700 underline">Add it to a recipe</Link> to see what it does to your margins.
+          </p>
+        )}
+        {i.otherRecipes.length > 0 && i.uses.length > 0 && <p className="px-3 pt-2 text-xs text-stone-500">Also in {i.otherRecipes.join(", ")} — not sold as a menu item yet.</p>}
+        <div className="px-3 pt-3">
+          <p className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">
+            Price history{i.change90dPct != null && <span className="ml-2 font-normal tracking-normal normal-case"><Delta value={i.change90dPct} /> in 90 days</span>}
+          </p>
+          {i.history.length === 0 ? (
+            <p className="pt-1 text-xs text-stone-500">No prices recorded yet — scan an invoice that has it, or type one on Ingredients.</p>
+          ) : (
+            <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs tabular-nums text-stone-700">
+              {i.history.map((h, k) => (
+                <li key={k}>
+                  <span className="text-stone-500">{h.date}</span> {unitMoney(h.cost)}/{i.unit}
+                  {h.vendor && <span className="text-stone-500"> · {h.vendor}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {i.spend90 > 0 && <p className="pt-1 text-xs text-stone-500">Spent {money(i.spend90)} on it in the last 90 days.</p>}
+        </div>
+      </div>
+    </details>
   );
 }

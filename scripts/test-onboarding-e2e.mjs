@@ -243,6 +243,16 @@ try {
   const totalText = await page.getByTestId("margin-total").innerText();
   check(totalText.includes(`${wantTotal}%`), `Margins: whole-menu margin ${wantTotal}% over ${costedItems.length} costed items (one of each)`, totalText);
   await page.screenshot({ path: `${OUT}/06b-margins.png`, fullPage: true });
+  // The Ingredients tab: each ingredient against the items it goes into.
+  await page.goto(`${BASE}/margins?view=ingredients`);
+  const butter = page.locator('[data-testid="margin-ingredient"][data-name="Unsalted Butter"]');
+  await butter.locator("summary").click();
+  const butterUses = await butter.locator("tbody tr").allInnerTexts();
+  check(butterUses.some((u) => /croissant/i.test(u)) && butterUses.some((u) => /cookie/i.test(u)), `Margins → Ingredients: Unsalted Butter shows the items it goes into (${butterUses.length})`, butterUses);
+  const flourUses = await page.locator('[data-testid="margin-ingredient"][data-name="Bread Flour"]').locator("tbody tr").allTextContents();
+  check(flourUses.length > 0 && flourUses.every((u) => /croissant|pain/i.test(u)), "Margins → Ingredients: Bread Flour only against the croissant dough", flourUses);
+  const cream = await page.locator('[data-testid="margin-ingredient"][data-name="Heavy Cream"]').innerText();
+  check(/not in a menu item/i.test(cream), "Margins → Ingredients: an ingredient in no recipe still listed, with its price");
 
   // An item the import left without a recipe can be linked afterwards from Menu.
   await page.goto(`${BASE}/menu`);

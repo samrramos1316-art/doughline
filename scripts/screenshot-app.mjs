@@ -41,7 +41,7 @@ try {
     ["add", "/add"],
     ["menu", "/menu"],
     ["margins", "/margins"],
-    ["margins-items", "/margins?view=items"],
+    ["margins-ingredients", "/margins?view=ingredients"],
     ["recipes", "/recipes"],
     ["recipe", first.recipe],
     ["ingredients", "/ingredients"],
