@@ -58,7 +58,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
           value={soldAs.length}
           sub={soldAs.length ? soldAs.map((m) => `${m.name} ${m.margin_pct ?? "—"}%`).join(" · ") : "not on the menu yet"}
           tone={soldAs.some((m) => m.margin_pct != null && Number(m.margin_pct) < target) ? "critical" : "neutral"}
-          href={soldAs.length ? "/margins?view=items" : "/menu"}
+          href={soldAs.length ? "/margins" : "/menu"}
         />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">

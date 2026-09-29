@@ -53,7 +53,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
     return (
       <>
-        <PageHeader title="Ingredients" subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} actions={<ButtonLink href="/margins">What each one costs you, by menu item</ButtonLink>} />
+        <PageHeader title="Ingredients" subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
         {tab === "movers" ? (
           <Panel title="Every ingredient — biggest moves first" flush>
             {rows.length === 0 ? (
@@ -129,7 +129,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <PageHeader title="Ingredients" subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">What each one costs you, by menu item</ButtonLink>} />
+      <PageHeader title="Ingredients" subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
       <Panel title="Price list">
         <IngredientsGrid ingredients={list} />
       </Panel>

@@ -227,18 +227,21 @@ try {
   await page.goto(`${BASE}/menu`);
   await page.screenshot({ path: `${OUT}/06-menu.png`, fullPage: true });
 
-  // The Margins tab reads the same numbers, split by ingredient and by item.
-  await page.goto(`${BASE}/margins?view=items`);
+  // The Margins tab: each item worked out from its recipe, then the menu's total.
+  await page.goto(`${BASE}/margins`);
   const cItem = page.locator(`[data-testid="margin-item"][data-name="${cm?.name}"]`);
   const cText = await cItem.locator("summary").innerText();
-  check(cText.includes(`${Number(cm?.margin_pct).toFixed(1)}%`), `Margins → By menu item: ${cm?.name} at ${Number(cm?.margin_pct).toFixed(1)}%, same as the margin view`, cText);
-  await page.goto(`${BASE}/margins`);
-  const butter = page.locator('[data-testid="margin-ingredient"][data-name="Unsalted Butter"]');
-  await butter.locator("summary").click();
-  const uses = await butter.locator("tbody tr").allInnerTexts();
-  check(uses.some((u) => /croissant/i.test(u)) && uses.some((u) => /cookie/i.test(u)), `Margins → By ingredient: Unsalted Butter opens to the items it goes into (${uses.length})`, uses);
-  const flour = await page.locator('[data-testid="margin-ingredient"][data-name="Bread Flour"]').locator("tbody tr").allTextContents();
-  check(flour.length > 0 && flour.every((u) => /croissant/i.test(u)), "Bread Flour only shows against the croissant", flour);
+  check(cText.includes(`${Number(cm?.margin_pct).toFixed(1)}%`), `Margins: ${cm?.name} at ${Number(cm?.margin_pct).toFixed(1)}%, same as the margin view`, cText);
+  await cItem.locator("summary").click();
+  const working = await cItem.locator("tbody tr").evaluateAll((rows) => rows.map((r) => Number(r.cells[4].textContent.replace(/[$,]/g, ""))));
+  const lineSum = working.reduce((x, y) => x + y, 0);
+  check(working.length === 7 && Math.abs(lineSum - Number(cm?.cost_per_serving)) < 0.01, `Margins: the croissant's 7 ingredient lines add up to its cost ($${lineSum.toFixed(4)} vs $${Number(cm?.cost_per_serving).toFixed(4)})`, working);
+  const costedItems = menu.filter((m) => m.margin_pct != null);
+  const sales = costedItems.reduce((x, m) => x + Number(m.selling_price), 0);
+  const food = costedItems.reduce((x, m) => x + Number(m.cost_per_serving), 0);
+  const wantTotal = (((sales - food) / sales) * 100).toFixed(1);
+  const totalText = await page.getByTestId("margin-total").innerText();
+  check(totalText.includes(`${wantTotal}%`), `Margins: whole-menu margin ${wantTotal}% over ${costedItems.length} costed items (one of each)`, totalText);
   await page.screenshot({ path: `${OUT}/06b-margins.png`, fullPage: true });
 
   // An item the import left without a recipe can be linked afterwards from Menu.

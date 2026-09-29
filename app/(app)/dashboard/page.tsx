@@ -34,7 +34,7 @@ export default async function DashboardPage() {
         subtitle={`${today} · target margin ${org.target}%`}
         actions={
           <>
-            <ButtonLink href="/margins">Margins by ingredient</ButtonLink>
+            <ButtonLink href="/margins">Margins</ButtonLink>
             <ButtonLink href="/add" primary>
               <CameraIcon /> Add from a photo
             </ButtonLink>
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         {/* Menu margins: the squad list */}
-        <Panel title="Menu margins — worst first" action={{ href: "/margins?view=items", label: "Margins" }} flush className="xl:col-span-8">
+        <Panel title="Menu margins — worst first" action={{ href: "/margins", label: "Margins" }} flush className="xl:col-span-8">
           {o.menu.length === 0 ? (
             <Empty>No menu items yet. Add one on the Menu tab to see its margin here.</Empty>
           ) : (
@@ -203,7 +203,7 @@ export default async function DashboardPage() {
         </Panel>
 
         {/* Where the cost goes */}
-        <Panel title="Where your food cost goes" action={{ href: "/margins", label: "By ingredient" }} className="xl:col-span-4">
+        <Panel title="Where your food cost goes" action={{ href: "/recipes", label: "Recipes" }} className="xl:col-span-4">
           {o.drivers.length === 0 ? (
             <Empty>Build recipes and menu items to see which ingredients drive your cost.</Empty>
           ) : (

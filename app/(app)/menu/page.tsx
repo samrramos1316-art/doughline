@@ -39,7 +39,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
         tabs={Object.entries(SORTS).map(([k, label]) => ({ href: `/menu?sort=${k}`, label: `Sort: ${label}`, active: sort === k }))}
         actions={
           <>
-            <ButtonLink href="/margins">See margins by ingredient</ButtonLink>
+            <ButtonLink href="/margins">See how each margin is worked out</ButtonLink>
             <ButtonLink href="/onboarding/import?kind=menu" primary>
               <CameraIcon /> Import menu from a photo
             </ButtonLink>
