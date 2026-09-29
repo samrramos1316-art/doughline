@@ -106,7 +106,7 @@ async function waitChange(page, before, timeout = 60_000) {
 }
 async function reviewAll(page, label) {
   await page.goto(`${BASE}/review`);
-  await page.getByRole("heading", { name: "Review queue" }).waitFor();
+  await page.getByRole("heading", { name: "Match invoice lines" }).waitFor();
   await snap(page, `${label}-review-start`, false);
   let state = await cardState(page);
   let guard = 0;

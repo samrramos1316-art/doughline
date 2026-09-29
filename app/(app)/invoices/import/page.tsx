@@ -33,7 +33,7 @@ export default async function ImportInvoicesPage() {
             <li>Each file is read and matched to your ingredients exactly like a scan.</li>
             <li><b className="text-stone-800">Older invoices</b> go into price history without changing today&apos;s costs or raising alerts.</li>
             <li>Anything unreadable is flagged so you can type it in by hand.</li>
-            <li><b className="text-stone-800">Menus and recipes</b> have their own import: <Link href="/onboarding/import" className="font-medium text-amber-700 underline">Import menu &amp; recipes</Link>. They&apos;re turned away here.</li>
+            <li><b className="text-stone-800">Menus and recipes</b> have their own import: <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your menu</Link> and <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">Import recipes</Link>. They&apos;re turned away here.</li>
             <li>For today&apos;s delivery on your phone, use <Link href="/invoices/scan" className="font-medium text-amber-700 underline">Scan</Link>.</li>
           </ul>
         </Panel>

@@ -6,10 +6,17 @@ import { OnboardingImport } from "@/components/onboarding/OnboardingImport";
 import { PageHeader } from "@/components/ui/dash";
 
 // §9.3: shown once right after signup (the signup action lands here with
-// ?welcome=1), and reachable any time after from Recipes and Menu ("Import
-// from photo"). A suggestion, never a gate: Skip goes straight to manual entry.
-export default async function OnboardingImportPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
-  const { welcome } = await searchParams;
+// ?welcome=1, both kinds at once), and any time after from Add from a photo,
+// Menu and Recipes with ?kind=menu or ?kind=recipe — one kind per screen.
+// A suggestion, never a gate: Skip goes straight to manual entry.
+const COPY = {
+  menu: { title: "Import your menu", subtitle: "A photo or PDF of your menu. We read each item and its price, link it to the recipe it's made from, and you check it before anything is saved.", back: "/menu" },
+  recipe: { title: "Import recipes", subtitle: "Photos or PDFs of your recipes, one per file. We read the ingredients and amounts and match them to your price list; you check them before anything is saved.", back: "/recipes" },
+} as const;
+
+export default async function OnboardingImportPage({ searchParams }: { searchParams: Promise<{ welcome?: string; kind?: string }> }) {
+  const { welcome, kind: kindParam } = await searchParams;
+  const kind = !welcome && (kindParam === "menu" || kindParam === "recipe") ? kindParam : undefined;
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
@@ -22,14 +29,16 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
   return (
     <>
       <PageHeader
-        title={welcome ? `Welcome, ${org?.name ?? "let's get you set up"}` : "Import menu & recipes"}
+        title={welcome ? `Welcome, ${org?.name ?? "let's get you set up"}` : kind ? COPY[kind].title : "Import menu & recipes"}
         subtitle={
           welcome
             ? "Upload your menu and recipes to get started fast — photos or PDFs. We read them, you check them, nothing is saved until you say so."
-            : "Photos or PDFs of your menu and recipes. We read them, you check them, nothing is saved until you say so."
+            : kind
+              ? COPY[kind].subtitle
+              : "Photos or PDFs of your menu and recipes. We read them, you check them, nothing is saved until you say so."
         }
         actions={
-          <Link href={welcome ? "/recipes" : "/dashboard"} className="text-sm font-medium text-stone-600 underline underline-offset-2 hover:text-stone-900">
+          <Link href={welcome ? "/recipes" : kind ? COPY[kind].back : "/add"} className="text-sm font-medium text-stone-600 underline underline-offset-2 hover:text-stone-900">
             {welcome ? "Skip — I'll enter these manually" : "Cancel"}
           </Link>
         }
@@ -42,6 +51,8 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
         </ol>
       )}
       <OnboardingImport
+        key={kind ?? "both"}
+        only={kind}
         orgId={orgId}
         ingredients={ingredients ?? []}
         recipes={(recipes ?? []).map((r) => ({

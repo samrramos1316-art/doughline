@@ -52,7 +52,9 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/market") ||
     request.nextUrl.pathname.startsWith("/review") ||
     request.nextUrl.pathname.startsWith("/onboarding") ||
-    request.nextUrl.pathname.startsWith("/settings");
+    request.nextUrl.pathname.startsWith("/settings") ||
+    request.nextUrl.pathname.startsWith("/margins") ||
+    request.nextUrl.pathname === "/add";
 
   if (isAppRoute && !user) {
     const loginUrl = new URL("/login", request.url);

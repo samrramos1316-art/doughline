@@ -8,4 +8,8 @@ export const createMenuItemSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-export const updateMenuItemSchema = createMenuItemSchema.partial();
+// null unlinks the recipe, or goes back to the recipe's own yield.
+export const updateMenuItemSchema = createMenuItemSchema.partial().extend({
+  recipe_id: z.string().uuid().nullable().optional(),
+  servings_per_batch: z.coerce.number().positive().nullable().optional(),
+});

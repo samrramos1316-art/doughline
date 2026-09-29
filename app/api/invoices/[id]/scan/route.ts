@@ -19,8 +19,8 @@ const EXT_TO_MIME: Record<string, string> = {
 };
 
 const NOT_INVOICE: Record<Extract<DocumentType, "menu" | "recipe">, { message: string; importUrl: string }> = {
-  menu: { message: "This looks like a menu, not an invoice. Add menus with the menu & recipe import.", importUrl: ONBOARDING_IMPORT_URL },
-  recipe: { message: "This looks like a recipe, not an invoice. Add recipes with the menu & recipe import.", importUrl: ONBOARDING_IMPORT_URL },
+  menu: { message: "This looks like a menu, not an invoice. Add menus with the menu import.", importUrl: `${ONBOARDING_IMPORT_URL}?kind=menu` },
+  recipe: { message: "This looks like a recipe, not an invoice. Add recipes with the recipe import.", importUrl: `${ONBOARDING_IMPORT_URL}?kind=recipe` },
 };
 
 // §5.2 step 4: fetch the file from Storage, run it through the configured

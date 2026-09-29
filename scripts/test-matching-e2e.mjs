@@ -344,7 +344,7 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert(overflow <= 0, `no sideways scroll at phone width, so the gate covers the whole page (overflow ${overflow}px)`);
   await page.goto(`${BASE_URL}/review`);
-  await page.getByRole("heading", { name: "Review queue" }).waitFor();
+  await page.getByRole("heading", { name: "Match invoice lines" }).waitFor();
   assert((await page.getByRole("alertdialog").count()) === 0, "…but not the review queue it sends you to");
   await screenshot("review-queue-while-blocked");
   const blocked = await api("POST", "/api/invoices", { id: crypto.randomUUID(), file_storage_path: `${orgId}/x.jpg`, file_type: "image" });

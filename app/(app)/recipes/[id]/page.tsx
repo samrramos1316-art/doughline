@@ -8,16 +8,16 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: recipe }, { data: recipeIngredients }, { data: allIngredients }, { data: cost }, { data: menu }, { data: org }] = await Promise.all([
+  const [{ data: recipe }, { data: recipeIngredients }, { data: allIngredients }, { data: cost }, { data: menu }, { data: org }, { data: menuItems }] = await Promise.all([
     supabase.from("recipes").select("*").eq("id", id).maybeSingle(),
     supabase.from("recipe_ingredients").select("ingredient_id, quantity, unit, ingredients(name, base_unit, current_unit_cost)").eq("recipe_id", id),
     supabase.from("ingredients").select("id, name, base_unit").order("name"),
     supabase.from("recipe_costs").select("*").eq("recipe_id", id).maybeSingle(),
     supabase.from("menu_item_margins").select("menu_item_id, name, selling_price, margin_pct"),
     supabase.from("organizations").select("target_margin_pct").maybeSingle(),
+    supabase.from("menu_items").select("id").eq("recipe_id", id),
   ]);
   if (!recipe) notFound();
-  const { data: menuItems } = await supabase.from("menu_items").select("id").eq("recipe_id", id);
   const soldAs = (menu ?? []).filter((m) => (menuItems ?? []).some((mi) => mi.id === m.menu_item_id));
 
   const initialRows = (recipeIngredients ?? []).map((ri) => ({ ingredient_id: ri.ingredient_id, quantity: String(ri.quantity), unit: ri.unit }));
@@ -58,7 +58,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
           value={soldAs.length}
           sub={soldAs.length ? soldAs.map((m) => `${m.name} ${m.margin_pct ?? "—"}%`).join(" · ") : "not on the menu yet"}
           tone={soldAs.some((m) => m.margin_pct != null && Number(m.margin_pct) < target) ? "critical" : "neutral"}
-          href="/menu"
+          href={soldAs.length ? "/margins?view=items" : "/menu"}
         />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -80,8 +80,8 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
                 </tr>
               </thead>
               <tbody>
-                {breakdown.map((b) => (
-                  <tr key={b.name} className={row}>
+                {breakdown.map((b, i) => (
+                  <tr key={`${b.name}-${i}`} className={row}>
                     <td className={`${td} font-medium`}>{b.name}</td>
                     <td className={tdNum}>{b.qty} {b.unit}</td>
                     <td className={tdNum}>{b.unitCost == null ? <span className="text-amber-700">no price</span> : unitMoney(b.unitCost)}</td>

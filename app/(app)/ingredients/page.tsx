@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { IngredientsGrid } from "@/components/ingredients/IngredientsGrid";
 import { isoDaysAgo } from "@/lib/dates/localDate";
-import { Panel, PageHeader, Delta, Spark, Empty, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { Panel, PageHeader, ButtonLink, Delta, Spark, Empty, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 
 export default async function IngredientsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
@@ -53,7 +53,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
     return (
       <>
-        <PageHeader title="Ingredients" subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} />
+        <PageHeader title="Ingredients" subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} actions={<ButtonLink href="/margins">What each one costs you, by menu item</ButtonLink>} />
         {tab === "movers" ? (
           <Panel title="Every ingredient — biggest moves first" flush>
             {rows.length === 0 ? (
@@ -129,7 +129,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <PageHeader title="Ingredients" subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} />
+      <PageHeader title="Ingredients" subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">What each one costs you, by menu item</ButtonLink>} />
       <Panel title="Price list">
         <IngredientsGrid ingredients={list} />
       </Panel>

@@ -16,8 +16,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .update(parsed.data)
     .eq("id", id)
     .select()
-    .single();
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (!menuItem) return NextResponse.json({ error: "Menu item not found" }, { status: 404 });
   return NextResponse.json({ menuItem });
 }
 

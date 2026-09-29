@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewRecipeForm } from "@/components/recipes/NewRecipeForm";
-import { Panel, Kpi, PageHeader, ButtonLink, Empty, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { Panel, Kpi, PageHeader, ButtonLink, Empty, CameraIcon, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 export default async function RecipesPage() {
   const supabase = await createClient();
@@ -22,7 +22,15 @@ export default async function RecipesPage() {
 
   return (
     <>
-      <PageHeader title="Recipes" subtitle="What each batch costs to make, live from today's ingredient prices" actions={<ButtonLink href="/onboarding/import">Import from photo</ButtonLink>} />
+      <PageHeader
+        title="Recipes"
+        subtitle="What each batch costs to make, live from today's ingredient prices"
+        actions={
+          <ButtonLink href="/onboarding/import?kind=recipe" primary>
+            <CameraIcon /> Import recipes from a photo
+          </ButtonLink>
+        }
+      />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Recipes" value={list.length} />
         <Kpi label="On the menu" value={list.length - unused} sub={unused ? `${unused} not sold yet` : "all in use"} tone={unused ? "warning" : "neutral"} />
@@ -32,7 +40,7 @@ export default async function RecipesPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <Panel title="All recipes" flush className="xl:col-span-9">
           {list.length === 0 ? (
-            <Empty>No recipes yet. Create one on the right, or <Link href="/onboarding/import" className="font-medium text-amber-700 underline">import them from photos or PDFs</Link>.</Empty>
+            <Empty>No recipes yet. <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">Import them from photos or PDFs</Link>, or create one by hand.</Empty>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -75,7 +83,7 @@ export default async function RecipesPage() {
             </div>
           )}
         </Panel>
-        <Panel title="New recipe" className="xl:col-span-3">
+        <Panel title="New recipe by hand" className="xl:col-span-3">
           <NewRecipeForm />
         </Panel>
       </div>

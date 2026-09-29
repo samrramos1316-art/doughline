@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { isoDaysAgo } from "@/lib/dates/localDate";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
-import { Panel, Kpi, PageHeader, ButtonLink, Empty, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { Panel, Kpi, PageHeader, ButtonLink, Empty, CameraIcon, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 const TABS = [
   { key: "all", label: "All", match: () => true },
@@ -33,12 +33,14 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader
         title="Invoices"
-        subtitle="Every delivery, read line by line — prices flow into your costs as you confirm them"
+        subtitle="What you paid your suppliers, read line by line — prices flow into your costs as you confirm them"
         tabs={TABS.map((t) => ({ href: t.key === "all" ? "/invoices" : `/invoices?tab=${t.key}`, label: t.label, active: t.key === current.key, count: invoices.filter((i) => t.match(i.status)).length }))}
         actions={
           <>
-            <ButtonLink href="/invoices/import">Import files</ButtonLink>
-            <ButtonLink href="/invoices/scan" primary>Scan invoice</ButtonLink>
+            <ButtonLink href="/invoices/import">Upload PDFs</ButtonLink>
+            <ButtonLink href="/invoices/scan" primary>
+              <CameraIcon /> Scan an invoice
+            </ButtonLink>
           </>
         }
       />

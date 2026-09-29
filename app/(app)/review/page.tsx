@@ -29,7 +29,7 @@ export default async function ReviewQueuePage() {
   return (
     <>
       <PageHeader
-        title="Review queue"
+        title="Match invoice lines"
         subtitle={`${backlog.unresolved} unreviewed line item${backlog.unresolved === 1 ? "" : "s"} across all invoices${backlog.blocked ? ` — scanning is paused until this is ${backlog.cap} or fewer` : ""}`}
       />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">

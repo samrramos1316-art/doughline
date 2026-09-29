@@ -38,7 +38,10 @@ try {
 
   const screens = [
     ["dashboard", "/dashboard"],
+    ["add", "/add"],
     ["menu", "/menu"],
+    ["margins", "/margins"],
+    ["margins-items", "/margins?view=items"],
     ["recipes", "/recipes"],
     ["recipe", first.recipe],
     ["ingredients", "/ingredients"],
@@ -52,6 +55,8 @@ try {
     ["market", "/market"],
     ["settings", "/settings"],
     ["import", "/invoices/import"],
+    ["import-menu", "/onboarding/import?kind=menu"],
+    ["import-recipe", "/onboarding/import?kind=recipe"],
     ["scan", "/invoices/scan"],
   ].filter(([name, path]) => path && (!only || only.includes(name)));
 
@@ -59,6 +64,8 @@ try {
   for (const [name, path] of screens) {
     await page.goto(`${BASE}${path}`);
     await page.waitForLoadState("networkidle").catch(() => {});
+    // Margins: open the first card so its breakdown is in the shot.
+    if (name.startsWith("margins")) await page.locator("main details summary").first().click().catch(() => {});
     await page.screenshot({ path: `${OUT}/${name}-desktop.png`, fullPage: true });
     await phone.goto(`${BASE}${path}`);
     await phone.waitForLoadState("networkidle").catch(() => {});

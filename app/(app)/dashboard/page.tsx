@@ -6,7 +6,7 @@ import { getOverview } from "@/lib/dashboard/overview";
 import { getMarketTrends, DEFAULT_WINDOW_DAYS } from "@/lib/market/trends";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import {
-  Panel, Kpi, PageHeader, ButtonLink, Pill, Delta, MarginBar, Spark, HBar, Empty,
+  Panel, Kpi, PageHeader, ButtonLink, CameraIcon, Pill, Delta, MarginBar, Spark, HBar, Empty,
   marginTone, money, unitMoney, th, thNum, td, tdNum, row,
 } from "@/components/ui/dash";
 
@@ -20,8 +20,8 @@ export default async function DashboardPage() {
   const { kpis, org } = o;
   const setupLeft = [
     !o.counts.ingredients && { href: "/ingredients", label: "Add your ingredients (or import a spreadsheet)" },
-    !o.counts.recipes && { href: "/onboarding/import", label: "Import your recipes from photos" },
-    !o.counts.menuItems && { href: "/onboarding/import", label: "Import your menu with its prices" },
+    !o.counts.recipes && { href: "/onboarding/import?kind=recipe", label: "Import your recipes from photos" },
+    !o.counts.menuItems && { href: "/onboarding/import?kind=menu", label: "Import your menu with its prices" },
     !o.counts.invoices && { href: "/invoices/scan", label: "Scan your first invoice" },
   ].filter(Boolean) as { href: string; label: string }[];
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -34,9 +34,9 @@ export default async function DashboardPage() {
         subtitle={`${today} · target margin ${org.target}%`}
         actions={
           <>
-            <ButtonLink href="/invoices/import">Import invoices</ButtonLink>
-            <ButtonLink href="/invoices/scan" primary>
-              Scan invoice
+            <ButtonLink href="/margins">Margins by ingredient</ButtonLink>
+            <ButtonLink href="/add" primary>
+              <CameraIcon /> Add from a photo
             </ButtonLink>
           </>
         }
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         {/* Menu margins: the squad list */}
-        <Panel title="Menu margins — worst first" action={{ href: "/menu", label: "Menu" }} flush className="xl:col-span-8">
+        <Panel title="Menu margins — worst first" action={{ href: "/margins?view=items", label: "Margins" }} flush className="xl:col-span-8">
           {o.menu.length === 0 ? (
             <Empty>No menu items yet. Add one on the Menu tab to see its margin here.</Empty>
           ) : (
@@ -203,7 +203,7 @@ export default async function DashboardPage() {
         </Panel>
 
         {/* Where the cost goes */}
-        <Panel title="Where your food cost goes" action={{ href: "/recipes", label: "Recipes" }} className="xl:col-span-4">
+        <Panel title="Where your food cost goes" action={{ href: "/margins", label: "By ingredient" }} className="xl:col-span-4">
           {o.drivers.length === 0 ? (
             <Empty>Build recipes and menu items to see which ingredients drive your cost.</Empty>
           ) : (

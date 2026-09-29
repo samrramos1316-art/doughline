@@ -97,7 +97,9 @@ async function postJson(url: string, body: unknown, method = "POST") {
 // recipes (with each ingredient matched, or offered as a new ingredient)
 // and menu items (with prices, linked to a recipe). Nothing is saved until
 // "Save", and then only through the existing ingredient/recipe/menu APIs.
-export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: string; ingredients: Ingredient[]; recipes: Recipe[] }) {
+// `only` narrows the screen to one kind (Menu → "Import menu", Recipes →
+// "Import recipes"); without it both drop zones show, as on first run.
+export function OnboardingImport({ orgId, ingredients, recipes, only }: { orgId: string; ingredients: Ingredient[]; recipes: Recipe[]; only?: Kind }) {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [drafts, setDrafts] = useState<RecipeDraft[]>([]);
@@ -309,7 +311,8 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/dashboard" className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white">Go to Overview</Link>
-          <Link href="/menu" className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700">Menu & margins</Link>
+          <Link href={only === "recipe" ? "/recipes" : "/menu"} className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700">{only === "recipe" ? "Recipes" : "Menu"}</Link>
+          <Link href="/margins" className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700">Margins</Link>
           <Link href="/ingredients" className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700">Add prices</Link>
           <button type="button" onClick={() => { setFiles([]); setDrafts([]); setMenu([]); setSaved(null); setShowErrors(false); setPhase("pick"); }} className="rounded-md px-4 py-2 text-sm font-medium text-stone-600 underline">
             Import more
@@ -338,9 +341,9 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
     <div className="flex flex-col gap-4">
       {(phase === "pick" || phase === "reading") && (
         <>
-          <div className="grid gap-4 md:grid-cols-2">
-            <DropZone kind="menu" title="Your menu" hint="A photo of the board, a printed menu, or the PDF you print from." onFiles={addFiles} disabled={phase === "reading"} />
-            <DropZone kind="recipe" title="Your recipes" hint="One recipe per photo or PDF — cards, notebook pages, docs. Add as many as you like." onFiles={addFiles} disabled={phase === "reading"} />
+          <div className={`grid gap-4 ${only ? "" : "md:grid-cols-2"}`}>
+            {only !== "recipe" && <DropZone kind="menu" title="Your menu" hint="A photo of the board, a printed menu, or the PDF you print from." onFiles={addFiles} disabled={phase === "reading"} />}
+            {only !== "menu" && <DropZone kind="recipe" title="Your recipes" hint="One recipe per photo or PDF — cards, notebook pages, docs. Add as many as you like." onFiles={addFiles} disabled={phase === "reading"} />}
           </div>
           {files.length > 0 && (
             <ul aria-label="Files to read" className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
@@ -380,6 +383,7 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
             </p>
           )}
 
+          {(only !== "menu" || drafts.length > 0) && (
           <section aria-label="Recipes to add" className="overflow-hidden rounded-lg border border-stone-200 bg-white">
             <header className="flex items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3 py-2">
               <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">Recipes · {included.length}</h2>
@@ -503,7 +507,9 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
               {["lb", "oz", "kg", "g", "each", "dozen", "gal", "qt", "l", "ml", "cup", "tbsp", "tsp"].map((u) => <option key={u} value={u} />)}
             </datalist>
           </section>
+          )}
 
+          {(only !== "recipe" || menu.length > 0) && (
           <section aria-label="Menu items to add" className="overflow-hidden rounded-lg border border-stone-200 bg-white">
             <header className="flex items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3 py-2">
               <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">
@@ -560,10 +566,11 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
               </div>
             )}
           </section>
+          )}
 
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={save} disabled={phase === "saving" || linking || (!included.length && !includedMenu.length)} className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-40">
-              {phase === "saving" ? "Saving…" : `Save ${included.length} recipe${included.length === 1 ? "" : "s"} and ${includedMenu.length} menu item${includedMenu.length === 1 ? "" : "s"}`}
+              {phase === "saving" ? "Saving…" : `Save ${[only !== "menu" || included.length ? `${included.length} recipe${included.length === 1 ? "" : "s"}` : "", only !== "recipe" || includedMenu.length ? `${includedMenu.length} menu item${includedMenu.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ")}`}
             </button>
             <button type="button" onClick={() => setPhase("pick")} disabled={phase === "saving"} className="text-sm text-stone-600 underline">
               Add more files
@@ -578,6 +585,7 @@ export function OnboardingImport({ orgId, ingredients, recipes }: { orgId: strin
 
 function DropZone({ kind, title, hint, onFiles, disabled }: { kind: Kind; title: string; hint: string; onFiles: (f: FileList | null, k: Kind) => void; disabled: boolean }) {
   const ref = useRef<HTMLInputElement>(null);
+  const cam = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   return (
     <div
@@ -585,14 +593,27 @@ function DropZone({ kind, title, hint, onFiles, disabled }: { kind: Kind; title:
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); if (!disabled) onFiles(e.dataTransfer.files, kind); }}
-      className={`flex flex-col items-center gap-2 rounded-lg border-2 border-dashed px-5 py-8 text-center ${over ? "border-amber-500 bg-amber-50" : "border-stone-300 bg-white"}`}
+      className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed px-5 py-10 text-center transition ${over ? "border-amber-500 bg-amber-50" : "border-amber-300 bg-amber-50/40 hover:border-amber-400"}`}
     >
-      <p className="font-semibold text-stone-900">{title}</p>
-      <p className="max-w-xs text-sm text-stone-500">{hint}</p>
+      <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-400 text-stone-900">
+        <svg viewBox="0 0 24 24" className="h-6 w-6">
+          <path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .8-.4l1-1.3A1 1 0 0 1 9.8 4h4.4a1 1 0 0 1 .8.3l1 1.3a1 1 0 0 0 .8.4H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" fill="none" stroke="currentColor" strokeWidth="2" />
+          <circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      </span>
+      <p className="text-base font-semibold text-stone-900">{title}</p>
+      <p className="max-w-xs text-sm text-stone-600">{hint}</p>
+      <p className="hidden text-xs text-stone-500 md:block">Drag files here, or</p>
       <input ref={ref} type="file" multiple accept="image/*,application/pdf" aria-label={`Choose ${kind === "menu" ? "menu" : "recipe"} files`} className="sr-only" onChange={(e) => { onFiles(e.target.files, kind); e.target.value = ""; }} />
-      <button type="button" disabled={disabled} onClick={() => ref.current?.click()} className="mt-1 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:border-stone-400 disabled:opacity-40">
-        Choose files
-      </button>
+      <input ref={cam} type="file" accept="image/*" capture="environment" aria-label={`Take a photo of your ${kind}`} className="sr-only" onChange={(e) => { onFiles(e.target.files, kind); e.target.value = ""; }} />
+      <div className="mt-1 flex flex-wrap justify-center gap-2">
+        <button type="button" disabled={disabled} onClick={() => cam.current?.click()} className="rounded-md bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-40 md:hidden">
+          Take a photo
+        </button>
+        <button type="button" disabled={disabled} onClick={() => ref.current?.click()} className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:border-stone-400 disabled:opacity-40">
+          Choose files
+        </button>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,8 @@
 //
 //   1. A new signup lands on /onboarding/import?welcome=1; "Skip" goes to
 //      manual entry. Logging in later goes to the dashboard (shown once).
-//   2. With the owner's price list loaded, "Import from photo" on Recipes:
+//   2. With the owner's price list loaded, "Import recipes/menu from a photo"
+//      open their own screens; then both at once on the combined import:
 //      upload the menu PDF, a photographed handwritten recipe card (metric)
 //      and a typed recipe PDF (cups and spoons).
 //   3. Check what was read against the paper: menu names + prices (the
@@ -104,8 +105,15 @@ try {
   await page.getByLabel("Import ingredients CSV").setInputFiles(`${FIX}/ingredients.csv`);
   await page.getByRole("status").filter({ hasText: /Saved/ }).waitFor({ timeout: 120_000 });
   await page.goto(`${BASE}/recipes`);
-  await page.getByRole("link", { name: "Import from photo" }).click();
-  await page.waitForURL(/\/onboarding\/import$/);
+  await page.getByRole("link", { name: "Import recipes from a photo" }).click();
+  await page.waitForURL(/\/onboarding\/import\?kind=recipe$/);
+  check((await page.getByTestId("drop-recipe").isVisible()) && !(await page.getByTestId("drop-menu").isVisible()), "Recipes → the recipe import, with no menu drop zone");
+  await page.goto(`${BASE}/menu`);
+  await page.getByRole("link", { name: "Import menu from a photo" }).click();
+  await page.waitForURL(/\/onboarding\/import\?kind=menu$/);
+  check((await page.getByTestId("drop-menu").isVisible()) && !(await page.getByTestId("drop-recipe").isVisible()), "Menu → the menu import, with no recipe drop zone");
+  // Both at once, as on first run, to exercise the menu → recipe linking.
+  await page.goto(`${BASE}/onboarding/import`);
   await page.getByLabel("Choose menu files").setInputFiles(`${FIX}/${MENU_BOARD.file}`);
   await page.getByLabel("Choose recipe files").setInputFiles([`${FIX}/${RECIPE_CARD.file}`, `${FIX}/${RECIPE_DOC.file}`]);
   await page.screenshot({ path: `${OUT}/02-files.png`, fullPage: true });
@@ -141,10 +149,11 @@ try {
     check((await lines.count()) === paper.lines.length, `${paper.title}: ${await lines.count()} of ${paper.lines.length} ingredient lines read`);
     for (let i = 0; i < (await lines.count()); i++) {
       const line = lines.nth(i);
-      const raw = (await line.locator("td").nth(1).innerText()).replace(/(Matched|Check|New ingredient\?)$/, "").trim();
+      // The line as printed is the cell's first text node (a status badge and the why-note follow).
+      const raw = (await line.locator("td").nth(1).evaluate((td) => td.firstChild?.textContent ?? "")).trim();
       const select = line.getByRole("combobox").first();
       const shown = await select.evaluate((s) => s.selectedOptions[0]?.textContent?.replace(/ \(\d+%\)$/, ""));
-      const badge = await line.locator("td").nth(1).locator("span").innerText();
+      const badge = await line.locator("td").nth(1).locator("span:not([data-testid=line-note])").first().innerText();
       const want = intended(raw);
       let action = "kept";
       if (want === "new") {
@@ -180,6 +189,7 @@ try {
   fs.writeFileSync(`${OUT}/decisions.json`, JSON.stringify(decisions, null, 2));
 
   // Menu → recipe links the screen suggested.
+  await page.getByText("matching to recipes…").waitFor({ state: "hidden", timeout: 180_000 });
   const links = await page.getByTestId("menu-draft").evaluateAll((rows) => rows.map((r) => [r.querySelector('input[aria-label="Menu item name"]').value, r.querySelector("select").selectedOptions[0]?.textContent]));
   const croissantLink = links.find(([n]) => /croissant/i.test(n))?.[1] ?? "";
   const cookieLink = links.find(([n]) => /cookie/i.test(n))?.[1] ?? "";
@@ -216,6 +226,37 @@ try {
   check(ck && ck.margin_pct == null, "cookie shows no margin yet — Flaky Sea Salt has no price until an invoice or the price list sets one");
   await page.goto(`${BASE}/menu`);
   await page.screenshot({ path: `${OUT}/06-menu.png`, fullPage: true });
+
+  // The Margins tab reads the same numbers, split by ingredient and by item.
+  await page.goto(`${BASE}/margins?view=items`);
+  const cItem = page.locator(`[data-testid="margin-item"][data-name="${cm?.name}"]`);
+  const cText = await cItem.locator("summary").innerText();
+  check(cText.includes(`${Number(cm?.margin_pct).toFixed(1)}%`), `Margins → By menu item: ${cm?.name} at ${Number(cm?.margin_pct).toFixed(1)}%, same as the margin view`, cText);
+  await page.goto(`${BASE}/margins`);
+  const butter = page.locator('[data-testid="margin-ingredient"][data-name="Unsalted Butter"]');
+  await butter.locator("summary").click();
+  const uses = await butter.locator("tbody tr").allInnerTexts();
+  check(uses.some((u) => /croissant/i.test(u)) && uses.some((u) => /cookie/i.test(u)), `Margins → By ingredient: Unsalted Butter opens to the items it goes into (${uses.length})`, uses);
+  const flour = await page.locator('[data-testid="margin-ingredient"][data-name="Bread Flour"]').locator("tbody tr").allTextContents();
+  check(flour.length > 0 && flour.every((u) => /croissant/i.test(u)), "Bread Flour only shows against the croissant", flour);
+  await page.screenshot({ path: `${OUT}/06b-margins.png`, fullPage: true });
+
+  // An item the import left without a recipe can be linked afterwards from Menu.
+  await page.goto(`${BASE}/menu`);
+  await page.getByRole("button", { name: "Edit Cinnamon Roll" }).click();
+  const dlg = page.getByRole("dialog", { name: "Edit Cinnamon Roll" });
+  await dlg.getByLabel("Made from recipe").selectOption({ label: "Butter Croissants" });
+  await dlg.getByLabel("Servings per batch").fill("12");
+  await dlg.getByLabel("Selling price").fill("5.25");
+  await page.screenshot({ path: `${OUT}/06c-edit-menu-item.png` });
+  await dlg.getByRole("button", { name: "Save" }).click();
+  await dlg.waitFor({ state: "hidden" });
+  const { data: rollItem } = await admin.from("menu_items").select("id, servings_per_batch").eq("org_id", orgId).eq("name", "Cinnamon Roll").single();
+  const { data: rollMargin } = await admin.from("menu_item_margins").select("selling_price, margin_pct, cost_per_serving").eq("menu_item_id", rollItem.id).single();
+  const roll = { ...rollMargin, servings_per_batch: rollItem.servings_per_batch };
+  const rollHand = Math.round(((5.25 - cps * 2) / 5.25) * 10000) / 100;
+  check(Number(roll.selling_price) === 5.25 && Number(roll.servings_per_batch) === 12 && Math.abs(Number(roll.margin_pct) - rollHand) < 0.05, `Edit on Menu: Cinnamon Roll linked, 12 per batch, $5.25 → ${roll.margin_pct}% (hand: ${rollHand}%)`, roll);
+  await page.getByRole("row").filter({ hasText: "Cinnamon Roll" }).getByRole("link", { name: "Butter Croissants" }).waitFor();
 
   const phone = await (await browser.newContext({ storageState: await ctx.storageState(), viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })).newPage();
   await phone.goto(`${BASE}/onboarding/import`);
