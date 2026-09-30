@@ -113,12 +113,14 @@ function Arrow({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-export function Landing({ signedIn }: { signedIn: boolean }) {
+// Everyone sees the same page: Log in and Get started. Someone already
+// signed in who taps Log in goes straight to their dashboard (/login does that).
+export function Landing() {
   const root = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const appHref = signedIn ? "/dashboard" : "/login";
-  const startHref = signedIn ? "/dashboard" : "/signup";
+  const appHref = "/login";
+  const startHref = "/signup";
 
   // Smooth, weighted scrolling that GSAP's ScrollTrigger reads from. Off for
   // people who've asked their OS for less motion.
@@ -330,13 +332,11 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
           </nav>
           <div className="flex items-center gap-2">
             <Link href={appHref} className="rounded-full px-3.5 py-2 text-[13px] font-medium text-[#ece4d6] transition hover:text-white">
-              {signedIn ? "Open app" : "Log in"}
+              Log in
             </Link>
-            {!signedIn && (
-              <Link href="/signup" className="hidden rounded-full bg-[#ff5b1f] px-4 py-2 text-[13px] font-semibold text-[#0c0b09] transition hover:bg-[#ff7a45] sm:inline-flex">
-                Get started
-              </Link>
-            )}
+            <Link href="/signup" className="hidden rounded-full bg-[#ff5b1f] px-4 py-2 text-[13px] font-semibold text-[#0c0b09] transition hover:bg-[#ff7a45] sm:inline-flex">
+              Get started
+            </Link>
             <button
               type="button"
               aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -385,13 +385,11 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
         </nav>
         <div className="mt-auto flex flex-col gap-2">
           <Link href={startHref} className="rounded-full bg-[#ff5b1f] px-5 py-3.5 text-center text-sm font-semibold text-[#0c0b09]">
-            {signedIn ? "Open your dashboard" : "Get started"}
+            Get started
           </Link>
-          {!signedIn && (
-            <Link href="/login" className="rounded-full border border-white/15 px-5 py-3.5 text-center text-sm font-medium text-white">
-              Log in
-            </Link>
-          )}
+          <Link href="/login" className="rounded-full border border-white/15 px-5 py-3.5 text-center text-sm font-medium text-white">
+            Log in
+          </Link>
         </div>
       </aside>
 
@@ -455,7 +453,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
                 </ol>
                 <div className="hero-fade mt-8 flex flex-wrap items-center gap-3">
                   <Link data-magnet href={startHref} className="group inline-flex items-center gap-2.5 rounded-full bg-[#ff5b1f] px-7 py-4 text-[15px] font-semibold text-[#0c0b09] transition-colors hover:bg-[#ff7a45]">
-                    {signedIn ? "Open your dashboard" : "Start tracking margins"}
+                    Start tracking margins
                     <Arrow className="h-4 w-4 transition group-hover:translate-x-1" />
                   </Link>
                   <a href="#numbers" className="rounded-full border border-white/15 px-6 py-4 text-[15px] font-medium text-white transition hover:border-white/40">
@@ -639,7 +637,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
               <p className="mt-5 max-w-xs text-[#a79f92]">
                 Anything else,{" "}
                 <Link href={appHref} className="text-white underline decoration-[#ff5b1f] underline-offset-4">
-                  {signedIn ? "open the app" : "log in"}
+                  log in
                 </Link>{" "}
                 and poke around. It&apos;s all in the product today.
               </p>
@@ -673,14 +671,12 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
             </p>
             <div className="mt-14 flex flex-wrap items-center gap-4">
               <Link data-magnet href={startHref} className="group inline-flex items-center gap-2.5 rounded-full bg-[#ff5b1f] px-8 py-5 text-base font-semibold text-[#0c0b09] transition-colors hover:bg-[#ff7a45]">
-                {signedIn ? "Open your dashboard" : "Create your account"}
+                Create your account
                 <Arrow className="h-4 w-4 transition group-hover:translate-x-1" />
               </Link>
-              {!signedIn && (
-                <Link href="/login" className="rounded-full border border-white/15 px-7 py-5 text-base font-medium text-white transition hover:border-white/40">
-                  I already have one
-                </Link>
-              )}
+              <Link href="/login" className="rounded-full border border-white/15 px-7 py-5 text-base font-medium text-white transition hover:border-white/40">
+                I already have one
+              </Link>
             </div>
           </div>
         </section>
@@ -700,7 +696,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
             ))}
           </ul>
           <ul className="space-y-2">
-            {(signedIn ? [["Open app", "/dashboard"]] : [["Log in", "/login"], ["Create an account", "/signup"]]).map(([label, href]) => (
+            {[["Log in", "/login"], ["Create an account", "/signup"]].map(([label, href]) => (
               <li key={href}>
                 <Link href={href} className="text-[#a79f92] hover:text-white">
                   {label}

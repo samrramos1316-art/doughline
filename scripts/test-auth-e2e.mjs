@@ -179,8 +179,10 @@ try {
   }
   await p8.screenshot({ path: `${OUT}/07-terms.png`, fullPage: false });
   await page.goto(BASE);
-  const openApp = page.getByRole("banner").getByRole("link", { name: "Open app" });
-  assert((await openApp.isVisible()) && (await openApp.getAttribute("href")) === "/dashboard", "signed-in visitors get an Open app tab straight into /dashboard");
+  const logInTab = page.getByRole("banner").getByRole("link", { name: "Log in" });
+  await logInTab.click();
+  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  assert(page.url().endsWith("/dashboard"), "signed-in visitors see the same Log in tab, and it takes them straight to /dashboard");
 
   console.log(`\nAuth end-to-end test passed. Screenshots in ${OUT}/`);
 } finally {
