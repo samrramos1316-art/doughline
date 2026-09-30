@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { CLOSED_MESSAGE, canUseApp } from "@/lib/access";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validators/auth";
@@ -42,6 +43,8 @@ export async function signUpAction(_prevState: AuthActionState, formData: FormDa
   }
 
   const { email, password, businessName, businessType, fullName } = parsed.data;
+  // Pre-launch: no new accounts except the allow-list (lib/access.ts).
+  if (!canUseApp(email)) return { error: CLOSED_MESSAGE };
   const supabase = await createClient();
 
   // The DB trigger `handle_new_user` (012_handle_new_user_trigger.sql) reads
@@ -86,6 +89,8 @@ export async function logInAction(_prevState: AuthActionState, formData: FormDat
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
+  // Pre-launch: only the allow-list gets in (lib/access.ts).
+  if (!canUseApp(parsed.data.email)) return { error: CLOSED_MESSAGE };
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 

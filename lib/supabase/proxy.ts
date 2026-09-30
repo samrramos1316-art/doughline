@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { CLOSED_MESSAGE, canUseApp } from "@/lib/access";
 
 // Session-refresh helper used by the root proxy.ts (Next.js 16 renamed the
 // middleware.js convention to proxy.js — see node_modules/next/dist/docs/
@@ -59,6 +60,20 @@ export async function updateSession(request: NextRequest) {
   if (isAppRoute && !user) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Pre-launch (lib/access.ts): someone signed in who isn't on the
+  // allow-list (an old test or demo account) is signed out — pages go to
+  // /login with the reason, API calls get a 403.
+  const isApi = request.nextUrl.pathname.startsWith("/api/");
+  if (user && (isAppRoute || isApi) && !canUseApp(user.email)) {
+    await supabase.auth.signOut();
+    const out = isApi
+      ? NextResponse.json({ error: CLOSED_MESSAGE }, { status: 403 })
+      : NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(CLOSED_MESSAGE)}`, request.url));
+    // Carry the cleared session cookies over to the new response.
+    for (const c of response.cookies.getAll()) out.cookies.set(c);
+    return out;
   }
 
   return response;
