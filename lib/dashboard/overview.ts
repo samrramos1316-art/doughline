@@ -211,8 +211,8 @@ export async function getOverview(supabase: Client, orgId: string) {
     inbox.push({
       kind: "failed",
       title: `Couldn't read an invoice${inv.vendors?.name ? ` from ${inv.vendors.name}` : ""}`,
-      detail: "Type it in by hand — it takes a minute",
-      href: `/invoices/${inv.id}/manual-entry`,
+      detail: "Type it in by hand, or delete it if it's the wrong file",
+      href: `/invoices/${inv.id}`,
       tone: "warning",
       at: inv.created_at,
     });
