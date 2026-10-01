@@ -6,16 +6,6 @@ import { LogoMark } from "@/components/marketing/Logo";
 import { CameraIcon } from "@/components/ui/dash";
 
 export type NavCounts = { review: number; alerts: number; failed: number; reviewBlocked: boolean };
-export type Trial = { daysLeft: number; ended: boolean };
-
-// "Free trial · 9 days left" (lib/trial.ts).
-function TrialBadge({ trial, className = "" }: { trial: Trial; className?: string }) {
-  return (
-    <span data-testid="trial-badge" className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${trial.ended ? "bg-red-500/15 text-red-300" : trial.daysLeft <= 3 ? "bg-amber-400/20 text-amber-200" : "bg-white/10 text-stone-300"} ${className}`}>
-      {trial.ended ? "Free trial ended" : `Free trial · ${trial.daysLeft} day${trial.daysLeft === 1 ? "" : "s"} left`}
-    </span>
-  );
-}
 
 type Item = { href: string; label: string; icon: keyof typeof ICONS; badge?: (c: NavCounts) => { n: number; tone: "red" | "amber" } | null };
 // Grouped the way the money moves: what you sell, what you make it from,
@@ -80,7 +70,7 @@ function Badge({ n, tone }: { n: number; tone: "red" | "amber" }) {
 }
 
 // Desktop: a fixed dark rail with every section and its live counts.
-export function Sidebar({ business, owner, counts, logOut, trial }: { business: string; owner: string | null; counts: NavCounts; logOut: React.ReactNode; trial: Trial }) {
+export function Sidebar({ business, owner, counts, logOut }: { business: string; owner: string | null; counts: NavCounts; logOut: React.ReactNode }) {
   const path = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-[#1a1714] text-stone-300 lg:flex">
@@ -128,7 +118,6 @@ export function Sidebar({ business, owner, counts, logOut, trial }: { business: 
         ))}
       </nav>
       <div className="border-t border-white/5 p-3">
-        <TrialBadge trial={trial} className="mb-2.5 inline-block" />
         <div className="flex items-center justify-between gap-2 px-1 text-xs">
           <span className="truncate text-stone-400">{owner ?? "Signed in"}</span>
           {logOut}
@@ -139,7 +128,7 @@ export function Sidebar({ business, owner, counts, logOut, trial }: { business: 
 }
 
 // Phones: a dark top bar and every section as a scrolling tab strip.
-export function MobileNav({ business, counts, trial }: { business: string; counts: NavCounts; trial: Trial }) {
+export function MobileNav({ business, counts }: { business: string; counts: NavCounts }) {
   const path = usePathname();
   const items = GROUPS.flatMap((g) => g.items);
   return (
@@ -147,10 +136,7 @@ export function MobileNav({ business, counts, trial }: { business: string; count
       <div className="flex items-center justify-between gap-3 px-4 py-2.5">
         <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
           <LogoMark className="h-7 w-7" />
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-white">{business}</span>
-            <TrialBadge trial={trial} className="mt-0.5 inline-block" />
-          </span>
+          <span className="truncate text-sm font-semibold text-white">{business}</span>
         </Link>
         <Link href="/add" className="flex shrink-0 items-center gap-1.5 rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-stone-900">
           <CameraIcon /> Add photo
