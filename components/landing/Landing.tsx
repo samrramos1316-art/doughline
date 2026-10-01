@@ -460,7 +460,7 @@ export function Landing() {
                     See it on a real invoice
                   </a>
                 </div>
-                <p className="hero-fade mt-5 font-ledger text-[11px] tracking-wide text-[#7d766b]">free to use right now · no card · works on your phone</p>
+                <p className="hero-fade mt-5 font-ledger text-[11px] tracking-wide text-[#7d766b]">14-day free trial · no card · works on your phone</p>
               </div>
 
               <div className="relative flex justify-center lg:justify-end">

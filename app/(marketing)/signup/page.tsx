@@ -21,7 +21,7 @@ export default function SignUpPage() {
     );
   }
   return (
-    <AuthShell title="Create your account" subtitle="Set up your kitchen in a couple of minutes — no card needed.">
+    <AuthShell title="Create your account" subtitle="Start your 14-day free trial — no card needed. Setup takes a couple of minutes.">
       <SignUpForm />
     </AuthShell>
   );

@@ -5,6 +5,7 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { OnboardingImport } from "@/components/onboarding/OnboardingImport";
 import { PageHeader } from "@/components/ui/dash";
 import { ONBOARDING_FOLDER } from "@/lib/onboarding/upload";
+import { TRIAL_DAYS, trialInfo } from "@/lib/trial";
 
 // §9.3: shown once right after signup (the signup action lands here with
 // ?welcome=1, both kinds at once), and any time after from Add from a photo,
@@ -20,6 +21,10 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
   const kind: "menu" | "recipe" | undefined = !welcome && (kindParam === "menu" || kindParam === "recipe") ? kindParam : undefined;
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const trial = user ? trialInfo(user.created_at) : null;
   if (!orgId) redirect("/login");
   // ?file=: a menu or recipe the invoice scanner turned away, already in this
   // org's onboarding folder — read it straight away as `kind`.
@@ -49,6 +54,11 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
           </Link>
         }
       />
+      {welcome && trial && (
+        <p role="status" data-testid="trial-started" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          <b>Your {TRIAL_DAYS}-day free trial has begun.</b> Everything is open until {trial.endsOn} — no card needed.
+        </p>
+      )}
       {welcome && (
         <ol className="mb-4 grid gap-2 text-sm text-stone-600 sm:grid-cols-3">
           <li className="rounded-lg border border-stone-200 bg-white px-3 py-2"><b className="text-stone-900">1. Drop in your files.</b> The menu on one side, recipes on the other.</li>

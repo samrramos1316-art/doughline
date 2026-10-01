@@ -83,7 +83,7 @@ const sections: LegalSection[] = [
     id: "fees",
     title: "Fees",
     body: (
-      <p>The Service is currently free to use. If we introduce paid plans, we&apos;ll tell you before any charge applies and you won&apos;t be charged unless you choose a paid plan.</p>
+      <p>New accounts get a 14-day free trial, starting when the account is created, with no payment details required. To keep using the Service after the trial, you&apos;ll need a paid plan; we&apos;ll tell you the price before any charge applies, and you won&apos;t be charged unless you choose a plan.</p>
     ),
   },
   {
