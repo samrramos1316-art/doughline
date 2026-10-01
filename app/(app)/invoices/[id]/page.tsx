@@ -5,6 +5,7 @@ import { UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
 import { LineItemStatusBadge } from "@/components/invoices/LineItemStatusBadge";
 import { Panel, Kpi, PageHeader, ButtonLink, Empty, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { DeleteInvoiceButton } from "@/components/invoices/DeleteInvoiceButton";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -45,6 +46,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             <InvoiceStatusBadge status={invoice.status} />
             {!busy && <ButtonLink href={`/invoices/${invoice.id}/manual-entry`}>{invoice.status === "failed" ? "Enter by hand" : "Add or correct lines"}</ButtonLink>}
             {open > 0 && <ButtonLink href={`/invoices/${invoice.id}/review`} primary>Review {open} →</ButtonLink>}
+            {!busy && lineItems.length === 0 && <DeleteInvoiceButton invoiceId={invoice.id} />}
           </>
         }
       />
@@ -52,7 +54,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       {invoice.status === "failed" && (
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           We couldn&apos;t read this invoice automatically{invoice.error_message ? ` (${invoice.error_message})` : ""}.{" "}
-          <Link href={`/invoices/${invoice.id}/manual-entry`} className="font-medium underline">Enter its line items by hand</Link> — it takes a minute.
+          <Link href={`/invoices/${invoice.id}/manual-entry`} className="font-medium underline">Enter its line items by hand</Link> — it takes a minute. If it&apos;s a blank page, a duplicate or the wrong file, delete it instead.
         </p>
       )}
       {busy && <p className="mb-4 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-500">Still reading — line items will show up here shortly.</p>}

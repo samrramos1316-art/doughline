@@ -32,3 +32,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ invoice: updated });
 }
+
+// Remove an upload that has nothing on it — a blank page, a duplicate, the
+// wrong file — so it stops showing as "Couldn't read". Only for invoices with
+// no line items: once lines exist their prices may already be in ingredient
+// costs and history, and deleting would leave those pointing at nothing.
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: invoice } = await supabase.from("invoices").select("id, status, file_storage_path, invoice_line_items(count)").eq("id", id).maybeSingle();
+  if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  if (invoice.status === "pending" || invoice.status === "processing") {
+    return NextResponse.json({ error: "It's still being read — try again in a minute" }, { status: 409 });
+  }
+  if ((invoice.invoice_line_items[0]?.count ?? 0) > 0) {
+    return NextResponse.json({ error: "This invoice has line items, so it can't be deleted — its prices may already be in your costs" }, { status: 409 });
+  }
+  const { error } = await supabase.from("invoices").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  // The file goes too; a leftover file only costs storage, so don't fail on it.
+  await supabase.storage.from("invoices").remove([invoice.file_storage_path]);
+  return NextResponse.json({ ok: true });
+}
