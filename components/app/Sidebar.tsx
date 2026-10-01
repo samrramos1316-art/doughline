@@ -37,6 +37,10 @@ const GROUPS: { label: string; items: Item[] }[] = [
   },
   { label: "Business", items: [{ href: "/settings", label: "Settings", icon: "cog" }] },
 ];
+// Only for DoughTally's owner (lib/admin/access.ts); the page itself checks too.
+const ADMIN_ITEM: Item = { href: "/admin", label: "Owner console", icon: "chart" };
+const groupsFor = (admin: boolean) =>
+  admin ? GROUPS.map((g) => (g.label === "Business" ? { ...g, items: [...g.items, ADMIN_ITEM] } : g)) : GROUPS;
 
 const ICONS = {
   grid: "M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z",
@@ -70,7 +74,7 @@ function Badge({ n, tone }: { n: number; tone: "red" | "amber" }) {
 }
 
 // Desktop: a fixed dark rail with every section and its live counts.
-export function Sidebar({ business, owner, counts, logOut }: { business: string; owner: string | null; counts: NavCounts; logOut: React.ReactNode }) {
+export function Sidebar({ business, owner, counts, logOut, admin = false }: { business: string; owner: string | null; counts: NavCounts; logOut: React.ReactNode; admin?: boolean }) {
   const path = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-[#1a1714] text-stone-300 lg:flex">
@@ -92,7 +96,7 @@ export function Sidebar({ business, owner, counts, logOut }: { business: string;
         <p className="mt-1.5 text-center text-[11px] text-stone-500">Invoice, menu or recipe</p>
       </div>
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3">
-        {GROUPS.map((g) => (
+        {groupsFor(admin).map((g) => (
           <div key={g.label || "top"} className="mb-3">
             {g.label && <p className="px-2 pb-1 text-[10px] font-semibold tracking-[0.16em] text-stone-500 uppercase">{g.label}</p>}
             {g.items.map((it) => {
@@ -128,9 +132,9 @@ export function Sidebar({ business, owner, counts, logOut }: { business: string;
 }
 
 // Phones: a dark top bar and every section as a scrolling tab strip.
-export function MobileNav({ business, counts }: { business: string; counts: NavCounts }) {
+export function MobileNav({ business, counts, admin = false }: { business: string; counts: NavCounts; admin?: boolean }) {
   const path = usePathname();
-  const items = GROUPS.flatMap((g) => g.items);
+  const items = groupsFor(admin).flatMap((g) => g.items);
   return (
     <div className="sticky top-0 z-30 bg-[#1a1714] text-stone-300 lg:hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-2.5">

@@ -6,6 +6,7 @@ import { getReviewBacklog } from "@/lib/matching/review";
 import { ActionRequiredGate } from "@/components/review/ActionRequiredGate";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { Sidebar, MobileNav, type NavCounts } from "@/components/app/Sidebar";
+import { isAdmin } from "@/lib/admin/access";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -47,10 +48,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {backlog?.blocked && <ActionRequiredGate unresolved={backlog.unresolved} cap={backlog.cap} />}
       {/* The rail's dark background runs the full page height; the rail itself stays pinned. */}
       <div className="hidden shrink-0 bg-[#1a1714] lg:block">
-        <Sidebar business={business} owner={profile.data?.full_name ?? user.email ?? null} counts={counts} logOut={logOut} />
+        <Sidebar business={business} owner={profile.data?.full_name ?? user.email ?? null} counts={counts} logOut={logOut} admin={isAdmin(user.email)} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileNav business={business} counts={counts} />
+        <MobileNav business={business} counts={counts} admin={isAdmin(user.email)} />
         <main className="flex min-w-0 flex-1 flex-col px-4 py-4 lg:px-6 lg:py-5">{children}</main>
         <div className="flex justify-end px-4 pb-4 lg:hidden">{logOut}</div>
       </div>
