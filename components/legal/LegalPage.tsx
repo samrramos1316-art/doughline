@@ -4,9 +4,9 @@ import { LEGAL_UPDATED } from "@/lib/legal";
 
 export type LegalSection = { id: string; title: string; body: React.ReactNode };
 
-// Shared frame for /privacy and /terms: the landing page's dark look, a
-// sticky contents list on wide screens, readable measure for the text.
-export function LegalPage({ kicker, title, intro, sections }: { kicker: string; title: string; intro: React.ReactNode; sections: LegalSection[] }) {
+// Shared frame for /privacy, /terms and /cookies: the landing page's dark
+// look, a sticky contents list on wide screens, readable measure for the text.
+export function LegalPage({ kicker, title, intro, sections, updated = LEGAL_UPDATED }: { kicker: string; title: string; intro: React.ReactNode; sections: LegalSection[]; updated?: string }) {
   return (
     <div className="flex min-h-full flex-1 flex-col bg-[#0c0b09] font-body text-[#cfc6b7] selection:bg-[#ff5b1f] selection:text-[#0c0b09]">
       <header className="border-b border-white/[0.07]">
@@ -19,6 +19,7 @@ export function LegalPage({ kicker, title, intro, sections }: { kicker: string; 
           <nav className="flex items-center gap-4 text-[13px]">
             <Link href="/privacy" className="text-[#a79f92] hover:text-white">Privacy</Link>
             <Link href="/terms" className="text-[#a79f92] hover:text-white">Terms</Link>
+            <Link href="/cookies" className="text-[#a79f92] hover:text-white">Cookies</Link>
             <Link href="/" className="rounded-full border border-white/15 px-3.5 py-1.5 text-white hover:border-white/40">Home</Link>
           </nav>
         </div>
@@ -27,7 +28,7 @@ export function LegalPage({ kicker, title, intro, sections }: { kicker: string; 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-14 sm:px-8 sm:py-20">
         <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">{kicker}</p>
         <h1 className="mt-3 font-display text-4xl font-bold tracking-[-0.03em] text-white sm:text-5xl">{title}</h1>
-        <p className="mt-3 font-ledger text-[12px] text-[#8f877b]">Last updated {LEGAL_UPDATED}</p>
+        <p className="mt-3 font-ledger text-[12px] text-[#8f877b]">Last updated {updated}</p>
         <div className="mt-8 max-w-2xl text-[16px] leading-relaxed">{intro}</div>
 
         <div className="mt-12 grid gap-12 lg:grid-cols-[220px_1fr]">
@@ -60,7 +61,7 @@ export function LegalPage({ kicker, title, intro, sections }: { kicker: string; 
       </main>
 
       <footer className="border-t border-white/[0.07] py-6 text-center font-ledger text-[11px] tracking-wider text-[#6d665c]">
-        © 2026 DoughTally Software · <Link href="/privacy" className="hover:text-white">Privacy</Link> · <Link href="/terms" className="hover:text-white">Terms</Link>
+        © 2026 DoughTally Software · <Link href="/privacy" className="hover:text-white">Privacy</Link> · <Link href="/terms" className="hover:text-white">Terms</Link> · <Link href="/cookies" className="hover:text-white">Cookies</Link>
       </footer>
     </div>
   );

@@ -716,6 +716,7 @@ export function Landing() {
           <span>© 2026 DoughTally Software</span>
           <Link href="/privacy" className="hover:text-white">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-white">Terms of Service</Link>
+          <Link href="/cookies" className="hover:text-white">Cookie Policy</Link>
         </p>
       </footer>
     </div>

@@ -76,6 +76,7 @@ const sections: LegalSection[] = [
       <>
         <p>We use only the cookies needed to keep you signed in. There are no advertising or cross-site tracking cookies, and no third-party analytics.</p>
         <p>The app also stores a small note in your browser if you dismiss the &ldquo;install the app&rdquo; card, so it stops asking. If you install DoughTally to your home screen, your device keeps a copy of the offline page and app files; it never stores your business data offline.</p>
+        <p>Every item, what it&apos;s for and how long it lasts is listed in our <Link href="/cookies">Cookie Policy</Link>.</p>
       </>
     ),
   },
