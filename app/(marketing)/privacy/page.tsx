@@ -16,7 +16,7 @@ const sections: LegalSection[] = [
       <>
         <p><strong>Account details.</strong> Your email address, a password (stored only as a salted hash by our authentication provider), your business name and type, and your name if you give it.</p>
         <p><strong>What you put into the app.</strong> Photos and PDFs of supplier invoices, menus and recipes; the details read from them (vendors, invoice numbers and dates, line items, quantities, prices); your ingredient list and costs; recipes, menu items and selling prices; your settings, such as target margin and alert threshold; and the decisions you make while reviewing, such as confirming that a supplier&apos;s wording means a particular ingredient.</p>
-        <p><strong>Technical data.</strong> When you use the site, our hosting and database providers record standard request logs (IP address, browser type, pages requested, time, errors). We use these to keep the service running and secure.</p>
+        <p><strong>Technical data.</strong> When you use the site, our hosting and database providers record standard request logs (IP address, browser type, pages requested, time, errors). We use these to keep the service running and secure. We also count page visits with Vercel Web Analytics, which sets no cookies and records only the kind of page visited, the referring site and general device details (browser, operating system, country) — not who you are or what&apos;s in your account.</p>
         <p>We don&apos;t ask for payment card details, and we don&apos;t collect information about your customers.</p>
       </>
     ),
@@ -60,7 +60,7 @@ const sections: LegalSection[] = [
         <p>We use a small number of providers to run the service. Each only gets what it needs to do its job:</p>
         <ul>
           <li><strong>Supabase</strong>: database, sign-in, and storage for your uploaded files.</li>
-          <li><strong>Vercel</strong>: hosting of the website and app.</li>
+          <li><strong>Vercel</strong>: hosting of the website and app, and anonymous, cookie-free visit counts.</li>
           <li><strong>Anthropic</strong> and <strong>Voyage AI</strong>: as described above.</li>
           <li>An email delivery provider, for account emails.</li>
         </ul>
@@ -74,7 +74,7 @@ const sections: LegalSection[] = [
     title: "Cookies and local storage",
     body: (
       <>
-        <p>We use only the cookies needed to keep you signed in. There are no advertising or cross-site tracking cookies, and no third-party analytics.</p>
+        <p>We use only the cookies needed to keep you signed in. There are no advertising or cross-site tracking cookies, and our visit counting uses no cookies at all.</p>
         <p>The app also stores a small note in your browser if you dismiss the &ldquo;install the app&rdquo; card, so it stops asking. If you install DoughTally to your home screen, your device keeps a copy of the offline page and app files; it never stores your business data offline.</p>
         <p>Every item, what it&apos;s for and how long it lasts is listed in our <Link href="/cookies">Cookie Policy</Link>.</p>
       </>
