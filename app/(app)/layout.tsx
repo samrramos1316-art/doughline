@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logOutAction } from "@/app/(marketing)/auth-actions";
 import { getCurrentOrgId } from "@/lib/supabase/org";
+import { getSessionUser } from "@/lib/supabase/user";
 import { getReviewBacklog } from "@/lib/matching/review";
 import { ActionRequiredGate } from "@/components/review/ActionRequiredGate";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
@@ -10,9 +11,7 @@ import { isAdmin } from "@/lib/admin/access";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   // proxy.ts already redirects unauthenticated visitors away from these
   // routes, but a Proxy matcher change shouldn't be the only thing standing
@@ -20,11 +19,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // data-security guidance for Proxy).
   if (!user) redirect("/login");
 
-  const orgId = await getCurrentOrgId(supabase);
-  const [backlog, org, profile, alerts, failed] = await Promise.all([
-    orgId ? getReviewBacklog(supabase, orgId) : null,
-    supabase.from("organizations").select("name").eq("id", orgId ?? "").maybeSingle(),
-    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+  // Only the backlog needs the org id; RLS scopes the rest, so they start now.
+  const [backlog, profile, alerts, failed] = await Promise.all([
+    getCurrentOrgId(supabase).then((orgId) => (orgId ? getReviewBacklog(supabase, orgId) : null)),
+    supabase.from("profiles").select("full_name, organizations(name)").eq("id", user.id).maybeSingle(),
     supabase.from("price_alerts").select("id", { count: "exact", head: true }).eq("acknowledged", false).gt("pct_change", 0),
     supabase.from("invoices").select("id", { count: "exact", head: true }).eq("status", "failed"),
   ]);
@@ -34,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     alerts: alerts.count ?? 0,
     failed: failed.count ?? 0,
   };
-  const business = org.data?.name ?? "Your business";
+  const business = profile.data?.organizations?.name ?? "Your business";
   const logOut = (
     <form action={logOutAction}>
       <button type="submit" className="text-stone-400 underline decoration-stone-600 underline-offset-2 hover:text-white">
