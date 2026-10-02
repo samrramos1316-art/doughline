@@ -14,15 +14,17 @@ const head = "px-3 py-2 text-left font-ledger text-[10px] font-normal tracking-[
 // cookies (lib/supabase/server.ts, lib/supabase/proxy.ts; @supabase/ssr's
 // default 400-day max-age), the install-card dismissal in localStorage
 // (components/pwa/InstallPrompt.tsx, 30 days), and the service worker's
-// cache (public/sw.js). Update this page when any of that changes.
+// cache (public/sw.js), and Vercel Web Analytics (components/analytics/
+// SiteAnalytics.tsx — cookieless, scrubbed URLs). Update this page when any
+// of that changes.
 const sections: LegalSection[] = [
   {
     id: "short",
     title: "The short version",
     body: (
       <>
-        <p>DoughTally uses only what it needs to work: a cookie that keeps you signed in, one small note in your browser, and — if you install the app — a cached copy of its files.</p>
-        <p>There are no advertising cookies, no tracking across other websites, no social-media pixels and no third-party analytics. Nothing here is used to build a profile of you or sold to anyone.</p>
+        <p>DoughTally uses only what it needs to work: a cookie that keeps you signed in, one small note in your browser, and — if you install the app — a cached copy of its files. We also count page visits with a cookie-free analytics tool, so we know which pages people use.</p>
+        <p>There are no advertising cookies, no tracking across other websites and no social-media pixels. Nothing here is used to build a profile of you or sold to anyone.</p>
       </>
     ),
   },
@@ -77,11 +79,21 @@ const sections: LegalSection[] = [
     ),
   },
   {
+    id: "analytics",
+    title: "Visit counts (no cookies)",
+    body: (
+      <>
+        <p>We use Vercel Web Analytics, from our hosting provider, to count page visits — for example, how many people opened the pricing section or the invoice import this week. It sets <strong>no cookies</strong> and stores nothing on your device, and it doesn&apos;t follow you to other websites.</p>
+        <p>For each visit it records the kind of page (we strip anything after a &ldquo;?&rdquo; and replace record numbers, so it sees &ldquo;an invoice page&rdquo;, never which invoice), the referring site, and general device details such as browser, operating system and country. Visits can&apos;t be tied to your account, and a visitor can&apos;t be recognised from one day to the next.</p>
+      </>
+    ),
+  },
+  {
     id: "dont",
     title: "What we don't use",
     body: (
       <ul>
-        <li>No analytics or measurement tools (such as Google Analytics).</li>
+        <li>No cookie-based analytics or measurement tools (such as Google Analytics).</li>
         <li>No advertising or retargeting cookies, and no tracking pixels.</li>
         <li>No social-media buttons or embeds that set their own cookies.</li>
         <li>No fonts or scripts loaded from other companies&apos; servers on our pages — they&apos;re served from {SITE}.</li>
@@ -92,7 +104,7 @@ const sections: LegalSection[] = [
     id: "consent",
     title: "Why there's no cookie banner",
     body: (
-      <p>Cookies that are strictly necessary for a service you&apos;ve asked for — like staying signed in — don&apos;t need a consent pop-up. Since that&apos;s all we use, we don&apos;t show one. If we ever add anything that isn&apos;t strictly necessary, we&apos;ll update this page first and ask for your consent before setting it.</p>
+      <p>Cookies that are strictly necessary for a service you&apos;ve asked for — like staying signed in — don&apos;t need a consent pop-up, and our visit counting sets no cookies at all. Since that&apos;s all we use, we don&apos;t show one. If we ever add anything that isn&apos;t strictly necessary, we&apos;ll update this page first and ask for your consent before setting it.</p>
     ),
   },
   {
