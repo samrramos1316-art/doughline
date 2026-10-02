@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
@@ -6,7 +7,11 @@ import type { Database } from "@/types/database";
 // session cookie. Use this in Server Components, Route Handlers, and Server
 // Actions — never the service role key — so the database's RLS policies stay
 // the real security boundary.
-export async function createClient() {
+//
+// cache(): one client per request, so the layout, the page and helpers like
+// getCurrentOrgId share it (and dedupe their lookups) instead of each making
+// their own.
+export const createClient = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -31,4 +36,4 @@ export async function createClient() {
       },
     },
   );
-}
+});

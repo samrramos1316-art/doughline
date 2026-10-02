@@ -40,9 +40,13 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims refreshes an expired session (writing the new cookies above),
+  // then verifies the token against the project's public signing key — no
+  // round trip to the auth server on every request, as getUser() made.
+  const { data: auth } = await supabase.auth.getClaims();
+  const user = auth?.claims?.sub
+    ? { id: auth.claims.sub, email: typeof auth.claims.email === "string" ? auth.claims.email : undefined }
+    : null;
 
   const isAppRoute = request.nextUrl.pathname.startsWith("/dashboard") ||
     request.nextUrl.pathname.startsWith("/invoices") ||

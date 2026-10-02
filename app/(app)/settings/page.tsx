@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
+import { getSessionUser } from "@/lib/supabase/user";
 import { PageHeader, Panel } from "@/components/ui/dash";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 
@@ -8,9 +9,9 @@ export default async function SettingsPage() {
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
-  const [{ data: org }, { data: { user } }] = await Promise.all([
+  const [{ data: org }, user] = await Promise.all([
     supabase.from("organizations").select("name, business_type, target_margin_pct, price_alert_threshold_pct, max_unreviewed_line_items").eq("id", orgId).single(),
-    supabase.auth.getUser(),
+    getSessionUser(),
   ]);
   if (!org) redirect("/login");
 
