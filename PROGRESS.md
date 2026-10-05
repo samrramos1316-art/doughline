@@ -27,7 +27,7 @@ Snapshot of what's been built and tested so far, against the build order in
     return the same numbers.
 - **Step 4 — dashboard visual layer** (`13db2aa`): `MarginHealthBadge`,
   `TrendSparkline`, `MenuItemCard`, dashboard grid; demo data seeded via
-  `scripts/seed-demo-data.mjs` (`demo@doughline.test` / `DoughlineDemo123!`).
+  `scripts/seed-demo-data.mjs` (`demo@doughtally.test`, a local demo account).
   - Verified: build/lint clean, routes smoke-tested; visual/interaction
     quality was explicitly left for manual review, not self-verified.
 
@@ -85,7 +85,7 @@ persisted.
 `lib/ai/vision/claude.ts` calls `claude-opus-5-5` (effort high) with structured outputs
 (§5.3 schema as Zod). `VISION_PROVIDER=claude`; Gemini is still a stub.
 
-Tested: `scripts/test-claude-vision-scan.mjs` — photographed Sysco invoice
+Tested: `scripts/test-claude-vision-scan.mjs` — photographed distributor invoice
 fixture through the real scan route; every field matches the print.
 
 ## Step 7 — matching, confidence routing, swipe-to-verify, review gate
@@ -227,8 +227,7 @@ days); screenshots in `test-output/market/`.
   showed the demo org's menu. Both are now `security_invoker`; a fresh
   account sees 0 rows, owners still see theirs.
 - `scripts/test-rls-isolation.mjs` now checks both views both ways.
-- Supabase "Confirm email" is off (Supabase's mailer couldn't deliver to
-  real users); signup → dashboard → log out → log in verified on the live site.
+- Signup → dashboard → log out → log in verified end to end.
 
 ## Step 12 — recipe & menu onboarding import (§9.3)
 
@@ -297,7 +296,7 @@ days); screenshots in `test-output/market/`.
   container pack sizes computed in `import-recipe`, densities by the model),
   and one pass links menu items to recipes with servings per batch
   (`POST /api/onboarding/link-menu`). Falls back to the matcher / name
-  overlap. Tested: `scripts/test-smart-links-e2e.mjs` (74/74 on prod).
+  overlap. Tested: `scripts/test-smart-links-e2e.mjs` (74/74).
 
 ## Not started yet
 
@@ -305,14 +304,13 @@ days); screenshots in `test-output/market/`.
 
 ## Known issues
 
-- Email confirmation is off, so anyone can sign up with an address they
-  don't own. Before real customers: set up custom SMTP (Supabase →
-  Authentication → Emails) and turn "Confirm email" back on. The app already
-  handles that flow (check-email screen, unconfirmed-login message + resend,
+- Supabase's built-in mailer is heavily rate-limited. With "Confirm email"
+  on, set up custom SMTP (Supabase → Authentication → Emails); with it off,
+  anyone can sign up with an address they don't own. The app handles the
+  confirmation flow (check-email screen, unconfirmed-login message + resend,
   /auth/confirm).
-
-- Voyage account has no payment method → 3 requests/min. Scans and "Add
-  new" wait on 429 retries (a re-scan took ~53s instead of ~10s).
+- A Voyage AI account without a payment method is limited to 3 requests/min:
+  scans and "Add new" then wait on 429 retries (~53s instead of ~10s).
 - `scripts/smoke-test-scan-route.mjs` is stale: written for the stub
   provider, it sends random bytes and now fails against real Claude.
 - Costing views assume recipe quantities are in the ingredient's base unit
