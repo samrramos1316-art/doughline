@@ -4,8 +4,8 @@
 // which calls Claude with structured outputs. Prints the extracted JSON and
 // checks it against the known contents of the fixture.
 //
-// Fixture: scripts/fixtures/invoice-sysco-bakery.jpg (rendered from the .html
-// beside it — a skewed, shadowed phone-photo-style Sysco invoice with 8 item
+// Fixture: scripts/fixtures/invoice-bluebonnet-bakery.jpg (rendered from the .html
+// beside it — a skewed, shadowed phone-photo-style distributor invoice with 8 item
 // lines plus subtotal / fuel-surcharge / total rows that must be skipped).
 //
 // Makes one real, billed Claude API call. Run: node scripts/test-claude-vision-scan.mjs
@@ -27,7 +27,7 @@ const PORT = 3102;
 const BASE_URL = `http://localhost:${PORT}`;
 const PROJECT_REF = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
 const AUTH_COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`;
-const FIXTURE = "scripts/fixtures/invoice-sysco-bakery.jpg";
+const FIXTURE = "scripts/fixtures/invoice-bluebonnet-bakery.jpg";
 
 // What's printed on the fixture — the ground truth to check against.
 const EXPECTED_LINES = [
@@ -115,7 +115,7 @@ try {
   assert(scanBody.status === "processing", "invoice moves to 'processing' with line items extracted");
 
   const ex = scanBody.extraction;
-  assert(/sysco/i.test(ex.vendor_name_guess ?? ""), `vendor_name_guess mentions Sysco (${ex.vendor_name_guess})`);
+  assert(/bluebonnet/i.test(ex.vendor_name_guess ?? ""), `vendor_name_guess mentions Bluebonnet (${ex.vendor_name_guess})`);
   assert(ex.invoice_date_guess === "2026-09-22", `invoice_date_guess is ISO 2026-09-22 (${ex.invoice_date_guess})`);
   assert(ex.invoice_number_guess === "7719-204583", `invoice_number_guess is 7719-204583 (${ex.invoice_number_guess})`);
   assert(ex.line_items.length === EXPECTED_LINES.length,

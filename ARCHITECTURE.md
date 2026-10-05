@@ -1,8 +1,34 @@
-# Fatass — Technical Architecture & Implementation Plan
+# DoughTally — Technical Architecture
 
-**Product:** Lean AI-powered back-office micro-SaaS for micro-food businesses (home bakeries, food trucks, small caterers) — protects margins by automating wholesale invoice processing and real-time cost/margin tracking.
+**Product:** a lean, AI-powered back office for micro food businesses (home bakeries, food trucks, cafés, small caterers). It protects margins by automating supplier-invoice processing and tracking costs and margins in real time.
 
-**Purpose of this document:** a complete, opinionated implementation spec you can hand directly to a Claude Code session (or any engineer) to start scaffolding. It covers the stack decision, database schema + migrations, API surface, the AI vision/matching pipeline, margin-change alerting, the commodity-price early-warning panel, the suggestion engine, manual-entry fallbacks, and the Next.js codebase layout. No code has been scaffolded yet — this is the plan to build from.
+**About this document:** this started as the implementation spec DoughTally was built from. It covers the stack, database schema and migrations, API surface, the AI vision/matching pipeline, margin-change alerting, the commodity-price panel, the suggestion engine, manual-entry fallbacks and the codebase layout. It has since been updated to describe what was **actually built**. Where the code differs from the original plan, the difference is called out in a **"Built:"** note, and every difference is summarised in §0 below. When this document and the code disagree, the code (and the SQL in `supabase/migrations/`) wins.
+
+---
+
+## 0. Spec vs. build: where the code differs from the original plan
+
+| Area | Original plan | What was built |
+|---|---|---|
+| Framework | Next.js 15, `middleware.ts` | **Next.js 16**, where middleware is renamed **`proxy.ts`** (root) → `lib/supabase/proxy.ts` (session refresh, auth redirects, access gate). |
+| UI kit / data fetching | shadcn/ui, TanStack Query | **Neither is used.** Hand-built Tailwind 4 components plus Server Components and Server Actions; GSAP + Lenis on the landing page only. |
+| Vision provider | Gemini 2.5 Flash default, Claude as alternative | **Claude is the only working provider** (`lib/ai/vision/claude.ts`, structured outputs). `lib/ai/vision/gemini.ts` is a **stub that returns no lines**. ⚠️ `VISION_PROVIDER` still **defaults to `gemini`** when unset, so a fresh install without `VISION_PROVIDER=claude` silently extracts nothing. |
+| Extraction schema (§5.3) | vendor/date/number + `line_items` | Adds `document_type` (invoice vs. menu vs. recipe, used to route wrong-kind uploads), `invoice_total_guess`, per-line `item_name` (migration 016) and printed pack size (017). |
+| Extra AI calls | Vision + one narrative call per alert | Also `lib/ai/itemNames.ts` (Claude Haiku: expands "BUTTER SWT UNSLTD 36/1#" → "unsalted sweet butter"; embeddings are computed from this, not from `raw_text`) and `lib/onboarding/reason.ts` (Claude: recipe/menu linking and unit judgements during onboarding import). |
+| Org creation (§13 step 2) | Server action using the service role | **`handle_new_user` trigger on `auth.users`** (migration 012): org + profile are created in the same transaction as the user. |
+| View security (§3.9) | "Views inherit RLS automatically" | **Wrong in the original plan.** Views run as their owner and bypassed RLS until **migration 021** recreated them `with (security_invoker = true)`. Any new view must do the same. |
+| Margin cascade (§6.1) | App code (`lib/costing/marginImpact.ts`) | A **SQL function `apply_line_item_price()`** (migrations 017, 019), called from `lib/costing/applyPrice.ts`, does price history, current cost, alert and margin impacts in one transaction. Backdated invoices update history only (019). |
+| Review gate (§6.3) | App rule | Enforced in the database by the `enforce_invoice_review_gate` trigger (015), plus `components/review/ActionRequiredGate.tsx` in the UI. |
+| Matching thresholds (§5.2) | 0.90 / 0.75 | Kept (`lib/matching/thresholds.ts`), plus a display-only 0.65 floor for showing a low-confidence suggestion. |
+| "Not an ingredient" | — | Added: gloves/fees/surcharges can be marked once per vendor phrase and are remembered (migration 022, `/api/line-items/[id]/not-ingredient`). |
+| Costing correctness | — | Migration 014 honours `servings_per_batch`; 023 makes a recipe's cost unknown (not cheaper) while any ingredient is unpriced; 024 enforces one ingredient per name per org. |
+| API surface (§4) | Full REST surface | Several read endpoints became Server Component data loads instead of routes; see the "Built" note under §4. Stripe webhook not built. |
+| Pages (§11) | `ingredients/[id]`, `recipes/new` | Not built as separate pages. Added `add/` (one entry point for any photo import), `review/` (org-wide swipe queue), `margins/`, `alerts/[id]`, `admin/` (owner console) and marketing pages (`login`, `signup`, `privacy`, `terms`, `cookies`). |
+| Access control | — | Added a pre-launch gate (`DOUGHTALLY_ACCESS=closed` + `DOUGHTALLY_ALLOWED_EMAILS`, `lib/access.ts`) and an owner console gated by `DOUGHTALLY_ADMIN_EMAILS` (`lib/admin/`). Both are enforced in the app, not in Supabase Auth. |
+| Analytics | — | Vercel Web Analytics with scrubbed URLs (`components/analytics/SiteAnalytics.tsx`). |
+| Seed data | `supabase/seed.sql` | No `seed.sql`. `scripts/seed-demo-data.mjs` seeds a demo account; `scripts/fixtures/` holds made-up businesses and invoices. |
+| Tests | — | No unit-test runner. `scripts/test-*.mjs` are end-to-end scripts against a real Supabase project and a running server (RLS isolation, signup, costing views, scans, matching, cascade, bulk import, market, onboarding, PWA, access gate). |
+| Billing | Stripe placeholder | `organizations.subscription_tier` / `stripe_customer_id` columns exist; nothing is wired up. |
 
 ---
 
@@ -10,17 +36,17 @@
 
 | Layer | Choice | Why |
 |---|---|---|
-| Frontend | Next.js 15 (App Router) + TypeScript, mobile-first PWA | One codebase for web + installable mobile app; camera access via `getUserMedia`/`<input capture>` needs no native app |
-| Styling/UI | Tailwind CSS + shadcn/ui | Fast to build a clean mobile UI solo; no design system to maintain from scratch |
+| Frontend | Next.js 16 (App Router, `proxy.ts`) + React 19 + TypeScript, mobile-first PWA | One codebase for web + installable mobile app; camera access via `getUserMedia`/`<input capture>` needs no native app |
+| Styling/UI | Tailwind CSS 4 (hand-built components; shadcn/ui was planned but not used) | Fast to build a clean mobile UI solo; no design system to maintain from scratch |
 | Backend | Next.js Route Handlers (Node runtime) | No separate backend service for a lean v1; colocated with frontend |
 | Database | Supabase Postgres + `pgvector` | Managed Postgres, built-in Auth, Storage, and RLS — matches the vector-matching requirement natively |
 | Auth & multi-tenancy | Supabase Auth + Postgres Row-Level Security | Confirmed direction — tenant isolation enforced at the database layer, not just in application code |
 | File storage | Supabase Storage (private bucket, org-scoped paths) | Invoice photos/PDFs need to live somewhere; keeps everything in one platform |
-| Vision extraction (OCR → structured JSON) | **Gemini 2.5 Flash** (primary), abstracted behind a provider interface | See §2 — honest comparison |
+| Vision extraction (OCR → structured JSON) | Planned: **Gemini 2.5 Flash** (primary), abstracted behind a provider interface. **Built: Claude (`claude-opus-5-5`, structured outputs); Gemini is a stub** | See §2 — honest comparison |
 | Embeddings (semantic matching) | Voyage AI (`voyage-3.5` or `voyage-3-lite`) | Anthropic's recommended embedding partner; strong retrieval quality, cheap, dedicated embedding model (Claude/Gemini don't ship first-party embedding endpoints as good as a dedicated model) |
-| Suggestion narrative | Claude (Sonnet) | Reasoning over already-structured margin data — its actual strength, see §2 and §8 |
+| Suggestion narrative | Claude (built: `claude-opus-5-5`; item-name expansion uses `claude-haiku-4-5`) | Reasoning over already-structured margin data — its actual strength, see §2 and §8 |
 | External market data | USDA MyMarketNews API (free, US wholesale prices) + FAO Food Price Index (free, monthly, global) | See §7 |
-| State/data fetching | TanStack Query | Standard, well-understood server-state caching for a solo-maintained app |
+| State/data fetching | Planned: TanStack Query. **Built: Server Components + Server Actions + `fetch` to route handlers; no client cache library** | Fewer moving parts for a solo-maintained app |
 | Validation | Zod, shared between client and server | Single source of truth for request/response shapes |
 | Hosting | Vercel (app + cron) + Supabase (data/storage/auth) | Zero-ops for a solo founder; both scale down to ~$0 at low volume |
 
@@ -28,7 +54,9 @@
 
 ## 2. Honest vendor decision: which AI actually does the vision extraction
 
-You asked for the honest answer, not the convenient one, so here it is with the reasoning shown.
+> **Built:** the plan below recommended Gemini for extraction. In practice the Claude provider was implemented first, tested against real photographed invoices, and is what DoughTally runs today. The Gemini provider exists only as a stub (§5.1). The reasoning is kept here because it explains the provider interface and where a Gemini implementation would slot in.
+
+This is the reasoning behind the choice, shown in full.
 
 **The real input to this system is not a clean PDF — it's a phone photo of a crumpled paper invoice or a distributor's printed packing slip, taken by someone in a walk-in fridge.** That reframes the comparison: the number that matters is accuracy on *photographed/scanned* documents, not accuracy on born-digital PDFs (where every frontier model is >95% and the differences don't matter).
 
@@ -51,7 +79,7 @@ Either way: **do not hand-roll a separate OCR step.** All three frontier vision 
 Design principles:
 - Every tenant-scoped table carries an `org_id` and is protected by RLS — no table is trusted to filter by org in application code alone. The one exception is `commodity_price_series` (§3.10), which is shared public reference data, not tenant data.
 - Ingredient **cost is never a stored, cached number that can drift** — `ingredients.current_unit_cost` is a maintained field for fast reads, but it is always derived from (and kept in sync by) `ingredient_price_history`, which is the source of truth. Recipe/menu margin math reads live from these tables (a SQL view, §3.9) rather than a cached "margin" column, so "automatically updating menu margins in real time whenever new receipts are scanned" is true by construction, not by a background job you have to remember to run.
-- `vendor_ingredient_aliases` is what makes the semantic matching *feel* smart over time: once a human confirms that "ORG CHKN BRST 40# CS" from Sysco means "Chicken Breast," that exact vendor phrase is remembered and short-circuits the vector search on every future invoice from that vendor.
+- `vendor_ingredient_aliases` is what makes the semantic matching *feel* smart over time: once a human confirms that "ORG CHKN BRST 40# CS" from a given distributor means "Chicken Breast," that exact vendor phrase is remembered and short-circuits the vector search on every future invoice from that vendor.
 - Every ingredient price change is treated as an **event** that cascades: it doesn't just update one row, it computes and records exactly which recipes and menu items were affected and by how much (§3.11) — that's what turns "an ingredient cost more" into "here's what to do about it" in §8.
 
 ### 3.1 — `001_extensions.sql`
@@ -220,8 +248,8 @@ create index invoice_line_items_embedding_hnsw_idx on invoice_line_items
 ### 3.5 — `005_vendor_ingredient_aliases.sql`
 
 ```sql
--- once a human confirms "ORG CHKN BRST 40# CS" -> Chicken Breast for Sysco,
--- every future invoice from Sysco with that exact (normalized) text
+-- once a human confirms "ORG CHKN BRST 40# CS" -> Chicken Breast for a vendor,
+-- every future invoice from that vendor with that exact (normalized) text
 -- auto-matches with confidence 1.0, no vector search needed
 create table vendor_ingredient_aliases (
   id uuid primary key default uuid_generate_v4(),
@@ -339,8 +367,8 @@ create policy "users can update their own profile"
 
 ```sql
 -- organizations: a user can read the org they belong to, not create/delete
--- arbitrary orgs from the client (org creation happens via a signup server
--- action using the service role)
+-- arbitrary orgs from the client (Built: org creation happens in the
+-- security-definer handle_new_user trigger on auth.users, migration 012)
 alter table organizations enable row level security;
 
 create policy "org members can read their organization"
@@ -403,7 +431,7 @@ from menu_items m
 left join recipe_costs rc on rc.recipe_id = m.recipe_id;
 ```
 
-These views inherit RLS from their underlying tables automatically (Postgres evaluates the RLS of the base tables), so no separate policy is needed on the views themselves as long as they're created with the querying role's normal permissions (not `security definer`).
+> **Built — correction:** the original plan claimed these views "inherit RLS from their underlying tables automatically". That is **not** true. A Postgres view runs with its *owner's* privileges unless it is created `WITH (security_invoker = true)`. Owned by `postgres`, the views bypassed RLS, so any signed-in user could read every org's recipe costs and margins through them. **Migration 021** recreates both views with `security_invoker = true`, and migration 023 changed `recipe_costs` so that a recipe with an unpriced ingredient has an unknown cost rather than a too-low one. Every new view must use `security_invoker = true`.
 
 **Historical margin trend (for charts, not a table):** rather than adding a `margin_snapshots` table that has to be populated on a schedule and can drift, compute a menu item's margin-over-time series on demand in the application layer (`lib/costing/marginHistory.ts`): fetch the recipe's ingredients, pull each one's full `ingredient_price_history`, merge the timelines, and evaluate the `recipe_costs`/`menu_item_margins` formula at each date a price changed. This keeps the database lean and guarantees the chart is never stale, at the cost of a slightly more involved read — perfectly fine at this app's data volume (a handful of ingredients per recipe, a few dozen price changes a year).
 
@@ -459,6 +487,26 @@ create index margin_impacts_price_alert_idx on menu_item_margin_impacts(price_al
 
 `resolution` is intentionally simple and optional to fill in — it's a feedback loop (do owners mostly raise prices or adjust recipes?), not a workflow gate.
 
+### 3.12 — Migrations added during the build (012–024)
+
+The plan stopped at 011. These were added while building; read the SQL for details.
+
+| Migration | What it does |
+|---|---|
+| `012_handle_new_user_trigger.sql` | Creates the org + profile in the same transaction as the `auth.users` insert (security definer trigger). |
+| `013_invoice_storage.sql` | Private `invoices` Storage bucket; select/insert/update/delete policies on `{org_id}/…` paths. |
+| `014_menu_item_servings_per_batch.sql` | Margin view honours `menu_items.servings_per_batch`. |
+| `015_matching.sql` | `match_ingredients()` vector search (security invoker) and the `enforce_invoice_review_gate` trigger (§6.3). |
+| `016_line_item_item_name.sql` | Plain-English `item_name` per line, used for embeddings and shown on swipe cards. |
+| `017_price_cascade.sql` | Pack-size parsing and `apply_line_item_price()`: history, current cost, alert and margin impacts in one transaction. |
+| `018_alert_narrative.sql` | Caches the Claude narrative on the alert. |
+| `019_historical_prices.sql` | Backdated invoices go into history only; they don't move current cost or raise alerts. |
+| `020_line_item_position.sql` | Stable printed/typed line order. |
+| `021_views_security_invoker.sql` | **Security fix:** costing views now respect RLS (see §3.9). |
+| `022_alias_not_ingredient.sql` | Remember "not an ingredient" per vendor phrase. |
+| `023_recipe_costs_require_prices.sql` | A recipe's cost is unknown while any ingredient is unpriced. |
+| `024_unique_ingredient_names.sql` | One ingredient per (case/space-insensitive) name per org. |
+
 ---
 
 ## 4. API endpoint design (Next.js Route Handlers)
@@ -505,6 +553,28 @@ All routes live under `app/api/**/route.ts`, run on the **Node runtime** (not Ed
 
 Everything is validated against a shared Zod schema in `lib/validators/`, imported by both the route handler (server-side validation) and the client (form/mutation validation), so the shape is defined once.
 
+> **Built:** the route handlers that exist today are:
+>
+> | Route | Notes |
+> |---|---|
+> | `GET/POST /api/invoices`, `POST /api/invoices/bulk` | as planned |
+> | `PATCH/DELETE /api/invoices/[id]` | no `GET` (the invoice page loads it directly); `DELETE` only for invoices with **no** line items (409 otherwise), and it removes the file too |
+> | `POST /api/invoices/[id]/scan`, `POST /api/invoices/[id]/line-items` | as planned (no `GET` for line items) |
+> | `PATCH /api/line-items/[id]`, `POST …/confirm`, `…/reject`, `…/create-ingredient` | as planned |
+> | `POST /api/line-items/[id]/not-ingredient` | **added**: remember a vendor phrase as "not an ingredient" (migration 022) |
+> | `GET/POST /api/ingredients`, `PATCH/DELETE /api/ingredients/[id]`, `POST …/import`, `GET …/export` | as planned |
+> | `GET/POST /api/recipes`, `GET/PATCH/DELETE /api/recipes/[id]`, `GET /api/recipes/[id]/cost` | as planned |
+> | `GET/POST /api/menu-items`, `PATCH/DELETE /api/menu-items/[id]`, `GET /api/menu-items/[id]/margin` | as planned |
+> | `POST /api/alerts/[id]/acknowledge` | planned as `/ack` |
+> | `GET /api/alerts/[id]/suggestions` | as planned |
+> | `POST /api/alerts/[id]/narrative` | **added**: the optional Claude narrative, generated once and cached on the alert (migration 018) |
+> | `POST /api/onboarding/import-menu`, `…/import-recipe` | as planned |
+> | `POST /api/onboarding/link-menu` | **added**: links imported menu items to recipes |
+> | `GET /api/cron/ingest-market-data` | as planned; requires `Authorization: Bearer $CRON_SECRET` |
+> | `GET /auth/confirm` | **added**: email-confirmation / magic-link landing |
+>
+> **Not built as routes** (data is loaded directly in Server Components instead): `GET /api/invoices/[id]`, `GET /api/invoices/[id]/line-items`, `GET /api/alerts`, `GET /api/ingredients/[id]/price-history`, `GET /api/ingredients/[id]/market-context`, `GET /api/menu-items/[id]/margin-history`, `GET /api/market-trends`. **Not built at all:** `POST /api/margin-impacts/[id]/resolve` and `POST /api/webhooks/stripe`.
+
 ---
 
 ## 5. AI vision + semantic matching pipeline
@@ -536,6 +606,8 @@ export interface VisionProvider {
 `mimeType` deliberately includes `application/pdf` alongside `image/jpeg`/`image/png` — both Gemini and Claude accept PDFs natively as a vision input (each page treated as an image internally), so backfilling historical invoices that arrive as emailed PDFs (§9.1) needs no separate PDF-to-image conversion step. A multi-page PDF is treated as one invoice for v1: all line items across all pages merge into a single `invoices` row's line items, which is the common case (one invoice, one PDF, possibly several pages of line items).
 
 `lib/ai/vision/gemini.ts` implements this against Gemini 2.5 Flash with a forced JSON response schema; `lib/ai/vision/claude.ts` implements the same interface against Claude's `structured-outputs` API. The active provider is chosen by an env var (`VISION_PROVIDER=gemini|claude`), so switching — or later running both and reconciling — is a one-line config change, not a rewrite. The same `VisionProvider` interface is extended with `extractMenu()` and `extractRecipe()` methods for onboarding import (§9.3) — one abstraction, three extraction targets.
+
+> **Built:** only `claude.ts` makes real calls. `gemini.ts` returns an empty result for all three methods, so with `VISION_PROVIDER=gemini` every scan ends up with no lines and goes to manual entry. **`VISION_PROVIDER` defaults to `gemini` when unset** (`lib/ai/vision/index.ts`): set `VISION_PROVIDER=claude` in every deployment until a real Gemini provider lands. A contribution implementing `GeminiVisionProvider` against the §5.3 schema is welcome.
 
 ### 5.2 End-to-end flow
 
@@ -659,7 +731,7 @@ A single reusable component, `components/grid/EditableGrid.tsx` (tab-to-navigate
 - **Invoice line items** — when an invoice's `status` is `failed` (vision couldn't read it at all) or a scan simply missed or mis-read a line, the owner types the row directly (`POST/PATCH` the line-item endpoints from §4); it still runs through the normal alias/vector matching, so a manually-typed line gets the same smart matching a scanned one would.
 - **Recipe ingredients** — building or editing a recipe's ingredient list as rows, not one-at-a-time forms.
 
-On top of the grid, `POST /api/ingredients/import` / `GET /api/ingredients/export` (CSV) is the literal "in case the software is bugging" escape hatch you asked for: at any point, the owner can pull their entire ingredient list into a real spreadsheet, edit it there, and push it back — the app never becomes the only way to see or fix this data.
+On top of the grid, `POST /api/ingredients/import` / `GET /api/ingredients/export` (CSV) is the literal "in case the software is bugging" escape hatch: at any point, the owner can pull their entire ingredient list into a real spreadsheet, edit it there, and push it back — the app never becomes the only way to see or fix this data.
 
 ### 9.3 Recipe & menu onboarding import
 
@@ -688,156 +760,76 @@ This app's core value only lands if a margin problem is visible in one glance, n
 
 ## 11. Next.js TypeScript codebase structure
 
+> **Built:** this is the actual layout. The original plan's tree differed mainly in naming: `middleware.ts` became `proxy.ts`; `lib/ai/suggestions/claude.ts` became `lib/suggestions/narrative.ts`; `lib/market/usdaAms.ts`/`faoFpi.ts` became `series.ts`/`ingest.ts`/`trends.ts`; there is no `lib/costing/marginImpact.ts` because the cascade is SQL; and there is no `types/domain.ts` or `supabase/seed.sql`.
+
 ```
+proxy.ts                          # Next 16 "middleware": session refresh + route protection + access gate
 app/
+  layout.tsx  manifest.ts  globals.css
+  offline/page.tsx                # PWA offline fallback
+  auth/confirm/route.ts           # email confirmation / magic-link landing
   (marketing)/
     page.tsx                      # landing page
+    login/  signup/  signup/check-email/
+    privacy/  terms/  cookies/    # legal pages (contact in lib/legal.ts)
+    auth-actions.ts               # sign up / log in / log out server actions
   (app)/                          # authenticated shell, mobile-first
-    layout.tsx                    # bottom-nav mobile layout + Action Required banner (§6.3)
-    dashboard/page.tsx            # menu-item cards, margin health, market watch panel
+    layout.tsx                    # sidebar / mobile nav + Action Required gate (§6.3)
+    dashboard/page.tsx            # menu-item cards, margin health, market watch
+    add/page.tsx                  # one entry point for any photo import
     invoices/
-      page.tsx                    # invoice list
-      scan/page.tsx               # camera capture + upload flow
-      import/page.tsx             # bulk drag-and-drop backfill (§9.1)
-      [id]/page.tsx               # invoice detail
-      [id]/review/page.tsx        # swipe-to-verify queue for this invoice
-      [id]/manual-entry/page.tsx  # spreadsheet-style entry for `failed` invoices (§9.2)
-    ingredients/
-      page.tsx                    # includes bulk-edit grid + CSV import/export
-      [id]/page.tsx               # price history chart + market context
-    recipes/
-      page.tsx
-      new/page.tsx
-      [id]/page.tsx               # recipe builder + live cost-per-serving
-    menu/
-      page.tsx                    # menu items + margins
-    alerts/
-      page.tsx                    # price alerts + margin impacts + suggestions
-    market/
-      page.tsx                    # commodity trend panel (§7)
-    onboarding/
-      import/page.tsx            # recipe/menu photo-or-PDF import, shown once post-signup (§9.3)
-    settings/
-      page.tsx                    # thresholds, target margin, max_unreviewed_line_items
-  api/
-    invoices/route.ts
-    invoices/bulk/route.ts
-    invoices/[id]/route.ts
-    invoices/[id]/scan/route.ts
-    invoices/[id]/line-items/route.ts
-    line-items/[id]/route.ts
-    line-items/[id]/confirm/route.ts
-    line-items/[id]/reject/route.ts
-    line-items/[id]/create-ingredient/route.ts
-    ingredients/route.ts
-    ingredients/import/route.ts
-    ingredients/export/route.ts
-    ingredients/[id]/route.ts
-    ingredients/[id]/price-history/route.ts
-    ingredients/[id]/market-context/route.ts
-    recipes/route.ts
-    recipes/[id]/route.ts
-    recipes/[id]/cost/route.ts
-    onboarding/import-menu/route.ts
-    onboarding/import-recipe/route.ts
-    menu-items/route.ts
-    menu-items/[id]/route.ts
-    menu-items/[id]/margin/route.ts
-    menu-items/[id]/margin-history/route.ts
-    alerts/route.ts
-    alerts/[id]/ack/route.ts
-    alerts/[id]/suggestions/route.ts
-    margin-impacts/[id]/resolve/route.ts
-    market-trends/route.ts
-    cron/ingest-market-data/route.ts   # invoked by Vercel Cron
-    webhooks/stripe/route.ts
-  layout.tsx
-  manifest.ts                     # PWA web app manifest (Next's built-in manifest route)
-  globals.css
+      page.tsx  scan/page.tsx  import/page.tsx
+      [id]/page.tsx  [id]/review/page.tsx  [id]/manual-entry/page.tsx
+    review/page.tsx               # org-wide swipe-to-verify queue
+    ingredients/page.tsx          # grid + CSV import/export
+    recipes/page.tsx  recipes/[id]/page.tsx
+    menu/page.tsx
+    margins/page.tsx              # margins by menu item and by ingredient
+    alerts/page.tsx  alerts/[id]/page.tsx
+    market/page.tsx               # commodity trend panel (§7)
+    onboarding/import/page.tsx    # recipe/menu import (§9.3)
+    settings/page.tsx  settings/actions.ts
+    admin/page.tsx                # owner console (DOUGHTALLY_ADMIN_EMAILS); 404 for everyone else
+  api/                            # see the "Built" route table in §4
 
 components/
-  camera/
-    CaptureButton.tsx
-    ImageCompressor.ts             # canvas-based client-side resize/compress
-  swipe/
-    SwipeDeck.tsx
-    SwipeCard.tsx
-  grid/
-    EditableGrid.tsx               # shared spreadsheet-style component, §9.2
-  ingredients/
-    IngredientPicker.tsx
-  recipes/
-    RecipeIngredientRow.tsx
-    CostBreakdown.tsx
-  visual/
-    MarginHealthBadge.tsx          # green/amber/red, used everywhere a margin appears
-    TrendSparkline.tsx
-    MenuItemCard.tsx
-  ui/                              # shadcn/ui primitives
+  alerts/ analytics/ app/ auth/ camera/ grid/ ingredients/ invoices/
+  landing/ legal/ market/ marketing/ menu/ onboarding/ pwa/ recipes/
+  review/ settings/ swipe/ ui/ visual/
 
 lib/
-  supabase/
-    server.ts                     # server-side client (RLS-respecting, uses user session)
-    browser.ts                    # browser client
-    middleware.ts                 # session refresh helper used by middleware.ts
-  ai/
-    vision/
-      types.ts
-      gemini.ts
-      claude.ts
-      index.ts                    # provider selection by env var
-    embeddings/
-      voyage.ts
-    suggestions/
-      claude.ts                    # narrative suggestion generation, §8
-  matching/
-    vectorMatch.ts                 # pgvector query + confidence thresholds
-    normalize.ts                   # raw_text normalization for alias lookups
-  costing/
-    units.ts                       # unit conversion table + helpers
-    recipeCost.ts
-    marginHistory.ts               # on-demand historical margin series, §3.9
-    marginImpact.ts                # the cascade in §6.1
-    suggestions.ts                 # deterministic price/portion suggestions, §8
-  market/
-    categoryDefaults.ts            # ingredient category -> commodity_code defaults
-    usdaAms.ts                     # USDA MyMarketNews ingestion
-    faoFpi.ts                      # FAO Food Price Index ingestion
-  validators/
-    invoice.ts
-    ingredient.ts
-    recipe.ts
-    menuItem.ts
+  supabase/   server.ts browser.ts proxy.ts admin.ts (service role, server-only) user.ts org.ts columns.ts
+  ai/         vision/{types,claude,gemini(stub),index}.ts  embeddings/voyage.ts  itemNames.ts
+  matching/   vectorMatch.ts normalize.ts thresholds.ts vendors.ts queue.ts review.ts
+  costing/    applyPrice.ts units.ts marginHistory.ts retryPrices.ts
+  suggestions/ engine.ts math.ts narrative.ts
+  market/     categoryDefaults.ts series.ts ingest.ts trends.ts
+  onboarding/ paths.ts reason.ts upload.ts wrongKind.ts
+  dashboard/  invoices/  ingredients/  dates/  media/  visual/  validators/
+  access.ts (pre-launch gate)  admin/ (owner console)  csv.ts  legal.ts
 
-types/
-  database.ts                     # generated via `supabase gen types typescript`
-  domain.ts                       # hand-written domain types not derivable from the DB
+types/database.ts                 # generated via `supabase gen types typescript`
 
 supabase/
-  migrations/
-    001_extensions.sql
-    002_orgs_and_profiles.sql
-    003_vendors_and_ingredients.sql
-    004_invoices_and_line_items.sql
-    005_vendor_ingredient_aliases.sql
-    006_recipes_and_menu.sql
-    007_price_alerts.sql
-    008_rls_policies.sql
-    009_costing_views.sql
-    010_commodity_prices.sql
-    011_margin_impacts.sql
-  seed.sql
+  config.toml                     # local Supabase CLI config
+  migrations/001_extensions.sql … 024_unique_ingredient_names.sql
 
-middleware.ts                     # Supabase session refresh + route protection
+scripts/
+  test-*.mjs                      # end-to-end checks against a real Supabase project
+  fixtures/                       # made-up businesses and invoices
+  seed-demo-data.mjs  make-*.mjs  screenshot-*.mjs  backfill-ingredient-embeddings.mjs
+
 public/
   icons/                          # PWA icon set (192, 512, maskable)
   sw.js                           # service worker (offline shell + cache)
+vercel.json                       # region + daily market-data cron
 ```
 
 **Notes on a few structural decisions:**
 - Route grouping `(app)` vs `(marketing)` keeps the authenticated, mobile-first shell (bottom nav, camera-first) completely separate from any public marketing/landing pages.
 - The vision/embedding/suggestion provider modules are the only places that call third-party AI APIs — everything else in the app talks to Postgres and Storage. That keeps the AI vendor swap contained to a handful of files.
 - `types/database.ts` should be generated, not hand-written (`supabase gen types typescript --project-id <id> > types/database.ts`), and regenerated whenever a migration changes the schema, so query results are typed against the real schema automatically.
+- **Built:** the service-role client (`lib/supabase/admin.ts`) imports `server-only`, so importing it from a Client Component fails the build. Its only callers are the market-data cron job and the owner console's counts (after `isAdmin()`).
 
 ---
 
@@ -848,6 +840,8 @@ Flagging these so they're a conscious choice, not an oversight: Stripe billing i
 ---
 
 ## 13. Suggested build order
+
+> **Built:** steps 1–13 are complete, in roughly this order. Later work added the access gate, owner console, legal pages, analytics and performance work, plus migrations 012–024.
 
 1. Supabase project + migrations 001–011, confirm RLS with two test orgs (verify org A truly cannot read org B's data).
 2. Auth + org creation flow (signup creates an `organizations` row and a `profiles` row in one server action).

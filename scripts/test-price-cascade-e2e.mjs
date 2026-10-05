@@ -4,7 +4,7 @@
 //   1. Seed a bakery: the 15-ingredient master list with last month's costs
 //      (+ matching ingredient_price_history), recipes, and menu items — two
 //      recipes use Unsalted Butter, one doesn't, plus an inactive menu item.
-//   2. Scan the real Sysco invoice photo. Claude reads pack sizes ("36/1#" →
+//   2. Scan the Bluebonnet invoice photo. Claude reads pack sizes ("36/1#" →
 //      36 lb); auto-matched lines get their price converted to the
 //      ingredient's base unit and applied at scan time.
 //   3. Confirm small moves (eggs, flour) through the confirm API: price
@@ -36,7 +36,7 @@ const PORT = 3104;
 const BASE_URL = `http://localhost:${PORT}`;
 const PROJECT_REF = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
 const AUTH_COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`;
-const FIXTURE = "scripts/fixtures/invoice-sysco-bakery.jpg";
+const FIXTURE = "scripts/fixtures/invoice-bluebonnet-bakery.jpg";
 const OUT_DIR = "test-output/price-cascade";
 const LAST_MONTH = "2026-08-15";
 

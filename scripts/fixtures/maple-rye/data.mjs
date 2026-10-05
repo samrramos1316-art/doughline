@@ -171,7 +171,7 @@ export const INVOICES = [
     // A thermal receipt photographed in bad light: unreadable on purpose.
     // The owner types it in by hand (manual entry).
     file: "06-restaurant-depot-receipt-blurry.jpg", kind: "blurry", batch: "this-week",
-    vendor: { name: "Restaurant Depot", color: "#222", lines: ["4200 Airport Blvd · Austin, TX", "Member 0071-2291"], terms: "Paid — card" },
+    vendor: { name: "Capital Cash & Carry", color: "#222", lines: ["900 Warehouse Row · Austin, TX", "Member 0071-2291"], terms: "Paid — card" },
     number: "RD-5502-8813", date: AGO.today.date, dateText: AGO.today.slash,
     lines: [
       ["", "CINNAMON GROUND 18 OZ", 1, "EA", 6.84, { ingredient: "Ground Cinnamon", base: 0.38, pack: [18, "oz"] }],

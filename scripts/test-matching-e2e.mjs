@@ -5,7 +5,7 @@
 //      POST /api/ingredients (the route embeds it), the rest through
 //      scripts/backfill-ingredient-embeddings.mjs — and read the stored
 //      embeddings back.
-//   2. Scan the Sysco invoice photo: Claude extraction → vendor resolution →
+//   2. Scan the Bluebonnet invoice photo: Claude extraction → vendor resolution →
 //      Voyage embedding → match_ingredients vector search → confidence
 //      routing. Print every stored line, and score each top match against
 //      what the line really is.
@@ -40,11 +40,11 @@ const PORT = 3103;
 const BASE_URL = `http://localhost:${PORT}`;
 const PROJECT_REF = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname.split(".")[0];
 const AUTH_COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`;
-const FIXTURE = "scripts/fixtures/invoice-sysco-bakery.jpg";
+const FIXTURE = "scripts/fixtures/invoice-bluebonnet-bakery.jpg";
 const OUT_DIR = "test-output/matching";
 
 // A small bakery's master list, named the way an owner types them — not the
-// way Sysco prints them — with near-neighbours (three sugars, two butters,
+// way the distributor prints them — with near-neighbours (three sugars, two butters,
 // two chocolates, two flours) so matching has to discriminate.
 const INGREDIENTS = [
   { name: "All-Purpose Flour", category: "dry_goods", base_unit: "lb", current_unit_cost: 0.42 },

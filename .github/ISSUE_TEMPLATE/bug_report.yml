@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in DoughTally isn't working as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! **Security problems: please don't file them here.** Follow SECURITY.md instead.
+        Please don't attach real invoices or any customer, supplier or personal details. Redact or use made-up data.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Upload …
+        3. See …
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Where are you running DoughTally?
+      options:
+        - Hosted version
+        - Self-hosted (Vercel)
+        - Self-hosted (other)
+        - Local development
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      description: Self-hosted only. Output of `git rev-parse --short HEAD`.
+  - type: dropdown
+    id: vision
+    attributes:
+      label: VISION_PROVIDER
+      options:
+        - claude
+        - gemini
+        - not sure / not relevant
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove any keys, emails or business data first.

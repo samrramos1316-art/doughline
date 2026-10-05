@@ -34,7 +34,7 @@ const PROJECT_REF = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname
 const AUTH_COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`;
 const OUT_DIR = "test-output/bulk-import";
 const PDF = "scripts/fixtures/invoice-hill-country-dairy.pdf";
-const BLURRY = "scripts/fixtures/invoice-sysco-bakery-blurry.jpg";
+const BLURRY = "scripts/fixtures/invoice-bluebonnet-bakery-blurry.jpg";
 const LAST_MONTH = "2026-08-15";
 
 const INGREDIENTS = [
@@ -48,8 +48,8 @@ const INGREDIENTS = [
   ["Ground Cinnamon", "dry_goods", "oz", 0.6],
 ].map(([name, category, base_unit, current_unit_cost]) => ({ name, category, base_unit, current_unit_cost }));
 
-// The blurred Sysco invoice, as the owner would copy it off the paper.
-const SYSCO_ROWS = [
+// The blurred Bluebonnet invoice, as the owner would copy it off the paper.
+const VENDOR_ROWS = [
   ["AP FLOUR BLCHD 50# BG", "3", "BG", "21.48", "50", "lb", "64.44"],
   ["SUGAR GRAN XFINE 50#", "2", "BG", "38.90", "50", "lb", "77.80"],
   ["BUTTER SWT UNSLTD 36/1#", "1", "CS", "142.56", "36", "lb", "142.56"],
@@ -207,18 +207,18 @@ try {
   await page.getByRole("link", { name: "Enter its line items by hand" }).click();
   await page.getByRole("heading", { name: "Enter invoice lines" }).waitFor();
   await screenshot("manual-entry-empty");
-  await page.getByLabel("Vendor").fill("Sysco Central Texas");
+  await page.getByLabel("Vendor").fill("Bluebonnet Foodservice");
   await page.getByLabel("Invoice #").fill("7719-204583");
   await page.getByLabel("Invoice date").fill("2026-09-22");
 
   // Row 1 typed, moving with Tab like a spreadsheet.
   await cell("Item (as printed)", 1).click();
-  for (const [i, v] of SYSCO_ROWS[0].entries()) {
+  for (const [i, v] of VENDOR_ROWS[0].entries()) {
     await page.keyboard.type(v);
-    if (i < SYSCO_ROWS[0].length - 1) await page.keyboard.press("Tab");
+    if (i < VENDOR_ROWS[0].length - 1) await page.keyboard.press("Tab");
   }
   // Rows 2-8 pasted as a tab-separated block (what copying cells from a spreadsheet puts on the clipboard).
-  const tsv = SYSCO_ROWS.slice(1).map((r) => r.join("\t")).join("\n");
+  const tsv = VENDOR_ROWS.slice(1).map((r) => r.join("\t")).join("\n");
   await page.evaluate((t) => navigator.clipboard.writeText(t), tsv);
   await cell("Item (as printed)", 2).click();
   await page.keyboard.press("Control+V");
@@ -228,7 +228,7 @@ try {
   console.log("grid after typing row 1 + pasting 7 rows:");
   for (const r of gridValues) console.log("   " + r.join(" | "));
   assert(gridValues.length === 9 && gridValues[8].every((v) => v === ""), "8 filled rows + 1 waiting blank row");
-  assert(SYSCO_ROWS.every((r, i) => r.every((v, j) => gridValues[i][j] === v)), "every typed/pasted cell landed in the right column");
+  assert(VENDOR_ROWS.every((r, i) => r.every((v, j) => gridValues[i][j] === v)), "every typed/pasted cell landed in the right column");
 
   const inlineError = page.getByRole("alert").filter({ hasText: "not $79.50" });
   await inlineError.waitFor();
@@ -252,7 +252,7 @@ try {
   const { data: invAfter } = await admin.from("invoices").select("status, invoice_number, invoice_date, vendors(name)").eq("id", failedInv.id).single();
   console.log(`invoices row now: status '${invAfter.status}', vendor '${invAfter.vendors?.name}', #${invAfter.invoice_number}, ${invAfter.invoice_date}`);
   const manualLines = await printLines(failedInv.id, "typed into the grid");
-  assert(invAfter.status !== "failed" && invAfter.vendors?.name === "Sysco Central Texas", `invoice moved from 'failed' to '${invAfter.status}' with the typed header`);
+  assert(invAfter.status !== "failed" && invAfter.vendors?.name === "Bluebonnet Foodservice", `invoice moved from 'failed' to '${invAfter.status}' with the typed header`);
   assert(manualLines.length === 8 && manualLines.every((l) => l.entry_method === "manual"), "8 lines stored, entry_method 'manual'");
   assert(manualLines.find((l) => l.raw_text.startsWith("EGG")).parsed_line_total === 97.5, "the corrected line total was stored");
   assert(manualLines.every((l) => l.parsed_item_name), "every typed line got a plain-English name for matching");
