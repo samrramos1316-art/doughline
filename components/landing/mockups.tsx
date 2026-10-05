@@ -1,6 +1,6 @@
 import { MarginPill, Spark } from "./primitives";
 
-// Every figure below comes from the app itself: the Sysco invoice and bakery
+// Every figure below comes from the app itself: the (made-up) distributor invoice and bakery
 // used in its end-to-end tests, the +16.5% butter alert and the suggestions
 // computed for it, Claude's narrative for that alert, and real USDA series
 // (Jun 26 – Sep 25, 2026, downsampled).
@@ -100,7 +100,7 @@ export function InvoiceReadMock() {
     <div className="relative">
       <div className="rotate-[-1.5deg] rounded-xl bg-[#f4efe3] p-5 font-mono text-[11.5px] text-stone-700 shadow-[0_20px_50px_-20px_rgba(28,25,23,0.45)] ring-1 ring-stone-900/10">
         <div className="flex justify-between border-b border-dashed border-stone-400 pb-2">
-          <span className="font-bold tracking-widest">SYSCO CENTRAL TEXAS</span>
+          <span className="font-bold tracking-widest">BLUEBONNET FOODSERVICE</span>
           <span>INV 7719-204583 · 09/22/2026</span>
         </div>
         {INVOICE_LINES.map((l) => (
@@ -139,7 +139,7 @@ export function InvoiceReadMock() {
 export function SwipeMock() {
   return (
     <div className="px-4 pt-10 pb-6">
-      <p className="text-center text-[11px] text-stone-400">4 of 6 · Sysco Central Texas</p>
+      <p className="text-center text-[11px] text-stone-400">4 of 6 · Bluebonnet Foodservice</p>
       <div className="relative mt-3">
         <div className="absolute inset-x-3 -bottom-2 h-full rounded-2xl bg-white/70 ring-1 ring-stone-900/5" aria-hidden />
         <div className="relative rotate-[2deg] rounded-2xl bg-white p-4 shadow-lg ring-1 ring-stone-900/5">
@@ -170,7 +170,7 @@ export function AlertMock() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[15px] font-semibold text-stone-900">Unsalted Butter price change</p>
-          <p className="text-[12px] text-stone-500">$3.40/lb → $3.96/lb (+16.5%) · Sysco · Sep 22</p>
+          <p className="text-[12px] text-stone-500">$3.40/lb → $3.96/lb (+16.5%) · Bluebonnet · Sep 22</p>
         </div>
         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">+16.5%</span>
       </div>

@@ -7,8 +7,8 @@
 import { getAdminClient } from "./lib/supabaseTestEnv.mjs";
 
 const admin = getAdminClient();
-const DEMO_EMAIL = "demo@doughline.test";
-const DEMO_PASSWORD = "DoughlineDemo123!";
+const DEMO_EMAIL = "demo@doughtally.test";
+const DEMO_PASSWORD = "DoughtallyDemo123!";
 
 function daysAgo(n) {
   const d = new Date();

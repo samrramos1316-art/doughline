@@ -51,8 +51,8 @@ npm install
 cp .env.example .env.local   # then fill in the values
 ```
 
-1. Apply the SQL migrations in `supabase/migrations/` **in numeric order** (001 → 024).
-2. Fill in `.env.local`. At minimum you need the three Supabase values, `VISION_PROVIDER=claude`, `CLAUDE_API_KEY` and `VOYAGE_API_KEY`.
+1. Apply the SQL migrations in `supabase/migrations/` **in numeric order** (001 → 025).
+2. Fill in `.env.local`. At minimum you need the three Supabase values, `CLAUDE_API_KEY` and `VOYAGE_API_KEY`.
 3. Run the app:
 
 ```bash

@@ -12,7 +12,7 @@
 |---|---|---|
 | Framework | Next.js 15, `middleware.ts` | **Next.js 16**, where middleware is renamed **`proxy.ts`** (root) → `lib/supabase/proxy.ts` (session refresh, auth redirects, access gate). |
 | UI kit / data fetching | shadcn/ui, TanStack Query | **Neither is used.** Hand-built Tailwind 4 components plus Server Components and Server Actions; GSAP + Lenis on the landing page only. |
-| Vision provider | Gemini 2.5 Flash default, Claude as alternative | **Claude is the only working provider** (`lib/ai/vision/claude.ts`, structured outputs). `lib/ai/vision/gemini.ts` is a **stub that returns no lines**. ⚠️ `VISION_PROVIDER` still **defaults to `gemini`** when unset, so a fresh install without `VISION_PROVIDER=claude` silently extracts nothing. |
+| Vision provider | Gemini 2.5 Flash default, Claude as alternative | **Claude is the only working provider** (`lib/ai/vision/claude.ts`, structured outputs). `lib/ai/vision/gemini.ts` is a **stub that returns no lines**. `VISION_PROVIDER` defaults to `claude`. |
 | Extraction schema (§5.3) | vendor/date/number + `line_items` | Adds `document_type` (invoice vs. menu vs. recipe, used to route wrong-kind uploads), `invoice_total_guess`, per-line `item_name` (migration 016) and printed pack size (017). |
 | Extra AI calls | Vision + one narrative call per alert | Also `lib/ai/itemNames.ts` (Claude Haiku: expands "BUTTER SWT UNSLTD 36/1#" → "unsalted sweet butter"; embeddings are computed from this, not from `raw_text`) and `lib/onboarding/reason.ts` (Claude: recipe/menu linking and unit judgements during onboarding import). |
 | Org creation (§13 step 2) | Server action using the service role | **`handle_new_user` trigger on `auth.users`** (migration 012): org + profile are created in the same transaction as the user. |
@@ -24,7 +24,7 @@
 | Costing correctness | — | Migration 014 honours `servings_per_batch`; 023 makes a recipe's cost unknown (not cheaper) while any ingredient is unpriced; 024 enforces one ingredient per name per org. |
 | API surface (§4) | Full REST surface | Several read endpoints became Server Component data loads instead of routes; see the "Built" note under §4. Stripe webhook not built. |
 | Pages (§11) | `ingredients/[id]`, `recipes/new` | Not built as separate pages. Added `add/` (one entry point for any photo import), `review/` (org-wide swipe queue), `margins/`, `alerts/[id]`, `admin/` (owner console) and marketing pages (`login`, `signup`, `privacy`, `terms`, `cookies`). |
-| Access control | — | Added a pre-launch gate (`DOUGHTALLY_ACCESS=closed` + `DOUGHTALLY_ALLOWED_EMAILS`, `lib/access.ts`) and an owner console gated by `DOUGHTALLY_ADMIN_EMAILS` (`lib/admin/`). Both are enforced in the app, not in Supabase Auth. |
+| Access control | — | Added a pre-launch gate (`DOUGHTALLY_ACCESS=closed` + `DOUGHTALLY_ALLOWED_EMAILS`, `lib/access.ts`) and an owner console gated by `DOUGHTALLY_ADMIN_EMAILS` (`lib/admin/`). The app enforces the env vars; migration 025 adds an optional database-level gate (`signup_gate`, `signup_allowed_emails`) so sign-ups that bypass the app are refused too. |
 | Analytics | — | Vercel Web Analytics with scrubbed URLs (`components/analytics/SiteAnalytics.tsx`). |
 | Seed data | `supabase/seed.sql` | No `seed.sql`. `scripts/seed-demo-data.mjs` seeds a demo account; `scripts/fixtures/` holds made-up businesses and invoices. |
 | Tests | — | No unit-test runner. `scripts/test-*.mjs` are end-to-end scripts against a real Supabase project and a running server (RLS isolation, signup, costing views, scans, matching, cascade, bulk import, market, onboarding, PWA, access gate). |
@@ -489,7 +489,7 @@ create index margin_impacts_price_alert_idx on menu_item_margin_impacts(price_al
 
 ### 3.12 — Migrations added during the build (012–024)
 
-The plan stopped at 011. These were added while building; read the SQL for details.
+The plan stopped at 011. These were added while building (and 025 while preparing the open-source release); read the SQL for details.
 
 | Migration | What it does |
 |---|---|
@@ -506,6 +506,7 @@ The plan stopped at 011. These were added while building; read the SQL for detai
 | `022_alias_not_ingredient.sql` | Remember "not an ingredient" per vendor phrase. |
 | `023_recipe_costs_require_prices.sql` | A recipe's cost is unknown while any ingredient is unpriced. |
 | `024_unique_ingredient_names.sql` | One ingredient per (case/space-insensitive) name per org. |
+| `025_signup_gate.sql` | Optional database-level sign-up gate (off by default), so closed sign-ups can't be bypassed via Supabase Auth directly. |
 
 ---
 
@@ -607,7 +608,7 @@ export interface VisionProvider {
 
 `lib/ai/vision/gemini.ts` implements this against Gemini 2.5 Flash with a forced JSON response schema; `lib/ai/vision/claude.ts` implements the same interface against Claude's `structured-outputs` API. The active provider is chosen by an env var (`VISION_PROVIDER=gemini|claude`), so switching — or later running both and reconciling — is a one-line config change, not a rewrite. The same `VisionProvider` interface is extended with `extractMenu()` and `extractRecipe()` methods for onboarding import (§9.3) — one abstraction, three extraction targets.
 
-> **Built:** only `claude.ts` makes real calls. `gemini.ts` returns an empty result for all three methods, so with `VISION_PROVIDER=gemini` every scan ends up with no lines and goes to manual entry. **`VISION_PROVIDER` defaults to `gemini` when unset** (`lib/ai/vision/index.ts`): set `VISION_PROVIDER=claude` in every deployment until a real Gemini provider lands. A contribution implementing `GeminiVisionProvider` against the §5.3 schema is welcome.
+> **Built:** only `claude.ts` makes real calls. `gemini.ts` returns an empty result for all three methods, so with `VISION_PROVIDER=gemini` every scan ends up with no lines and goes to manual entry. `VISION_PROVIDER` therefore defaults to `claude` (`lib/ai/vision/index.ts`). A contribution implementing `GeminiVisionProvider` against the §5.3 schema is welcome.
 
 ### 5.2 End-to-end flow
 
@@ -812,7 +813,7 @@ types/database.ts                 # generated via `supabase gen types typescript
 
 supabase/
   config.toml                     # local Supabase CLI config
-  migrations/001_extensions.sql … 024_unique_ingredient_names.sql
+  migrations/001_extensions.sql … 025_signup_gate.sql
 
 scripts/
   test-*.mjs                      # end-to-end checks against a real Supabase project
@@ -841,7 +842,7 @@ Flagging these so they're a conscious choice, not an oversight: Stripe billing i
 
 ## 13. Suggested build order
 
-> **Built:** steps 1–13 are complete, in roughly this order. Later work added the access gate, owner console, legal pages, analytics and performance work, plus migrations 012–024.
+> **Built:** steps 1–13 are complete, in roughly this order. Later work added the access gate, owner console, legal pages, analytics and performance work, plus migrations 012–025.
 
 1. Supabase project + migrations 001–011, confirm RLS with two test orgs (verify org A truly cannot read org B's data).
 2. Auth + org creation flow (signup creates an `organizations` row and a `profiles` row in one server action).

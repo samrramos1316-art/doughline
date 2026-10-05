@@ -25,6 +25,9 @@ async function confirmUrl() {
 function friendly(message: string) {
   if (/invalid login credentials/i.test(message)) return "That email and password don't match an account.";
   if (/rate limit/i.test(message)) return "Too many emails sent just now — wait a few minutes and try again.";
+  // The database's signup gate (migration 025) rejected the new user; Auth
+  // reports any trigger error as this generic message.
+  if (/database error saving new user/i.test(message)) return CLOSED_MESSAGE;
   return message;
 }
 

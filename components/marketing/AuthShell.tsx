@@ -19,7 +19,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
             <p className="text-xs font-medium tracking-wide text-amber-300 uppercase">Price alert</p>
             <p className="mt-1 font-medium text-white">Unsalted butter $3.40 → $3.96/lb</p>
-            <p className="text-sm text-stone-400">+16.5% · Sysco invoice 7719-204583</p>
+            <p className="text-sm text-stone-400">+16.5% · Bluebonnet invoice 7719-204583</p>
             <div className="mt-4 space-y-2 text-sm">
               {[
                 ["Butter Croissant", "88.6%", "87.3%"],

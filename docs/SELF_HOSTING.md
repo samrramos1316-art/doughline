@@ -36,17 +36,17 @@ cp .env.example .env.local
 
 ## 3. Run the migrations, in order
 
-The schema lives in `supabase/migrations/`, numbered `001` to `024`. **They must be applied in numeric order**, because later migrations alter tables, views and functions created by earlier ones.
+The schema lives in `supabase/migrations/`, numbered `001` to `025`. **They must be applied in numeric order**, because later migrations alter tables, views and functions created by earlier ones.
 
 **Option A: Supabase CLI (recommended)**
 
 ```bash
 npx supabase login
 npx supabase link --project-ref <your-project-ref>   # the ref is in your project URL
-npx supabase db push                                  # applies 001 → 024 in order
+npx supabase db push                                  # applies 001 → 025 in order
 ```
 
-**Option B: SQL editor.** Open **SQL Editor** in the dashboard and run each file's contents in turn, `001_extensions.sql` first and `024_unique_ingredient_names.sql` last. Don't skip any.
+**Option B: SQL editor.** Open **SQL Editor** in the dashboard and run each file's contents in turn, `001_extensions.sql` first and `025_signup_gate.sql` last. Don't skip any.
 
 The migrations set up everything DoughTally needs:
 
@@ -54,6 +54,7 @@ The migrations set up everything DoughTally needs:
 - every table, with **Row-Level Security enabled and org-scoped policies** on all tenant tables (002–011)
 - a trigger that creates each new user's organization and profile on signup (012)
 - the costing views, recreated with `security_invoker = true` so they respect RLS (021)
+- a database-level sign-up gate, off by default (025)
 
 **Check it worked:** in **Table Editor**, every table should show "RLS enabled". To test tenant isolation, run `node scripts/test-rls-isolation.mjs` (it uses `.env.local` and creates and deletes two test users).
 
@@ -84,7 +85,7 @@ Every variable is listed, with a comment, in [`.env.example`](../.env.example). 
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | Publishable/anon key; browser-safe |
 | `SUPABASE_SECRET_KEY` | yes | Service-role key; **server-only** |
-| `VISION_PROVIDER` | yes | `claude` (see below) |
+| `VISION_PROVIDER` | no | `claude` (default) or `gemini` (see below) |
 | `CLAUDE_API_KEY` | yes | Anthropic key. If empty, the SDK falls back to `ANTHROPIC_API_KEY` |
 | `VOYAGE_API_KEY` | yes | Embeddings for ingredient matching |
 | `CRON_SECRET` | for Market Watch | Long random string; protects the cron route |
@@ -100,10 +101,19 @@ Generate a `CRON_SECRET` with `openssl rand -hex 32`.
 
 Invoice, menu and recipe photos are read through a provider interface (`lib/ai/vision/`), selected by `VISION_PROVIDER`:
 
-- **`claude`**: the working implementation (Claude structured outputs). **Use this.**
+- **`claude`** (the default when unset or empty): the working implementation (Claude structured outputs).
 - **`gemini`**: **a stub today.** It returns no lines, so every scan falls through to manual entry. It's there so a real Gemini implementation can slot in without touching the rest of the pipeline. Contributions are welcome.
 
-> ⚠️ If `VISION_PROVIDER` is **unset**, the code defaults to `gemini`, and scans quietly extract nothing. Always set `VISION_PROVIDER=claude`. If it's set to an **empty string**, scans fail with "Unknown VISION_PROVIDER".
+### Closing sign-ups (optional)
+
+`DOUGHTALLY_ACCESS=closed` plus `DOUGHTALLY_ALLOWED_EMAILS` makes the **app** refuse sign-ups and log-ins from anyone not on the list. Because the publishable key is public, someone could still create an account by calling Supabase Auth directly. To block that as well, set the same rule in the database (SQL editor):
+
+```sql
+update signup_gate set closed = true;
+insert into signup_allowed_emails (email) values ('you@example.com'); -- lowercase
+```
+
+Keep the two lists in step: the app checks the env vars on every request, and the database checks these rows when an account is created. Run `update signup_gate set closed = false;` to reopen.
 
 ## 7. Run locally
 
@@ -113,7 +123,7 @@ npm run dev
 
 Open http://localhost:3000, sign up, confirm your email, and you'll land on the dashboard.
 
-Optional: `node scripts/seed-demo-data.mjs` creates a demo account (`demo@doughline.test`) with sample ingredients, recipes and price history.
+Optional: `node scripts/seed-demo-data.mjs` creates a demo account (`demo@doughtally.test`) with sample ingredients, recipes and price history.
 
 ## 8. Deploy to Vercel
 
@@ -156,8 +166,7 @@ Then redeploy. New migrations are always added as new numbered files; existing o
 
 | Symptom | Likely cause |
 |---|---|
-| Every scan ends up with zero lines / goes to manual entry | `VISION_PROVIDER` unset or `gemini`; set it to `claude` |
-| "Unknown VISION_PROVIDER" | `VISION_PROVIDER` is set to an empty string |
+| Every scan ends up with zero lines / goes to manual entry | `VISION_PROVIDER=gemini` (a stub); unset it or set `claude`. Or `CLAUDE_API_KEY` is missing |
 | Lines never auto-match | `VOYAGE_API_KEY` missing, or ingredients created before the key was set: run `node scripts/backfill-ingredient-embeddings.mjs` |
 | Confirmation email link lands on the home page | `/auth/confirm` is missing from Supabase's Redirect URLs |
 | Market Watch is empty | Cron not run yet (trigger it manually), `CRON_SECRET` mismatch, or no `USDA_API_KEY` (FAO only) |

@@ -30,7 +30,7 @@ Follow the Quickstart in the [README](README.md) and, for a full environment, [d
 
 ## Database changes
 
-- Add a **new** numbered migration (`supabase/migrations/025_short_name.sql`). Never edit a migration that has already shipped.
+- Add a **new** numbered migration (`supabase/migrations/026_short_name.sql`). Never edit a migration that has already shipped.
 - Every new tenant table needs an `org_id`, `enable row level security`, and select/insert/update/delete policies scoped to `current_org_id()`. Extend `scripts/test-rls-isolation.mjs` to cover it.
 - Views must be created `with (security_invoker = true)` (see migration 021), or they bypass RLS.
 - Regenerate `types/database.ts` after a schema change:

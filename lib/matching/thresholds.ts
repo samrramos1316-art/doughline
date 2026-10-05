@@ -3,7 +3,7 @@
 //   top ≥ AUTO_MATCH_THRESHOLD → auto_matched
 //   top ≥ REVIEW_THRESHOLD     → needs_review
 //   otherwise                  → new_ingredient
-// First real-data calibration (8 photographed Sysco lines vs. a bakery
+// First real-data calibration (8 photographed distributor lines vs. a bakery
 // list): correct top matches 0.681–0.946, items not in the list topped out
 // at 0.603–0.606. The spec's 0.75 review bar routes the correct eggs match
 // (0.681) to new_ingredient; that's intended — it still shows as a
