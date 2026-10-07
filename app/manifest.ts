@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/dashboard",
     name: "DoughTally",
     short_name: "DoughTally",
-    description: "Snap your wholesale invoices and see what every price change does to your menu margins.",
+    description: "Snap your supplier invoices and see what every price change does to your margins.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

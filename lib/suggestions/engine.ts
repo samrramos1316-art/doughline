@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { suggestForItem, type ItemSuggestion } from "./math";
+import { effectiveUnitCost } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 
@@ -58,10 +59,10 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
       supabase.from("organizations").select("target_margin_pct").eq("id", alert.org_id).single(),
       supabase.from("menu_items").select("id, name, selling_price, servings_per_batch").in("id", menuItemIds),
       supabase.from("menu_item_margins").select("menu_item_id, cost_per_serving").in("menu_item_id", menuItemIds),
-      supabase.from("recipes").select("id, name, batch_yield_qty").in("id", recipeIds),
+      supabase.from("recipes").select("id, name, batch_yield_qty, overhead_pct").in("id", recipeIds),
       supabase
         .from("recipe_ingredients")
-        .select("recipe_id, quantity")
+        .select("recipe_id, quantity, waste_pct")
         .eq("ingredient_id", alert.ingredient_id)
         .in("recipe_id", recipeIds),
     ]);
@@ -79,9 +80,10 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
     // (an unpriced ingredient, migration 023): nothing to compute from.
     if (!mi || !recipe || cps == null || impact.previous_margin_pct == null) continue;
     // A recipe can list the same ingredient on more than one line.
-    const qty = (recipeIngs ?? [])
+    const lines = (recipeIngs ?? [])
       .filter((ri) => ri.recipe_id === recipe.id)
-      .reduce((sum, ri) => sum + Number(ri.quantity), 0);
+      .map((ri) => ({ quantity: Number(ri.quantity), wastePct: Number(ri.waste_pct) }));
+    const qty = lines.reduce((sum, l) => sum + l.quantity, 0);
 
     const s = suggestForItem({
       sellingPrice: Number(mi.selling_price),
@@ -91,6 +93,7 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
       targetMarginPct: target,
       ingredientQtyPerBatch: qty,
       ingredientUnitCost: ingredientCost,
+      ingredientCostFactor: effectiveUnitCost(1, lines, Number(recipe.overhead_pct)),
       baseUnit: alert.ingredients.base_unit,
     });
 

@@ -1,4 +1,5 @@
-import type { VisionProvider, VisionExtractionResult, MenuExtractionResult, RecipeExtractionResult } from "./types";
+import type { VisionProvider, VisionExtractionResult, MenuExtractionResult, RecipeExtractionResult, ExtractOptions } from "./types";
+import { visionPrompt } from "./prompts";
 
 // §5.1: Gemini 2.5 Flash with a forced JSON response schema (§5.3). Not wired
 // to a real call yet — GEMINI_API_KEY isn't in .env.local, and guessing at
@@ -7,13 +8,15 @@ import type { VisionProvider, VisionExtractionResult, MenuExtractionResult, Reci
 // kind of wrong. This returns a fixed stub so the rest of the pipeline
 // (§5.2 step 4 onward) can be built and exercised against a known shape.
 export class GeminiVisionProvider implements VisionProvider {
-  async extractInvoice(fileBuffer: Buffer, mimeType: string): Promise<VisionExtractionResult> {
+  async extractInvoice(fileBuffer: Buffer, mimeType: string, opts?: ExtractOptions): Promise<VisionExtractionResult> {
     void fileBuffer;
     void mimeType;
     // TODO: needs GEMINI_API_KEY. Real implementation: call the Gemini API
     // (generateContent with a responseSchema matching §5.3's JSON schema),
+    // with this as the system instruction — the same prompt Claude gets —
     // passing fileBuffer as inline image/pdf data, and map its response into
     // VisionExtractionResult.
+    void visionPrompt("invoice", opts?.hints);
     return {
       document_type: "invoice",
       vendor_name_guess: null,
@@ -26,15 +29,17 @@ export class GeminiVisionProvider implements VisionProvider {
 
   // Same stub treatment as extractInvoice (§9.3): nothing extracted, so the
   // onboarding screen falls back to "enter these by hand".
-  async extractMenu(fileBuffer: Buffer, mimeType: string): Promise<MenuExtractionResult> {
+  async extractMenu(fileBuffer: Buffer, mimeType: string, opts?: ExtractOptions): Promise<MenuExtractionResult> {
     void fileBuffer;
     void mimeType;
+    void visionPrompt("menu", opts?.hints);
     return { document_type: "menu", items: [] };
   }
 
-  async extractRecipe(fileBuffer: Buffer, mimeType: string): Promise<RecipeExtractionResult> {
+  async extractRecipe(fileBuffer: Buffer, mimeType: string, opts?: ExtractOptions): Promise<RecipeExtractionResult> {
     void fileBuffer;
     void mimeType;
+    void visionPrompt("recipe", opts?.hints);
     return { document_type: "recipe", name_guess: null, yield_qty_guess: null, yield_unit_guess: null, ingredient_lines: [] };
   }
 }

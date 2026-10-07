@@ -4,13 +4,15 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getSessionUser } from "@/lib/supabase/user";
 import { PageHeader, Panel } from "@/components/ui/dash";
 import { SettingsForm } from "@/components/settings/SettingsForm";
+import { industryOptions } from "@/lib/industries/gate";
+import { normalizeIndustryId } from "@/lib/industries";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
   const [{ data: org }, user] = await Promise.all([
-    supabase.from("organizations").select("name, business_type, target_margin_pct, price_alert_threshold_pct, max_unreviewed_line_items").eq("id", orgId).single(),
+    supabase.from("organizations").select("name, business_type, target_margin_pct, price_alert_threshold_pct, max_unreviewed_line_items, default_labor_rate_per_hour").eq("id", orgId).single(),
     getSessionUser(),
   ]);
   if (!org) redirect("/login");
@@ -26,7 +28,10 @@ export default async function SettingsPage() {
               target_margin_pct: Number(org.target_margin_pct),
               price_alert_threshold_pct: Number(org.price_alert_threshold_pct),
               max_unreviewed_line_items: org.max_unreviewed_line_items,
+              default_labor_rate_per_hour: Number(org.default_labor_rate_per_hour),
+              business_type: normalizeIndustryId(org.business_type) === "other" ? "" : (normalizeIndustryId(org.business_type) ?? ""),
             }}
+            industries={industryOptions(org.business_type)}
           />
         </Panel>
         <Panel title="Account" className="xl:col-span-4">
@@ -34,10 +39,6 @@ export default async function SettingsPage() {
             <div>
               <dt className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Signed in as</dt>
               <dd className="text-stone-800">{user?.email}</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Business type</dt>
-              <dd className="text-stone-800 capitalize">{org.business_type?.replace("_", " ") ?? "—"}</dd>
             </div>
           </dl>
         </Panel>

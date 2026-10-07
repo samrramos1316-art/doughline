@@ -24,9 +24,9 @@ export type GridRow = {
   isNew?: boolean;
 };
 
-// "$1,234.50" → 1234.5; blank → null; junk → NaN.
+// "$1,234.50" → 1234.5; "10%" → 10; blank → null; junk → NaN.
 export function parseNumber(value: string): number | null {
-  const t = value.trim().replace(/^\$/, "").replace(/,/g, "");
+  const t = value.trim().replace(/^\$/, "").replace(/%$/, "").replace(/,/g, "");
   return t === "" ? null : Number(t);
 }
 

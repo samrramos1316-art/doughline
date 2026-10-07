@@ -1,16 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { IngredientsGrid } from "@/components/ingredients/IngredientsGrid";
 import { isoDaysAgo } from "@/lib/dates/localDate";
+import { getVocab, getIndustry } from "@/lib/supabase/vocab";
+import { formSuggestions } from "@/lib/industries";
+import { lower } from "@/lib/vocab";
 import { Panel, PageHeader, ButtonLink, Delta, Spark, Empty, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 
 export default async function IngredientsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab } = await searchParams;
   const supabase = await createClient();
-  const { data: ingredients } = await supabase
-    .from("ingredients")
-    .select("id, name, category, base_unit, current_unit_cost")
-    .order("name");
+  const [{ data: ingredients }, v] = await Promise.all([
+    supabase.from("ingredients").select("id, name, category, base_unit, current_unit_cost").order("name"),
+    getVocab(),
+  ]);
   const list = ingredients ?? [];
   const tabs = [
     { href: "/ingredients", label: "Price list", active: tab !== "movers" && tab !== "history", count: list.length },
@@ -53,11 +56,11 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
     return (
       <>
-        <PageHeader title="Ingredients" subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
+        <PageHeader title={v.ingredients} subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
         {tab === "movers" ? (
-          <Panel title="Every ingredient — biggest moves first" flush>
+          <Panel title={`Every ${lower(v.ingredient)} — biggest moves first`} flush>
             {rows.length === 0 ? (
-              <Empty>No ingredients yet.</Empty>
+              <Empty>No {lower(v.ingredients)} yet.</Empty>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -129,9 +132,9 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <PageHeader title="Ingredients" subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
+      <PageHeader title={v.ingredients} subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
       <Panel title="Price list">
-        <IngredientsGrid ingredients={list} />
+        <IngredientsGrid ingredients={list} suggest={formSuggestions(await getIndustry())} />
       </Panel>
     </>
   );

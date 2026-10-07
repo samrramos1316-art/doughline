@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loadReviewQueue } from "@/lib/matching/queue";
 import { SwipeDeck } from "@/components/swipe/SwipeDeck";
+import { getIndustry } from "@/lib/supabase/vocab";
+import { formSuggestions } from "@/lib/industries";
 
 export default async function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,6 +32,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         ingredients={ingredients}
         doneHref={`/invoices/${id}`}
         doneLabel="Back to invoice"
+        suggest={formSuggestions(await getIndustry())}
       />
     </div>
   );

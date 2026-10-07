@@ -4,25 +4,31 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { signUpAction, type AuthActionState } from "@/app/(marketing)/auth-actions";
 import { Field, FormMessage, PasswordField, SubmitButton, fieldClass } from "@/components/marketing/FormFields";
+import type { IndustryOption } from "@/lib/industries/gate";
 
-export function SignUpForm() {
+// `industries`: what ENABLED_INDUSTRIES offers (lib/industries/gate.ts).
+// The industry picker comes first: it sets the words, units and invoice
+// reading for the new account (lib/industries).
+export function SignUpForm({ industries, defaultIndustry = "" }: { industries: IndustryOption[]; defaultIndustry?: string }) {
   const [state, action, pending] = useActionState<AuthActionState, FormData>(signUpAction, null);
 
   return (
     <form action={action} className="space-y-4">
       {state && "error" in state && <FormMessage kind="error">{state.error}</FormMessage>}
-      <Field id="businessName" label="Business name" required autoComplete="organization" placeholder="Sweet Crumb Bakery" />
       <div className="space-y-1.5">
         <label htmlFor="businessType" className="text-sm font-medium text-stone-700">
           What kind of business?
         </label>
-        <select id="businessType" name="businessType" defaultValue="" className={fieldClass}>
+        <select id="businessType" name="businessType" defaultValue={defaultIndustry} className={fieldClass}>
           <option value="">Other / prefer not to say</option>
-          <option value="bakery">Home bakery</option>
-          <option value="food_truck">Food truck</option>
-          <option value="caterer">Caterer</option>
+          {industries.map((i) => (
+            <option key={i.id} value={i.id}>
+              {`${i.name}${i.beta ? " (beta)" : ""}`}
+            </option>
+          ))}
         </select>
       </div>
+      <Field id="businessName" label="Business name" required autoComplete="organization" placeholder="Sweet Crumb Bakery" />
       <Field id="fullName" label="Your name" autoComplete="name" placeholder="Optional" />
       <Field id="email" label="Email" type="email" required autoComplete="email" placeholder="you@yourbakery.com" />
       <PasswordField autoComplete="new-password" required minLength={8} hint="At least 8 characters." />

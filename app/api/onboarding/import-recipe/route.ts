@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getVisionProvider } from "@/lib/ai/vision";
+import { getIndustry } from "@/lib/supabase/vocab";
+import { extractionHints } from "@/lib/industries/extraction";
 import { readOnboardingUpload } from "@/lib/onboarding/upload";
 import { wrongKindBody } from "@/lib/onboarding/wrongKind";
 import { matchLines } from "@/lib/matching/vectorMatch";
 import { SUGGESTION_DISPLAY_THRESHOLD } from "@/lib/matching/thresholds";
-import { canonicalUnit, conversionFactor } from "@/lib/costing/units";
+import { canonicalUnit, conversionFactor, isContainerUnit } from "@/lib/costing/units";
 import { resolveRecipeLines, type LineDecision, type PriceListItem } from "@/lib/onboarding/reason";
 
 // Claude (read, then reason), and one Voyage call for the lines (free-tier 429s retry).
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
 
   let recipe;
   try {
-    recipe = await getVisionProvider().extractRecipe(file.buffer, file.mimeType);
+    recipe = await getVisionProvider().extractRecipe(file.buffer, file.mimeType, { hints: extractionHints((await getIndustry()).id, "recipe") });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't read this recipe" }, { status: 502 });
   }
@@ -179,7 +181,7 @@ async function containerPacks(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ingredients: { id: string; base_unit: string }[],
 ): Promise<Map<string, Pack>> {
-  const ids = ingredients.filter((i) => !canonicalUnit(i.base_unit)).map((i) => i.id);
+  const ids = ingredients.filter((i) => isContainerUnit(i.base_unit)).map((i) => i.id);
   const packs = new Map<string, Pack>();
   if (!ids.length) return packs;
   const { data } = await supabase

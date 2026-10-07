@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewRecipeForm } from "@/components/recipes/NewRecipeForm";
+import { getVocab } from "@/lib/supabase/vocab";
+import { lower } from "@/lib/vocab";
 import { Panel, Kpi, PageHeader, ButtonLink, Empty, CameraIcon, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 export default async function RecipesPage() {
   const supabase = await createClient();
-  const [{ data: recipes }, { data: costs }, { data: lines }, { data: menu }] = await Promise.all([
+  const [{ data: recipes }, { data: costs }, { data: lines }, { data: menu }, v] = await Promise.all([
     supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit").order("name"),
     supabase.from("recipe_costs").select("recipe_id, batch_total_cost, cost_per_serving, unpriced_ingredients"),
     supabase.from("recipe_ingredients").select("recipe_id"),
     supabase.from("menu_items").select("name, recipe_id, is_active"),
+    getVocab(),
   ]);
   const costBy = new Map((costs ?? []).map((c) => [c.recipe_id, c]));
   const countBy = new Map<string, number>();
@@ -23,7 +26,7 @@ export default async function RecipesPage() {
   return (
     <>
       <PageHeader
-        title="Recipes"
+        title={v.recipes}
         subtitle="What each batch costs to make, live from today's ingredient prices"
         actions={
           <ButtonLink href="/onboarding/import?kind=recipe" primary>
@@ -38,9 +41,9 @@ export default async function RecipesPage() {
         <Kpi label="Menu items" value={(menu ?? []).filter((m) => m.is_active).length} href="/menu" />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Panel title="All recipes" flush className="xl:col-span-9">
+        <Panel title={`All ${lower(v.recipes)}`} flush className="xl:col-span-9">
           {list.length === 0 ? (
-            <Empty>No recipes yet. <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">Import them from photos or PDFs</Link>, or create one by hand.</Empty>
+            <Empty>No {lower(v.recipes)} yet. <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">Import them from photos or PDFs</Link>, or create one by hand.</Empty>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -83,7 +86,7 @@ export default async function RecipesPage() {
             </div>
           )}
         </Panel>
-        <Panel title="New recipe by hand" className="xl:col-span-3">
+        <Panel title={`New ${lower(v.recipe)} by hand`} className="xl:col-span-3">
           <NewRecipeForm />
         </Panel>
       </div>

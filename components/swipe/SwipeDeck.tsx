@@ -69,11 +69,13 @@ export function SwipeDeck({
   ingredients,
   doneHref,
   doneLabel,
+  suggest,
 }: {
   lineItems: ReviewLineItem[];
   ingredients: IngredientOption[];
   doneHref: string;
   doneLabel: string;
+  suggest?: { units: string[]; categories: string[] }; // the industry's lists (lib/industries); left out, the food ones
 }) {
   const router = useRouter();
   const [queue, setQueue] = useState(lineItems);
@@ -224,7 +226,7 @@ export function SwipeDeck({
               className="rounded-lg border border-zinc-300 px-3 py-2"
             />
             <datalist id="base-units">
-              {COMMON_UNITS.map((u) => (
+              {(suggest?.units ?? COMMON_UNITS).map((u) => (
                 <option key={u} value={u} />
               ))}
             </datalist>
@@ -237,9 +239,17 @@ export function SwipeDeck({
             <input
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              placeholder="e.g. dairy"
+              placeholder={suggest ? `e.g. ${suggest.categories[0]?.replace("_", " ")}` : "e.g. dairy"}
+              list={suggest ? "ingredient-categories" : undefined}
               className="rounded-lg border border-zinc-300 px-3 py-2"
             />
+            {suggest && (
+              <datalist id="ingredient-categories">
+                {suggest.categories.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            )}
           </label>
           <div className="flex gap-3">
             <button

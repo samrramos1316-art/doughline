@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getVisionProvider } from "@/lib/ai/vision";
+import { getIndustry } from "@/lib/supabase/vocab";
+import { extractionHints } from "@/lib/industries/extraction";
 import { readOnboardingUpload } from "@/lib/onboarding/upload";
 import { wrongKindBody } from "@/lib/onboarding/wrongKind";
 
@@ -19,7 +21,7 @@ export async function POST(request: Request) {
   if ("error" in file) return NextResponse.json({ error: file.error }, { status: file.status });
 
   try {
-    const { document_type, items } = await getVisionProvider().extractMenu(file.buffer, file.mimeType);
+    const { document_type, items } = await getVisionProvider().extractMenu(file.buffer, file.mimeType, { hints: extractionHints((await getIndustry()).id, "menu") });
     // Not a menu (a recipe, an invoice…): say what it is so the screen can route it.
     if (document_type !== "menu") return NextResponse.json(wrongKindBody("menu", document_type, file.path), { status: 422 });
     return NextResponse.json({ items: items.filter((i) => i.name_guess.trim()) });

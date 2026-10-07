@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { createRecipeSchema } from "@/lib/validators/recipe";
+import { getIndustry } from "@/lib/supabase/vocab";
 
 export async function GET() {
   const supabase = await createClient();
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
   const { ingredients, ...recipeFields } = parsed.data;
+  // The industry's usual overhead (lib/industries) unless one was given; 0 for food.
+  const defaultOverhead = (await getIndustry()).defaults.default_overhead_pct;
+  if (recipeFields.overhead_pct === undefined && defaultOverhead > 0) recipeFields.overhead_pct = defaultOverhead;
 
   const { data: recipe, error: recipeError } = await supabase
     .from("recipes")
@@ -29,7 +33,8 @@ export async function POST(request: Request) {
   if (recipeError) return NextResponse.json({ error: recipeError.message }, { status: 400 });
 
   if (ingredients.length > 0) {
-    const rows = ingredients.map((i) => ({ ...i, org_id: orgId, recipe_id: recipe.id }));
+    // waste_pct on every row: a bulk insert sends null for a key some rows lack (NOT NULL).
+    const rows = ingredients.map((i) => ({ ...i, waste_pct: i.waste_pct ?? 0, org_id: orgId, recipe_id: recipe.id }));
     const { error: riError } = await supabase.from("recipe_ingredients").insert(rows);
     if (riError) return NextResponse.json({ error: riError.message }, { status: 400 });
   }

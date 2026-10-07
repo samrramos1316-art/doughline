@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { OnboardingImport } from "@/components/onboarding/OnboardingImport";
+import { getIndustry } from "@/lib/supabase/vocab";
+import { formSuggestions } from "@/lib/industries";
 import { PageHeader } from "@/components/ui/dash";
 import { ONBOARDING_FOLDER } from "@/lib/onboarding/upload";
 
@@ -57,6 +59,7 @@ export default async function OnboardingImportPage({ searchParams }: { searchPar
         </ol>
       )}
       <OnboardingImport
+        suggest={formSuggestions(await getIndustry())}
         key={`${kind ?? "both"}:${handedOver.map((h) => h.path).join(",")}`}
         only={kind}
         preloaded={handedOver}

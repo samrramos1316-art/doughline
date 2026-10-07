@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getVisionProvider } from "@/lib/ai/vision";
+import { getIndustry } from "@/lib/supabase/vocab";
+import { extractionHints } from "@/lib/industries/extraction";
 import { resolveVendorId } from "@/lib/matching/vendors";
 import { insertAndMatchLines } from "@/lib/invoices/lines";
 import { ONBOARDING_FOLDER } from "@/lib/onboarding/upload";
@@ -60,7 +62,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   let extraction;
   try {
-    extraction = await provider.extractInvoice(fileBuffer, mimeType);
+    // The org's industry hints (none for food) go into the prompt.
+    extraction = await provider.extractInvoice(fileBuffer, mimeType, { hints: extractionHints((await getIndustry()).id, "invoice") });
   } catch (err) {
     await supabase
       .from("invoices")

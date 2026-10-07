@@ -5,6 +5,8 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getOverview } from "@/lib/dashboard/overview";
 import { getMarketTrends, DEFAULT_WINDOW_DAYS } from "@/lib/market/trends";
 import { InvoiceStatusBadge } from "@/components/invoices/InvoiceStatusBadge";
+import { getIndustry } from "@/lib/supabase/vocab";
+import { lower } from "@/lib/vocab";
 import {
   Panel, Kpi, PageHeader, ButtonLink, CameraIcon, Pill, Delta, MarginBar, Spark, HBar, Empty,
   marginTone, money, unitMoney, th, thNum, td, tdNum, row,
@@ -16,12 +18,18 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
-  const [o, trends] = await Promise.all([getOverview(supabase, orgId), getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS })]);
+  const industry = await getIndustry();
+  // Market Watch only for an industry with a series actually ingested (lib/industries).
+  const [o, trends] = await Promise.all([
+    getOverview(supabase, orgId),
+    industry.hasMarketData ? getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS }) : Promise.resolve([]),
+  ]);
+  const v = industry.vocab;
   const { kpis, org } = o;
   const setupLeft = [
-    !o.counts.ingredients && { href: "/ingredients", label: "Add your ingredients (or import a spreadsheet)" },
-    !o.counts.recipes && { href: "/onboarding/import?kind=recipe", label: "Import your recipes from photos" },
-    !o.counts.menuItems && { href: "/onboarding/import?kind=menu", label: "Import your menu with its prices" },
+    !o.counts.ingredients && { href: "/ingredients", label: `Add your ${lower(v.ingredients)} (or import a spreadsheet)` },
+    !o.counts.recipes && { href: "/onboarding/import?kind=recipe", label: `Import your ${lower(v.recipes)} from photos` },
+    !o.counts.menuItems && { href: "/onboarding/import?kind=menu", label: `Import your ${lower(v.menu)} with its prices` },
     !o.counts.invoices && { href: "/invoices/scan", label: "Scan your first invoice" },
   ].filter(Boolean) as { href: string; label: string }[];
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -70,7 +78,7 @@ export default async function DashboardPage() {
           label="Below target"
           value={`${kpis.belowTarget}/${kpis.activeItems}`}
           tone={kpis.belowTarget ? "critical" : kpis.activeItems ? "good" : "neutral"}
-          sub={kpis.belowTarget ? "menu items under " + org.target + "%" : "every item on target"}
+          sub={kpis.belowTarget ? `${lower(v.menuItems)} under ${org.target}%` : "every item on target"}
           href="/menu"
         />
         <Kpi
@@ -99,9 +107,9 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         {/* Menu margins: the squad list */}
-        <Panel title="Menu margins — worst first" action={{ href: "/margins", label: "Margins" }} flush className="xl:col-span-8">
+        <Panel title={`${v.menu} margins — worst first`} action={{ href: "/margins", label: "Margins" }} flush className="xl:col-span-8">
           {o.menu.length === 0 ? (
-            <Empty>No menu items yet. Add one on the Menu tab to see its margin here.</Empty>
+            <Empty>No {lower(v.menuItems)} yet. Add one on the {v.menu} tab to see its margin here.</Empty>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -142,7 +150,7 @@ export default async function DashboardPage() {
                               <Pill tone="warning">{m.unpriced.length === 1 ? "Needs a price" : `Needs ${m.unpriced.length} prices`}</Pill>
                             </Link>
                           ) : m.recipeName == null ? (
-                            <Pill tone="neutral">No recipe</Pill>
+                            <Pill tone="neutral">No {lower(v.recipe)}</Pill>
                           ) : (
                             <Pill tone={tone}>{TONE_TEXT[tone]}</Pill>
                           )}
@@ -179,7 +187,7 @@ export default async function DashboardPage() {
         </Panel>
 
         {/* Cost movers */}
-        <Panel title="Ingredient cost movers · 90 days" action={{ href: "/ingredients?tab=movers", label: "All prices" }} flush className="xl:col-span-4">
+        <Panel title={`${v.ingredient} cost movers · 90 days`} action={{ href: "/ingredients?tab=movers", label: "All prices" }} flush className="xl:col-span-4">
           {o.movers.length === 0 ? (
             <Empty>No price changes yet. They appear as invoices come in.</Empty>
           ) : (
@@ -203,12 +211,12 @@ export default async function DashboardPage() {
         </Panel>
 
         {/* Where the cost goes */}
-        <Panel title="Where your food cost goes" action={{ href: "/recipes", label: "Recipes" }} className="xl:col-span-4">
+        <Panel title={industry.family !== "food" || o.drivers.some((d) => d.kind !== "ingredient") ? "Where your cost goes" : "Where your food cost goes"} action={{ href: "/recipes", label: v.recipes }} className="xl:col-span-4">
           {o.drivers.length === 0 ? (
-            <Empty>Build recipes and menu items to see which ingredients drive your cost.</Empty>
+            <Empty>Build {lower(v.recipes)} and {lower(v.menuItems)} to see which {lower(v.ingredients)} drive your cost.</Empty>
           ) : (
             <>
-              <p className="mb-2 text-xs text-stone-500">Share of the cost of making one of each menu item.</p>
+              <p className="mb-2 text-xs text-stone-500">Share of the cost of making one of each {lower(v.menuItem)}.</p>
               <ul className="space-y-2">
                 {o.drivers.slice(0, 7).map((d) => (
                   <li key={d.name}>
@@ -246,7 +254,7 @@ export default async function DashboardPage() {
         </Panel>
 
         {/* Recent invoices */}
-        <Panel title="Recent invoices" action={{ href: "/invoices", label: "All invoices" }} flush className="xl:col-span-8">
+        <Panel title="Recent invoices" action={{ href: "/invoices", label: "All invoices" }} flush className={industry.hasMarketData ? "xl:col-span-8" : "xl:col-span-12"}>
           {o.recent.length === 0 ? (
             <Empty>No invoices yet — snap one on your phone or import PDFs.</Empty>
           ) : (
@@ -284,6 +292,7 @@ export default async function DashboardPage() {
         </Panel>
 
         {/* Market */}
+        {industry.hasMarketData && (
         <Panel title={`Market watch · ${DEFAULT_WINDOW_DAYS} days`} action={{ href: "/market", label: "Market" }} flush className="xl:col-span-4">
           {watched.length === 0 ? (
             <Empty>{trends.length ? "None of your ingredients follow a tracked commodity yet." : "Market data loads once a day from USDA and FAO."}</Empty>
@@ -305,6 +314,7 @@ export default async function DashboardPage() {
           )}
           <p className="border-t border-stone-100 px-3 py-2 text-[11px] text-stone-400">Wholesale context, not a forecast of your next invoice.</p>
         </Panel>
+        )}
       </div>
     </>
   );

@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { isoDaysAgo } from "@/lib/dates/localDate";
+import { batchCost, laborCost, lineCost, marginPctOf, overheadMultiplier, perServing, wasteMultiplier, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 
 // One ingredient line of an item's recipe, worked through to a cost per
-// serving: batch amount ÷ servings per batch × price per unit.
+// serving: batch amount ÷ servings per batch × price per unit, grossed up
+// for waste (÷ (1 − waste %)) when the recipe sets one.
 export type Part = {
   ingredientId: string;
   name: string;
@@ -13,8 +15,10 @@ export type Part = {
   batchQty: number; // in the recipe, per batch (repeated lines merged)
   qty: number; // per serving
   unitCost: number | null; // price per unit today
-  cost: number | null; // per serving
+  cost: number | null; // per serving, waste included
   shareOfCost: number | null; // of the item's cost, 0–1
+  wastePct: number; // effective across merged lines; 0 = none
+  costFactor: number; // what a $1 move in its price adds per unit used: waste × overhead
 };
 
 export type ItemMargin = {
@@ -27,7 +31,9 @@ export type ItemMargin = {
   yieldUnit: string | null;
   price: number;
   cost: number | null; // null until every ingredient has a price
-  knownCost: number; // what the priced ingredients add up to so far
+  knownCost: number; // what the priced ingredients add up to so far (plus labor and overhead)
+  labor: number; // per serving; 0 when the recipe has no labor time or rate
+  overhead: number | null; // per serving; null while the cost is unknown
   profit: number | null;
   marginPct: number | null;
   parts: Part[];
@@ -71,15 +77,16 @@ const round = (n: number, dp = 2) => Math.round(n * 10 ** dp) / 10 ** dp;
 
 // The Margins tab: every active menu item's margin, worked out from its
 // recipe, and the menu's total margin. Same costing as the menu_item_margins
-// view: menu_items.servings_per_batch when set, otherwise the recipe's yield.
+// view: menu_items.servings_per_batch when set, otherwise the recipe's yield,
+// and the shared formula (lib/costing/recipeCost.ts) for waste/labor/overhead.
 export async function getMargins(supabase: Client, orgId: string) {
   const since30 = isoDaysAgo(30);
   const since90 = isoDaysAgo(90);
   const [org, menuItems, recipes, recipeIngredients, ingredients, history, lines] = await Promise.all([
-    supabase.from("organizations").select("target_margin_pct").eq("id", orgId).single(),
+    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch").eq("is_active", true).order("name"),
-    supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit"),
-    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity"),
+    supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit, labor_minutes, labor_rate_per_hour, overhead_pct"),
+    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct"),
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost").order("name"),
     supabase.from("ingredient_price_history").select("ingredient_id, unit_cost, effective_date, created_at, vendors(name)").order("effective_date").order("created_at"),
     supabase
@@ -91,28 +98,64 @@ export async function getMargins(supabase: Client, orgId: string) {
   const target = Number(org.data?.target_margin_pct ?? 65);
   const recipeById = new Map((recipes.data ?? []).map((r) => [r.id, r]));
   const ingById = new Map((ingredients.data ?? []).map((i) => [i.id, i]));
-  const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number }[]>();
+  const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number; wastePct: number }[]>();
   for (const l of recipeIngredients.data ?? []) {
-    linesByRecipe.set(l.recipe_id, [...(linesByRecipe.get(l.recipe_id) ?? []), { ingredient_id: l.ingredient_id, quantity: Number(l.quantity) }]);
+    linesByRecipe.set(l.recipe_id, [...(linesByRecipe.get(l.recipe_id) ?? []), { ingredient_id: l.ingredient_id, quantity: Number(l.quantity), wastePct: Number(l.waste_pct) }]);
   }
+  const defaultRate = Number(org.data?.default_labor_rate_per_hour ?? 0);
 
   const items: ItemMargin[] = (menuItems.data ?? []).map((m) => {
     const recipe = m.recipe_id ? recipeById.get(m.recipe_id) : undefined;
     const servingsRaw = m.servings_per_batch ?? recipe?.batch_yield_qty ?? null;
     const servings = servingsRaw == null || Number(servingsRaw) <= 0 ? null : Number(servingsRaw);
     const price = Number(m.selling_price);
+    const lines = (recipe && linesByRecipe.get(recipe.id)) || [];
+    const lo: LaborOverhead = recipe
+      ? {
+          laborMinutes: Number(recipe.labor_minutes),
+          laborRatePerHour: recipe.labor_rate_per_hour == null ? null : Number(recipe.labor_rate_per_hour),
+          defaultLaborRatePerHour: defaultRate,
+          overheadPct: Number(recipe.overhead_pct),
+        }
+      : {};
+    const unitCostOf = (id: string) => {
+      const c = ingById.get(id)?.current_unit_cost;
+      return c == null ? null : Number(c);
+    };
     // Merge repeated lines for one ingredient (flour in the dough and for dusting).
-    const perIng = new Map<string, number>();
-    for (const l of (recipe && linesByRecipe.get(recipe.id)) || []) perIng.set(l.ingredient_id, (perIng.get(l.ingredient_id) ?? 0) + l.quantity);
-    const parts: Part[] = [...perIng.entries()].map(([id, batchQty]) => {
+    const perIng = new Map<string, { batchQty: number; batchCost: number; boughtQty: number }>();
+    for (const l of lines) {
+      const cur = perIng.get(l.ingredient_id) ?? { batchQty: 0, batchCost: 0, boughtQty: 0 };
+      const c = unitCostOf(l.ingredient_id);
+      cur.batchQty += l.quantity;
+      cur.batchCost += c == null ? 0 : lineCost(l.quantity, c, l.wastePct);
+      cur.boughtQty += l.quantity * wasteMultiplier(l.wastePct);
+      perIng.set(l.ingredient_id, cur);
+    }
+    const parts: Part[] = [...perIng.entries()].map(([id, p]) => {
       const ing = ingById.get(id);
-      const unitCost = ing?.current_unit_cost == null ? null : Number(ing.current_unit_cost);
-      const qty = servings ? batchQty / servings : 0;
-      return { ingredientId: id, name: ing?.name ?? "?", unit: ing?.base_unit ?? "", batchQty, qty, unitCost, cost: unitCost == null || !servings ? null : qty * unitCost, shareOfCost: null };
+      const unitCost = unitCostOf(id);
+      const qty = servings ? p.batchQty / servings : 0;
+      const bought = p.batchQty > 0 ? p.boughtQty / p.batchQty : 1; // = 1 / (1 − waste)
+      return {
+        ingredientId: id,
+        name: ing?.name ?? "?",
+        unit: ing?.base_unit ?? "",
+        batchQty: p.batchQty,
+        qty,
+        unitCost,
+        cost: unitCost == null || !servings ? null : p.batchCost / servings,
+        shareOfCost: null,
+        wastePct: bought > 1 ? (1 - 1 / bought) * 100 : 0,
+        costFactor: bought * overheadMultiplier(lo.overheadPct),
+      };
     });
     const unpriced = parts.filter((p) => p.unitCost == null).map((p) => p.name);
-    const knownCost = parts.reduce((s, p) => s + (p.cost ?? 0), 0);
-    const cost = parts.length && servings && !unpriced.length ? knownCost : null;
+    const batch = servings ? batchCost(lines.map((l) => ({ quantity: l.quantity, unitCost: unitCostOf(l.ingredient_id), wastePct: l.wastePct })), lo) : null;
+    const cost = perServing(batch?.total ?? null, servings);
+    const labor = servings ? laborCost(lo) / servings : 0;
+    const knownMaterials = parts.reduce((s, p) => s + (p.cost ?? 0), 0);
+    const knownCost = cost ?? (knownMaterials + labor) * overheadMultiplier(lo.overheadPct);
     for (const p of parts) p.shareOfCost = cost && p.cost != null ? p.cost / cost : null;
     parts.sort((a, b) => (b.cost ?? -1) - (a.cost ?? -1));
     return {
@@ -126,8 +169,10 @@ export async function getMargins(supabase: Client, orgId: string) {
       price,
       cost,
       knownCost,
+      labor,
+      overhead: batch && servings ? batch.overhead / servings : null,
       profit: cost == null ? null : price - cost,
-      marginPct: cost == null || price <= 0 ? null : round(((price - cost) / price) * 100),
+      marginPct: marginPctOf(price, cost),
       parts,
       unpriced,
     };
@@ -185,7 +230,8 @@ export async function getMargins(supabase: Client, orgId: string) {
           shareOfCost: p.shareOfCost,
           pctOfPrice: p.cost != null && m.price > 0 ? (p.cost / m.price) * 100 : null,
           marginPct: m.marginPct,
-          impact30d: p.unitCost != null && then != null && m.price > 0 ? -((p.qty * (p.unitCost - then)) / m.price) * 100 : null,
+          // Waste and overhead scale a price move too.
+          impact30d: p.unitCost != null && then != null && m.price > 0 ? -((p.qty * (p.unitCost - then) * p.costFactor) / m.price) * 100 : null,
         },
       ]);
     }

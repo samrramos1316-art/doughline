@@ -10,6 +10,8 @@ import Lenis from "lenis";
 import { LogoMark } from "@/components/marketing/Logo";
 import { BrowserFrame, PhoneFrame } from "./primitives";
 import { AlertMock, DashboardMock, GridMock, InvoiceReadMock, MarketMock, SwipeMock } from "./mockups";
+import { HeroExample, IndustriesSection } from "./IndustryExamples";
+import type { IndustryId } from "@/lib/industries";
 
 gsap.registerPlugin(ScrollTrigger, SplitText, useGSAP);
 
@@ -115,7 +117,45 @@ function Arrow({ className = "h-4 w-4" }: { className?: string }) {
 
 // Everyone sees the same page: Log in and Get started. Someone already
 // signed in who taps Log in goes straight to their dashboard (/login does that).
-export function Landing() {
+// Two versions of one page: "general" (the home page — any business that buys
+// supplies on invoices and sells what it makes, food first) and "food" (the
+// original food-business page, at /food). Only the wording, the hero's right
+// side and the Industries section differ. `enabled`: ENABLED_INDUSTRIES, read
+// on the server, for the Industries cards.
+const COPY = {
+  general: {
+    strip: "For businesses that buy supplies on invoices",
+    h1: (
+      <>
+        Know what every product <span className="text-[#ff5b1f]">really costs you.</span>
+      </>
+    ),
+    sub: "Snap a photo of a supplier invoice. Your costs and margins update, and you get warned before a price change eats your profit.",
+    units: "per lb, gram, stem",
+    marquee: ["Home bakeries", "Caterers", "Food trucks", "Coffee carts", "Florists", "Jewelers", "Makers & small shops"],
+    leak: "Supplier prices move every week. Your prices move a few times a year. The gap between them is invisible on any one invoice, which is exactly where a small business loses its margin.",
+    market: "The USDA's Agricultural Marketing Service for daily wholesale eggs, butter and wheat, and the UN FAO Food Price Index — food commodities only for now. Wholesale markets don't move exactly like your distributor, so it's shown as direction only.",
+    footer: "DoughTally Software. Invoice-to-margin tracking for small businesses that make what they sell.",
+  },
+  food: {
+    strip: "For bakeries, trucks, caterers & carts",
+    h1: (
+      <>
+        Snap the supplier invoice. See what it did to your <span className="text-[#ff5b1f]">margins.</span>
+      </>
+    ),
+    sub: "DoughTally reads every delivery slip, keeps what each ingredient really costs, and tells you which menu items just got less profitable, and what to charge instead.",
+    units: "per lb, dozen, gal",
+    marquee: ["Home bakeries", "Food trucks", "Caterers", "Coffee carts", "Market stalls", "Ghost kitchens", "Pop-ups"],
+    leak: "Wholesale prices move every week. Menu prices move a few times a year. The gap between them is invisible on any one invoice, which is exactly where a small food business loses its margin.",
+    market: FAQ[3][1],
+    footer: "DoughTally Software. Invoice-to-menu margin tracking for small food businesses.",
+  },
+} as const;
+
+export function Landing({ variant = "general", enabled = [] }: { variant?: "general" | "food"; enabled?: IndustryId[] }) {
+  const copy = COPY[variant];
+  const faq = FAQ.map(([q, a], i) => [q, i === 3 ? copy.market : a] as const);
   const root = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -414,7 +454,7 @@ export function Landing() {
           <div className="relative mx-auto max-w-[1400px] px-4 sm:px-8">
             <div className="hero-fade flex flex-wrap items-center justify-between gap-3 border-y border-white/10 py-2 font-ledger text-[10px] tracking-[0.2em] text-[#8f877b] uppercase sm:text-[11px]">
               <span>Invoice → cost → recipe → margin</span>
-              <span className="hidden sm:inline">For bakeries, trucks, caterers &amp; carts</span>
+              <span className="hidden sm:inline">{copy.strip}</span>
               <span className="text-[#ff5b1f]">● Live on doughtally.app</span>
             </div>
 
@@ -433,15 +473,15 @@ export function Landing() {
             <div className="relative mt-10 grid gap-12 pb-16 lg:mt-14 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div>
                 <h1 className="hero-fade max-w-[19ch] font-display text-[2.35rem] leading-[1.02] font-bold tracking-[-0.03em] text-white sm:text-5xl lg:text-[3.5rem]">
-                  Snap the supplier invoice. See what it did to your <span className="text-[#ff5b1f]">margins.</span>
+                  {copy.h1}
                 </h1>
                 <p className="hero-fade mt-5 max-w-xl text-[17px] leading-relaxed text-[#b5ad9f] sm:text-[19px]">
-                  DoughTally reads every delivery slip, keeps what each ingredient really costs, and tells you which menu items just got less profitable, and what to charge instead.
+                  {copy.sub}
                 </p>
                 <ol className="hero-fade mt-8 grid max-w-xl gap-px overflow-hidden rounded-md border border-white/10 bg-white/10 sm:grid-cols-3">
                   {[
                     ["01", "Snap the invoice", "photo or PDF"],
-                    ["02", "Costs update", "per lb, dozen, gal"],
+                    ["02", "Costs update", copy.units],
                     ["03", "Get the fix", "new price or portion"],
                   ].map(([n, what, how]) => (
                     <li key={n} className="flex items-baseline gap-3 bg-[#0c0b09] px-4 py-3 sm:block">
@@ -464,7 +504,7 @@ export function Landing() {
               </div>
 
               <div className="relative flex justify-center lg:justify-end">
-                <Ticker />
+                {variant === "food" ? <Ticker /> : <HeroExample />}
                 <div className="dt-spin pointer-events-none absolute -top-14 -left-4 hidden h-28 w-28 sm:block lg:-left-10" aria-hidden>
                   <svg viewBox="0 0 120 120" className="h-full w-full">
                     <defs>
@@ -481,13 +521,15 @@ export function Landing() {
           </div>
         </section>
 
+        {variant === "general" && <IndustriesSection enabled={enabled} />}
+
         {/* ------------------------------------------------------- marquee */}
         <section aria-label="Who it's for" className="marquee overflow-hidden border-y border-white/10 bg-[#ff5b1f] py-4 text-[#0c0b09]">
           <div className="marquee-track">
             <div className="dt-marquee flex w-max whitespace-nowrap">
               {[0, 1].map((k) => (
                 <div key={k} aria-hidden={k === 1} className="flex items-center">
-                  {["Home bakeries", "Food trucks", "Caterers", "Coffee carts", "Market stalls", "Ghost kitchens", "Pop-ups"].map((w) => (
+                  {copy.marquee.map((w) => (
                     <span key={w} className="flex items-center font-display text-3xl font-extrabold tracking-tight uppercase sm:text-5xl">
                       <span className="px-6">{w}</span>
                       <span className="text-2xl sm:text-4xl">✺</span>
@@ -516,7 +558,7 @@ export function Landing() {
             </span>
           </p>
           <div className="mt-16 grid gap-x-16 gap-y-6 text-[17px] leading-relaxed text-[#a79f92] md:grid-cols-[1fr_1fr] lg:ml-[30%]">
-            <p>Wholesale prices move every week. Menu prices move a few times a year. The gap between them is invisible on any one invoice, which is exactly where a small food business loses its margin.</p>
+            <p>{copy.leak}</p>
             <p>Nobody has time to re-cost every recipe when a delivery comes in. So we made the invoice do it: scan it, and the change shows up on the items it actually touches.</p>
           </div>
         </section>
@@ -643,7 +685,7 @@ export function Landing() {
               </p>
             </div>
             <div className="border-t border-white/10">
-              {FAQ.map(([q, a], i) => (
+              {faq.map(([q, a], i) => (
                 <details key={q} className="group border-b border-white/10">
                   <summary className="flex cursor-pointer list-none items-center gap-5 py-6 [&::-webkit-details-marker]:hidden">
                     <span className="font-ledger text-[11px] text-[#ff5b1f]">{String(i + 1).padStart(2, "0")}</span>
@@ -685,7 +727,7 @@ export function Landing() {
       {/* -------------------------------------------------------- footer */}
       <footer className="relative overflow-hidden border-t border-white/10">
         <div className="mx-auto grid max-w-[1400px] gap-10 px-4 pt-14 text-sm sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
-          <p className="max-w-xs text-[#8f877b]">DoughTally Software. Invoice-to-menu margin tracking for small food businesses.</p>
+          <p className="max-w-xs text-[#8f877b]">{copy.footer}</p>
           <ul className="space-y-2">
             {NAV.map(([label, href]) => (
               <li key={href}>

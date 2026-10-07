@@ -5,6 +5,8 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { loadReviewQueue } from "@/lib/matching/queue";
 import { getReviewBacklog, UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { SwipeDeck } from "@/components/swipe/SwipeDeck";
+import { getIndustry } from "@/lib/supabase/vocab";
+import { formSuggestions } from "@/lib/industries";
 import { PageHeader, Panel, Kpi } from "@/components/ui/dash";
 
 // Org-wide swipe-to-verify queue — where the §6.3 Action Required
@@ -34,7 +36,7 @@ export default async function ReviewQueuePage() {
       />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="rounded-lg border border-stone-200 bg-white px-4 py-6 xl:col-span-8">
-          <SwipeDeck lineItems={lineItems} ingredients={ingredients} doneHref="/invoices" doneLabel="Go to invoices" />
+          <SwipeDeck lineItems={lineItems} ingredients={ingredients} doneHref="/invoices" doneLabel="Go to invoices" suggest={formSuggestions(await getIndustry())} />
         </div>
         <div className="flex flex-col gap-4 xl:col-span-4">
           <div className="grid grid-cols-2 gap-3">

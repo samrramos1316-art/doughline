@@ -57,8 +57,13 @@ export interface RecipeExtractionResult {
   ingredient_lines: RecipeIngredientLine[];
 }
 
+// hints: the org's industry hints (lib/industries/extraction.ts). Every
+// provider builds its prompt with visionPrompt() (./prompts.ts), which
+// appends them; empty for food businesses.
+export type ExtractOptions = { hints?: string };
+
 export interface VisionProvider {
-  extractInvoice(fileBuffer: Buffer, mimeType: string): Promise<VisionExtractionResult>;
-  extractMenu(fileBuffer: Buffer, mimeType: string): Promise<MenuExtractionResult>;
-  extractRecipe(fileBuffer: Buffer, mimeType: string): Promise<RecipeExtractionResult>;
+  extractInvoice(fileBuffer: Buffer, mimeType: string, opts?: ExtractOptions): Promise<VisionExtractionResult>;
+  extractMenu(fileBuffer: Buffer, mimeType: string, opts?: ExtractOptions): Promise<MenuExtractionResult>;
+  extractRecipe(fileBuffer: Buffer, mimeType: string, opts?: ExtractOptions): Promise<RecipeExtractionResult>;
 }

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getOverview } from "@/lib/dashboard/overview";
+import { getVocab } from "@/lib/supabase/vocab";
+import { lower } from "@/lib/vocab";
 import { NewMenuItemForm } from "@/components/menu/NewMenuItemForm";
 import { EditMenuItem } from "@/components/menu/EditMenuItem";
 import { Panel, Kpi, PageHeader, ButtonLink, Pill, Delta, MarginBar, Empty, marginTone, money, CameraIcon, th, thNum, td, tdNum, row } from "@/components/ui/dash";
@@ -15,10 +17,11 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
-  const [o, { data: recipes }, { data: links }] = await Promise.all([
+  const [o, { data: recipes }, { data: links }, v] = await Promise.all([
     getOverview(supabase, orgId),
     supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit").order("name"),
     supabase.from("menu_items").select("id, recipe_id, servings_per_batch"),
+    getVocab(),
   ]);
   const raw = new Map((links ?? []).map((l) => [l.id, l]));
   const recipeOf = new Map((links ?? []).map((l) => [l.id, l.recipe_id]));
@@ -34,7 +37,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
   return (
     <>
       <PageHeader
-        title="Menu"
+        title={v.menu}
         subtitle={`What you sell and for how much · ${items.length} item${items.length === 1 ? "" : "s"} · target margin ${target}%`}
         tabs={Object.entries(SORTS).map(([k, label]) => ({ href: `/menu?sort=${k}`, label: `Sort: ${label}`, active: sort === k }))}
         actions={
@@ -54,10 +57,10 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Panel title="Every menu item" flush className="xl:col-span-9">
+        <Panel title={`Every ${lower(v.menuItem)}`} flush className="xl:col-span-9">
           {items.length === 0 ? (
             <Empty>
-              No menu items yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your menu from a photo</Link>, or add one by hand.
+              No {lower(v.menuItems)} yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your menu from a photo</Link>, or add one by hand.
             </Empty>
           ) : (
             <div className="overflow-x-auto">
@@ -119,7 +122,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
             </div>
           )}
         </Panel>
-        <Panel title="Add a menu item by hand" className="xl:col-span-3">
+        <Panel title={`Add a ${lower(v.menuItem)} by hand`} className="xl:col-span-3">
           <NewMenuItemForm recipeOptions={recipeChoices} />
           <p className="mt-3 text-xs text-stone-500">
             Cost per serving comes from the recipe; each invoice that changes an ingredient price moves it automatically.

@@ -2,8 +2,12 @@ import Link from "next/link";
 import { AuthShell } from "@/components/marketing/AuthShell";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { CLOSED_MESSAGE, accessClosed } from "@/lib/access";
+import { industryOptions, isIndustryEnabled } from "@/lib/industries/gate";
 
-export default function SignUpPage() {
+// ?industry= (from an industry page) preselects the picker when that
+// industry is offered.
+export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ industry?: string }> }) {
+  const { industry } = await searchParams;
   // Pre-launch (lib/access.ts): no form to fill in for nothing.
   if (accessClosed()) {
     return (
@@ -21,8 +25,8 @@ export default function SignUpPage() {
     );
   }
   return (
-    <AuthShell title="Create your account" subtitle="Set up your kitchen in a couple of minutes — no card needed.">
-      <SignUpForm />
+    <AuthShell title="Create your account" subtitle="Set up your business in a couple of minutes — no card needed.">
+      <SignUpForm industries={industryOptions()} defaultIndustry={industry && isIndustryEnabled(industry) ? industry : ""} />
     </AuthShell>
   );
 }

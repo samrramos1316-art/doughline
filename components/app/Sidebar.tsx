@@ -6,6 +6,8 @@ import { LogoMark } from "@/components/marketing/Logo";
 import { CameraIcon } from "@/components/ui/dash";
 
 export type NavCounts = { review: number; alerts: number; failed: number; reviewBlocked: boolean };
+// Industry wording for the three links that have it (lib/vocab.ts).
+export type NavLabels = { menu: string; recipes: string; ingredients: string; market?: boolean };
 
 type Item = { href: string; label: string; icon: keyof typeof ICONS; badge?: (c: NavCounts) => { n: number; tone: "red" | "amber" } | null };
 // Grouped the way the money moves: what you sell, what you make it from,
@@ -39,8 +41,14 @@ const GROUPS: { label: string; items: Item[] }[] = [
 ];
 // Only for DoughTally's owner (lib/admin/access.ts); the page itself checks too.
 const ADMIN_ITEM: Item = { href: "/admin", label: "Owner console", icon: "chart" };
-const groupsFor = (admin: boolean) =>
-  admin ? GROUPS.map((g) => (g.label === "Business" ? { ...g, items: [...g.items, ADMIN_ITEM] } : g)) : GROUPS;
+const LABEL_KEYS: Record<string, keyof NavLabels> = { "/menu": "menu", "/recipes": "recipes", "/ingredients": "ingredients" };
+const groupsFor = (admin: boolean, labels?: NavLabels) =>
+  (admin ? GROUPS.map((g) => (g.label === "Business" ? { ...g, items: [...g.items, ADMIN_ITEM] } : g)) : GROUPS).map((g) => ({
+    ...g,
+    items: g.items
+      .filter((it) => it.href !== "/market" || labels?.market !== false)
+      .map((it) => (labels && LABEL_KEYS[it.href] ? { ...it, label: labels[LABEL_KEYS[it.href]] as string } : it)),
+  }));
 
 const ICONS = {
   grid: "M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z",
@@ -74,7 +82,7 @@ function Badge({ n, tone }: { n: number; tone: "red" | "amber" }) {
 }
 
 // Desktop: a fixed dark rail with every section and its live counts.
-export function Sidebar({ business, owner, counts, logOut, admin = false }: { business: string; owner: string | null; counts: NavCounts; logOut: React.ReactNode; admin?: boolean }) {
+export function Sidebar({ business, owner, counts, logOut, admin = false, labels }: { business: string; owner: string | null; counts: NavCounts; logOut: React.ReactNode; admin?: boolean; labels?: NavLabels }) {
   const path = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-[#1a1714] text-stone-300 lg:flex">
@@ -96,7 +104,7 @@ export function Sidebar({ business, owner, counts, logOut, admin = false }: { bu
         <p className="mt-1.5 text-center text-[11px] text-stone-500">Invoice, menu or recipe</p>
       </div>
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3">
-        {groupsFor(admin).map((g) => (
+        {groupsFor(admin, labels).map((g) => (
           <div key={g.label || "top"} className="mb-3">
             {g.label && <p className="px-2 pb-1 text-[10px] font-semibold tracking-[0.16em] text-stone-500 uppercase">{g.label}</p>}
             {g.items.map((it) => {
@@ -132,9 +140,9 @@ export function Sidebar({ business, owner, counts, logOut, admin = false }: { bu
 }
 
 // Phones: a dark top bar and every section as a scrolling tab strip.
-export function MobileNav({ business, counts, admin = false }: { business: string; counts: NavCounts; admin?: boolean }) {
+export function MobileNav({ business, counts, admin = false, labels }: { business: string; counts: NavCounts; admin?: boolean; labels?: NavLabels }) {
   const path = usePathname();
-  const items = groupsFor(admin).flatMap((g) => g.items);
+  const items = groupsFor(admin, labels).flatMap((g) => g.items);
   return (
     <div className="sticky top-0 z-30 bg-[#1a1714] text-stone-300 lg:hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-2.5">

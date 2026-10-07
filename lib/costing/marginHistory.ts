@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { batchCost, marginPctOf } from "./recipeCost";
 
 export type MarginHistoryPoint = {
   date: string;
@@ -26,14 +27,14 @@ export async function getMenuItemMarginHistory(
 
   const { data: recipe } = await supabase
     .from("recipes")
-    .select("batch_yield_qty")
+    .select("batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct, organizations(default_labor_rate_per_hour)")
     .eq("id", menuItem.recipe_id)
     .single();
   if (!recipe) return [];
 
   const { data: recipeIngredients } = await supabase
     .from("recipe_ingredients")
-    .select("ingredient_id, quantity")
+    .select("ingredient_id, quantity, waste_pct")
     .eq("recipe_id", menuItem.recipe_id);
   if (!recipeIngredients || recipeIngredients.length === 0) return [];
 
@@ -46,31 +47,32 @@ export async function getMenuItemMarginHistory(
     .order("effective_date", { ascending: true });
   if (!priceHistory || priceHistory.length === 0) return [];
 
-  const quantityByIngredient = new Map(
-    recipeIngredients.map((ri) => [ri.ingredient_id, Number(ri.quantity)]),
-  );
   const changeDates = [...new Set(priceHistory.map((p) => p.effective_date))].sort();
   const sellingPrice = Number(menuItem.selling_price);
   // Same divisor as the menu_item_margins view (migration 014): the menu
   // item's own servings_per_batch override, else the recipe's yield.
   const servingsPerBatch = Number(menuItem.servings_per_batch ?? recipe.batch_yield_qty);
 
+  // Waste, labor and overhead as the recipe has them now (lib/costing/recipeCost.ts).
+  const laborOverhead = {
+    laborMinutes: Number(recipe.labor_minutes),
+    laborRatePerHour: recipe.labor_rate_per_hour == null ? null : Number(recipe.labor_rate_per_hour),
+    defaultLaborRatePerHour: Number(recipe.organizations?.default_labor_rate_per_hour ?? 0),
+    overheadPct: Number(recipe.overhead_pct),
+  };
+
   return changeDates.map((date) => {
-    let batchTotalCost = 0;
-    for (const ingredientId of ingredientIds) {
-      const quantity = quantityByIngredient.get(ingredientId) ?? 0;
+    // An ingredient with no price yet on this date is left out, as before.
+    const lines = recipeIngredients.flatMap((ri) => {
       const pricesOnOrBefore = priceHistory.filter(
-        (p) => p.ingredient_id === ingredientId && p.effective_date <= date,
+        (p) => p.ingredient_id === ri.ingredient_id && p.effective_date <= date,
       );
       const latest = pricesOnOrBefore[pricesOnOrBefore.length - 1];
-      if (latest) batchTotalCost += quantity * Number(latest.unit_cost);
-    }
+      return latest ? [{ quantity: Number(ri.quantity), unitCost: Number(latest.unit_cost), wastePct: Number(ri.waste_pct) }] : [];
+    });
 
-    const costPerServing = batchTotalCost / servingsPerBatch;
-    const marginPct =
-      sellingPrice > 0
-        ? Math.round(((sellingPrice - costPerServing) / sellingPrice) * 100 * 100) / 100
-        : null;
+    const costPerServing = (batchCost(lines, laborOverhead)?.total ?? 0) / servingsPerBatch;
+    const marginPct = marginPctOf(sellingPrice, costPerServing);
 
     return { date, costPerServing, marginPct };
   });

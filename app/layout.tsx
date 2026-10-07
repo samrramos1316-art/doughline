@@ -34,8 +34,15 @@ const ledger = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://doughtally.app"),
   title: "DoughTally",
-  description: "Protects margins for micro food businesses by automating wholesale invoice processing and real-time cost/margin tracking.",
+  description: "Margin tracking for small businesses that buy supplies on invoices and sell what they make: snap an invoice, and costs and margins update.",
+  openGraph: {
+    siteName: "DoughTally",
+    type: "website",
+    title: "DoughTally",
+    description: "Snap a photo of a supplier invoice. Your costs and margins update, and you get warned before a price change eats your profit.",
+  },
   applicationName: "DoughTally",
   // Home-screen behaviour on iOS (the manifest covers everyone else).
   appleWebApp: { capable: true, title: "DoughTally", statusBarStyle: "default" },

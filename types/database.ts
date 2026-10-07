@@ -528,7 +528,9 @@ export type Database = {
         Row: {
           business_type: string | null
           created_at: string
+          default_labor_rate_per_hour: number
           id: string
+          industry_settings: Json
           max_unreviewed_line_items: number
           name: string
           price_alert_threshold_pct: number
@@ -540,7 +542,9 @@ export type Database = {
         Insert: {
           business_type?: string | null
           created_at?: string
+          default_labor_rate_per_hour?: number
           id?: string
+          industry_settings?: Json
           max_unreviewed_line_items?: number
           name: string
           price_alert_threshold_pct?: number
@@ -552,7 +556,9 @@ export type Database = {
         Update: {
           business_type?: string | null
           created_at?: string
+          default_labor_rate_per_hour?: number
           id?: string
+          industry_settings?: Json
           max_unreviewed_line_items?: number
           name?: string
           price_alert_threshold_pct?: number
@@ -671,6 +677,7 @@ export type Database = {
           quantity: number
           recipe_id: string
           unit: string
+          waste_pct: number
         }
         Insert: {
           created_at?: string
@@ -680,6 +687,7 @@ export type Database = {
           quantity: number
           recipe_id: string
           unit: string
+          waste_pct?: number
         }
         Update: {
           created_at?: string
@@ -689,6 +697,7 @@ export type Database = {
           quantity?: number
           recipe_id?: string
           unit?: string
+          waste_pct?: number
         }
         Relationships: [
           {
@@ -727,9 +736,12 @@ export type Database = {
           batch_yield_unit: string
           created_at: string
           id: string
+          labor_minutes: number
+          labor_rate_per_hour: number | null
           name: string
           notes: string | null
           org_id: string
+          overhead_pct: number
           updated_at: string
         }
         Insert: {
@@ -737,9 +749,12 @@ export type Database = {
           batch_yield_unit: string
           created_at?: string
           id?: string
+          labor_minutes?: number
+          labor_rate_per_hour?: number | null
           name: string
           notes?: string | null
           org_id: string
+          overhead_pct?: number
           updated_at?: string
         }
         Update: {
@@ -747,9 +762,12 @@ export type Database = {
           batch_yield_unit?: string
           created_at?: string
           id?: string
+          labor_minutes?: number
+          labor_rate_per_hour?: number | null
           name?: string
           notes?: string | null
           org_id?: string
+          overhead_pct?: number
           updated_at?: string
         }
         Relationships: [
@@ -864,8 +882,10 @@ export type Database = {
       menu_item_margins: {
         Row: {
           cost_per_serving: number | null
+          labor_cost: number | null
           margin_amount: number | null
           margin_pct: number | null
+          materials_cost: number | null
           menu_item_id: string | null
           name: string | null
           org_id: string | null
@@ -888,6 +908,8 @@ export type Database = {
           batch_yield_qty: number | null
           batch_yield_unit: string | null
           cost_per_serving: number | null
+          labor_cost: number | null
+          materials_cost: number | null
           name: string | null
           org_id: string | null
           recipe_id: string | null
@@ -918,6 +940,7 @@ export type Database = {
           similarity: number
         }[]
       }
+      normalize_business_type: { Args: { value: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

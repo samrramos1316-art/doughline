@@ -24,12 +24,13 @@ type Message = { kind: "error" | "ok"; text: string; details?: string[] } | null
 
 const CATEGORIES = ["dairy", "dry_goods", "produce", "protein", "packaging", "beverage", "frozen"];
 const BASE_UNITS = ["lb", "oz", "kg", "g", "each", "dozen", "gal", "qt", "l", "ml"];
-const COLUMNS: GridColumn[] = [
+const columnsFor = (categories: string[], units: string[]): GridColumn[] => [
   { key: "name", label: "Name", required: true, minWidth: 240 },
-  { key: "category", label: "Category", suggestions: CATEGORIES, minWidth: 140 },
-  { key: "base_unit", label: "Base unit", required: true, suggestions: BASE_UNITS, minWidth: 110 },
+  { key: "category", label: "Category", suggestions: categories, minWidth: 140 },
+  { key: "base_unit", label: "Base unit", required: true, suggestions: units, minWidth: 110 },
   { key: "current_unit_cost", label: "Cost / unit", type: "number", align: "right", minWidth: 110 },
 ];
+const FOOD_COLUMNS = columnsFor(CATEGORIES, BASE_UNITS);
 
 const valuesOf = (i: IngredientRecord) => ({
   name: i.name,
@@ -42,21 +43,27 @@ const valuesOf = (i: IngredientRecord) => ({
 // paste rows from a sheet, then save once. Saves go through the same bulk
 // upsert as CSV import (one embedding call for everything new or renamed).
 // A remount after save (keyed on the stored list) restarts from the database.
-export function IngredientsGrid({ ingredients }: { ingredients: IngredientRecord[] }) {
+// `suggest`: the industry's units and categories (lib/industries); left out,
+// the food lists above.
+export type Suggestions = { units: string[]; categories: string[] };
+export function IngredientsGrid({ ingredients, suggest }: { ingredients: IngredientRecord[]; suggest?: Suggestions }) {
   const [message, setMessage] = useState<Message>(null);
   const version = ingredients.map((i) => `${i.id}:${i.name}:${i.current_unit_cost}:${i.base_unit}:${i.category}`).join("|");
-  return <IngredientsGridForm key={version} ingredients={ingredients} message={message} setMessage={setMessage} />;
+  return <IngredientsGridForm key={version} ingredients={ingredients} message={message} setMessage={setMessage} suggest={suggest} />;
 }
 
 function IngredientsGridForm({
   ingredients,
   message,
   setMessage,
+  suggest,
 }: {
   ingredients: IngredientRecord[];
   message: Message;
   setMessage: (m: Message) => void;
+  suggest?: Suggestions;
 }) {
+  const COLUMNS = useMemo(() => (suggest ? columnsFor(suggest.categories, suggest.units) : FOOD_COLUMNS), [suggest]);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const byId = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);

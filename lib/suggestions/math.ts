@@ -17,6 +17,10 @@ export type ItemInputs = {
   targetMarginPct: number; // organizations.target_margin_pct
   ingredientQtyPerBatch: number; // recipe quantity of the ingredient that moved, in its base unit
   ingredientUnitCost: number; // that ingredient's current cost per base unit
+  // What one base unit used in the recipe really adds to the batch cost per
+  // $1 of unit cost: its waste (1 / (1 − waste %)) × the recipe's overhead.
+  // 1 when neither is set. lib/costing/recipeCost.ts effectiveUnitCost().
+  ingredientCostFactor?: number;
   baseUnit: string;
 };
 
@@ -75,10 +79,11 @@ export function suggestForItem(x: ItemInputs): ItemSuggestion {
   };
 
   // Reduce portion: hold the price, back-solve the moved ingredient's recipe
-  // quantity so cost_per_serving comes down to price × (1 - goal%).
+  // quantity so cost_per_serving comes down to price × (1 - goal%). Each unit
+  // cut also saves its waste and the overhead on it.
   const allowedCostPerServing = x.sellingPrice * keep;
   const excessPerBatch = (x.costPerServing - allowedCostPerServing) * x.servingsPerBatch;
-  const reduceBy = excessPerBatch / x.ingredientUnitCost;
+  const reduceBy = excessPerBatch / (x.ingredientUnitCost * (x.ingredientCostFactor ?? 1));
   let reduce_portion: ReducePortion;
   if (!(x.ingredientUnitCost > 0)) {
     reduce_portion = { feasible: false, reason: "ingredient has no cost" };

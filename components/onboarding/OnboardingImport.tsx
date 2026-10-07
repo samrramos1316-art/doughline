@@ -131,12 +131,14 @@ export function OnboardingImport({
   recipes,
   only,
   preloaded = [],
+  suggest,
 }: {
   orgId: string;
   ingredients: Ingredient[];
   recipes: Recipe[];
   only?: Kind;
   preloaded?: { path: string; kind: Kind }[];
+  suggest?: { units: string[]; categories: string[] }; // the industry's lists (lib/industries); left out, the food ones
 }) {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>(() =>
@@ -609,7 +611,7 @@ export function OnboardingImport({
                                     <input aria-label={`New ingredient name for ${l.raw}`} className={cell} value={l.newName} onChange={(e) => setLine(d.key, l.key, { newName: e.target.value })} placeholder="Name" />
                                     <select aria-label={`Category for ${l.raw}`} className={cell} value={l.newCategory} onChange={(e) => setLine(d.key, l.key, { newCategory: e.target.value })}>
                                       <option value="">Category…</option>
-                                      {CATEGORIES.map((c) => <option key={c} value={c}>{c.replace("_", " ")}</option>)}
+                                      {(suggest?.categories ?? CATEGORIES).map((c) => <option key={c} value={c}>{c.replace("_", " ")}</option>)}
                                     </select>
                                   </div>
                                 )}
@@ -642,7 +644,7 @@ export function OnboardingImport({
               );
             })}
             <datalist id="onboarding-units">
-              {["lb", "oz", "kg", "g", "each", "dozen", "gal", "qt", "l", "ml", "cup", "tbsp", "tsp"].map((u) => <option key={u} value={u} />)}
+              {(suggest?.units ?? ["lb", "oz", "kg", "g", "each", "dozen", "gal", "qt", "l", "ml", "cup", "tbsp", "tsp"]).map((u) => <option key={u} value={u} />)}
             </datalist>
           </section>
           )}

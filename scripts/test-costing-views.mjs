@@ -206,6 +206,85 @@ try {
     `recipe_costs.cost_per_serving updates live to $${newExpectedCostPerServing.toFixed(6)} the instant ingredients.current_unit_cost changes, with no recompute step`,
   );
 
+  // 7. Waste, labor and overhead (migration 025). Untouched, they change
+  //    nothing: materials_cost is the whole batch cost, labor_cost is 0.
+  assert(
+    Number(viewCostAfter.materials_cost) === Number(viewCostAfter.batch_total_cost) && Number(viewCostAfter.labor_cost) === 0,
+    `no waste/labor/overhead: batch_total_cost = materials_cost (${viewCostAfter.materials_cost}), labor_cost = 0`,
+  );
+
+  const viewRow = async () => {
+    const { data, error } = await admin.from("recipe_costs").select("*").eq("recipe_id", recipeId).single();
+    if (error) throw new Error("recipe_costs re-query failed: " + error.message);
+    return data;
+  };
+  const near = (a, b) => Math.abs(Number(a) - b) < 0.0001;
+
+  // 7a. 10% waste on the flour: 1000 g used = 1111.1 g bought.
+  await admin.from("recipe_ingredients").update({ waste_pct: 10 }).eq("recipe_id", recipeId).eq("ingredient_id", flourId);
+  const materials = (1000 / 0.9) * 0.004 + 500 * 0.0015 + 250 * 0.008; // 7.19444…
+  let v = await viewRow();
+  assert(near(v.batch_total_cost, materials), `10% flour waste: batch_total_cost ${v.batch_total_cost} = hand-computed ${materials.toFixed(4)}`);
+
+  // 7b. 30 minutes of labor, no recipe rate → the org default ($12/h) = $6.
+  await admin.from("organizations").update({ default_labor_rate_per_hour: 12 }).eq("id", orgId);
+  await admin.from("recipes").update({ labor_minutes: 30 }).eq("id", recipeId);
+  v = await viewRow();
+  assert(near(v.labor_cost, 6) && near(v.batch_total_cost, materials + 6), `labor at the org default rate: labor_cost ${v.labor_cost} = 6, total ${v.batch_total_cost}`);
+
+  // 7c. The recipe's own rate wins ($18/h → $9).
+  await admin.from("recipes").update({ labor_rate_per_hour: 18 }).eq("id", recipeId);
+  v = await viewRow();
+  assert(near(v.labor_cost, 9), `labor at the recipe's own rate: labor_cost ${v.labor_cost} = 9`);
+
+  // 7d. 10% overhead on top of materials + labor.
+  await admin.from("recipes").update({ overhead_pct: 10 }).eq("id", recipeId);
+  const total = (materials + 9) * 1.1;
+  v = await viewRow();
+  assert(near(v.batch_total_cost, total) && near(v.cost_per_serving, total / 24), `overhead on materials + labor: batch_total_cost ${v.batch_total_cost} = hand-computed ${total.toFixed(4)}`);
+  assert(near(v.materials_cost, materials), `materials_cost ${v.materials_cost} excludes labor and overhead`);
+
+  // 7e. The app's own copy of the formula (lib/costing/recipeCost.ts) agrees.
+  const { batchCost } = await import("../lib/costing/recipeCost.ts");
+  const app = batchCost(
+    [
+      { quantity: 1000, unitCost: 0.004, wastePct: 10 },
+      { quantity: 500, unitCost: 0.0015 },
+      { quantity: 250, unitCost: 0.008 },
+    ],
+    { laborMinutes: 30, laborRatePerHour: 18, defaultLaborRatePerHour: 12, overheadPct: 10 },
+  );
+  assert(near(v.batch_total_cost, app.total), `lib/costing/recipeCost.ts gives the view's batch cost (${app.total.toFixed(6)})`);
+
+  const { data: sixPackNow } = await admin.from("menu_item_margins").select("*").eq("menu_item_id", sixPackId).single();
+  assert(
+    near(sixPackNow.cost_per_serving, total / 4) && near(sixPackNow.labor_cost, 9 / 4),
+    `menu_item_margins carries it through per serving: 6-pack costs ${sixPackNow.cost_per_serving}, labor ${sixPackNow.labor_cost}`,
+  );
+
+  // 7f. The price cascade (apply_line_item_price) records before/after from
+  //     the same view, so waste and overhead amplify the margin move.
+  const { data: inv } = await admin.from("invoices").insert({ org_id: orgId, file_storage_path: `test/${suffix}.jpg` }).select("id").single();
+  const { data: line } = await admin
+    .from("invoice_line_items")
+    .insert({ org_id: orgId, invoice_id: inv.id, raw_text: "FLOUR", matched_ingredient_id: flourId, match_status: "confirmed" })
+    .select("id")
+    .single();
+  const { data: applied, error: applyErr } = await admin.rpc("apply_line_item_price", { p_line_item_id: line.id, p_base_unit_cost: 0.006 });
+  if (applyErr) throw new Error("apply_line_item_price failed: " + applyErr.message);
+  const { data: impact } = await admin
+    .from("menu_item_margin_impacts")
+    .select("previous_margin_pct, new_margin_pct")
+    .eq("price_alert_id", applied.price_alert_id)
+    .eq("menu_item_id", sixPackId)
+    .single();
+  const totalAfter = ((1000 / 0.9) * 0.006 + 500 * 0.0015 + 250 * 0.008 + 9) * 1.1;
+  const pctOf = (cost) => Math.round(((sixPackPrice - cost / 4) / sixPackPrice) * 100 * 100) / 100;
+  assert(
+    Math.abs(Number(impact.previous_margin_pct) - pctOf(total)) < 0.01 && Math.abs(Number(impact.new_margin_pct) - pctOf(totalAfter)) < 0.01,
+    `price alert impact uses waste, labor and overhead: ${impact.previous_margin_pct}% → ${impact.new_margin_pct}% (hand-computed ${pctOf(total)}% → ${pctOf(totalAfter)}%)`,
+  );
+
   console.log("\nAll costing view checks passed.");
 } finally {
   console.log("\nCleaning up test fixtures...");

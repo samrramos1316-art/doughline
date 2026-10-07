@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loginSchema, signUpSchema } from "@/lib/validators/auth";
 import { ONBOARDING_URL } from "@/lib/onboarding/paths";
 import { LEGAL_VERSION } from "@/lib/legal";
+import { isIndustryEnabled } from "@/lib/industries/gate";
 
 export type AuthActionState =
   | { error: string; unconfirmedEmail?: string }
@@ -43,6 +44,9 @@ export async function signUpAction(_prevState: AuthActionState, formData: FormDa
   }
 
   const { email, password, businessName, businessType, fullName } = parsed.data;
+  // Only what the picker offers (ENABLED_INDUSTRIES); a hand-made request
+  // can't pick a hidden industry.
+  if (!isIndustryEnabled(businessType)) return { error: "Pick a kind of business from the list." };
   // Pre-launch: no new accounts except the allow-list (lib/access.ts).
   if (!canUseApp(email)) return { error: CLOSED_MESSAGE };
   const supabase = await createClient();

@@ -1,7 +1,13 @@
-// §5.4: a small fixed conversion table for common kitchen units — mass,
-// volume, count — not general unit conversion. Each unit maps to a factor in
-// its dimension's reference unit (g, ml, each).
-const UNITS: Record<string, { dim: "mass" | "volume" | "count"; factor: number }> = {
+// §5.4: a small fixed conversion table for common units — mass, volume,
+// count, length — not general unit conversion. Each unit maps to a factor in
+// its dimension's reference unit (g, ml, each, m). A factor of null means the
+// size differs per ingredient (a bunch of tulips vs a bunch of eucalyptus):
+// it converts only when the caller passes that ingredient's size.
+// `container`: a piece whose contents vary (a bunch of cilantro, a sheet of
+// pastry) — handled like a bag or a case below, as these were before they
+// were in this table.
+type Dim = "mass" | "volume" | "count" | "length";
+const UNITS: Record<string, { dim: Dim; factor: number | null; container?: true }> = {
   g: { dim: "mass", factor: 1 },
   kg: { dim: "mass", factor: 1000 },
   oz: { dim: "mass", factor: 28.349523125 },
@@ -17,6 +23,19 @@ const UNITS: Record<string, { dim: "mass" | "volume" | "count"; factor: number }
   gal: { dim: "volume", factor: 3785.411784 },
   each: { dim: "count", factor: 1 },
   dozen: { dim: "count", factor: 12 },
+  // Precious metals (jewelry): troy weights, exact by definition.
+  "troy oz": { dim: "mass", factor: 31.1034768 },
+  dwt: { dim: "mass", factor: 1.55517384 },
+  carat: { dim: "mass", factor: 0.2 }, // gemstones; "ct" stays a count (food invoices use it that way)
+  // Flowers and sheet goods are counted.
+  stem: { dim: "count", factor: 1, container: true },
+  bunch: { dim: "count", factor: null, container: true }, // stems per bunch: per ingredient
+  sheet: { dim: "count", factor: 1, container: true },
+  // Length (wire, chain, stock).
+  in: { dim: "length", factor: 0.0254 },
+  cm: { dim: "length", factor: 0.01 },
+  ft: { dim: "length", factor: 0.3048 },
+  m: { dim: "length", factor: 1 },
 };
 
 const ALIASES: Record<string, string> = {
@@ -29,6 +48,12 @@ const ALIASES: Record<string, string> = {
   cups: "cup", teaspoon: "tsp", tablespoon: "tbsp",
   ea: "each", ct: "each", count: "each", pc: "each", pcs: "each", piece: "each", pieces: "each",
   dz: "dozen", doz: "dozen",
+  "troy ounce": "troy oz", "troy ounces": "troy oz", ozt: "troy oz", "oz t": "troy oz", "t oz": "troy oz", "oz troy": "troy oz",
+  pennyweight: "dwt", pennyweights: "dwt", carats: "carat",
+  stems: "stem", bunches: "bunch", bn: "bunch", sheets: "sheet",
+  inch: "in", inches: "in", foot: "ft", feet: "ft",
+  meter: "m", meters: "m", metre: "m", metres: "m",
+  centimeter: "cm", centimeters: "cm", centimetre: "cm", centimetres: "cm",
 };
 
 export function canonicalUnit(unit: string | null | undefined): string | null {
@@ -52,19 +77,36 @@ function unitKey(unit: string | null | undefined): string | null {
   return u;
 }
 
+// Bought and costed per container (bag, case, flat, bunch, sheet…): priced
+// as printed when the invoice uses the same unit, and converted to by the
+// pack size an invoice printed for it.
+export function isContainerUnit(unit: string | null | undefined): boolean {
+  const c = canonicalUnit(unit);
+  return c ? UNITS[c].container === true : unitKey(unit) != null;
+}
+
 export function sameUnit(a: string | null | undefined, b: string | null | undefined): boolean {
   const ka = unitKey(a);
   return ka != null && ka === unitKey(b);
 }
 
+// Per-ingredient sizes for units without a fixed one, in their dimension's
+// reference unit: { bunch: 10 } = 10 stems (each) to a bunch.
+export type UnitSizes = Partial<Record<string, number>>;
+
 // How many `to` are in one `from` (lb → oz = 16), or null if either unit is
-// unknown or they measure different things (a case of lb is not in gallons).
-export function conversionFactor(from: string | null | undefined, to: string | null | undefined): number | null {
+// unknown, they measure different things (a case of lb is not in gallons),
+// or one has no fixed size and `sizes` doesn't give it.
+export function conversionFactor(from: string | null | undefined, to: string | null | undefined, sizes?: UnitSizes): number | null {
   const f = canonicalUnit(from);
   const t = canonicalUnit(to);
   if (!f || !t) return null;
   if (UNITS[f].dim !== UNITS[t].dim) return null;
-  return UNITS[f].factor / UNITS[t].factor;
+  if (f === t) return 1;
+  const ff = UNITS[f].factor ?? sizes?.[f];
+  const tf = UNITS[t].factor ?? sizes?.[t];
+  if (!ff || !tf) return null;
+  return ff / tf;
 }
 
 export type BaseUnitCost = { ok: true; cost: number; basis: string } | { ok: false; note: string };
@@ -96,7 +138,7 @@ export function toBaseUnitCost(
     cost: round4(unitCost / factor),
     basis: `$${unitCost} per ${line.unit}`,
   });
-  if (!canonicalUnit(line.unit) && sameUnit(line.unit, baseUnit)) return { ok: true, cost: round4(unitCost), basis: `$${unitCost} per ${line.unit}` };
+  if (isContainerUnit(line.unit) && sameUnit(line.unit, baseUnit)) return { ok: true, cost: round4(unitCost), basis: `$${unitCost} per ${line.unit}` };
   if (direct && unitDim !== "count") return byDirect(direct);
 
   const packFactor = conversionFactor(line.pack_unit, baseUnit);

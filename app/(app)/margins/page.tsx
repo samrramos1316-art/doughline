@@ -134,7 +134,10 @@ function ItemCard({ m, target }: { m: ItemMargin; target: number }) {
                     <td className={`${cellL} font-medium`}>{p.name}</td>
                     <td className={cellR}>{qtyFmt(p.batchQty)} {p.unit}</td>
                     <td className={cellR}>{qtyFmt(p.qty)} {p.unit}</td>
-                    <td className={cellR}>{p.unitCost == null ? <Link href="/ingredients" className="text-xs font-medium text-amber-700 hover:underline">no price yet</Link> : `${unitMoney(p.unitCost)}/${p.unit}`}</td>
+                    <td className={cellR}>
+                      {p.unitCost == null ? <Link href="/ingredients" className="text-xs font-medium text-amber-700 hover:underline">no price yet</Link> : `${unitMoney(p.unitCost)}/${p.unit}`}
+                      {p.wastePct > 0 && <span className="block text-[11px] text-stone-500">+{Math.round(p.wastePct * 10) / 10}% waste</span>}
+                    </td>
                     <td className={cellR}>{cents(p.cost)}</td>
                     <td className={`${cellL} w-40`}>
                       {p.shareOfCost == null ? <span className="text-xs text-stone-400">—</span> : (
@@ -145,6 +148,21 @@ function ItemCard({ m, target }: { m: ItemMargin; target: number }) {
                 ))}
               </tbody>
               <tfoot className="border-t-2 border-stone-200">
+                {/* Only for recipes that log labor time or overhead (migration 025). */}
+                {m.labor > 0 && (
+                  <tr>
+                    <td className={cellL} colSpan={4}>Labor</td>
+                    <td className={cellR}>{cents(m.labor)}</td>
+                    <td />
+                  </tr>
+                )}
+                {m.overhead != null && m.overhead > 0 && (
+                  <tr>
+                    <td className={cellL} colSpan={4}>Overhead</td>
+                    <td className={cellR}>{cents(m.overhead)}</td>
+                    <td />
+                  </tr>
+                )}
                 <tr>
                   <td className={`${cellL} font-semibold`} colSpan={4}>Cost to make one</td>
                   <td className={`${cellR} font-semibold`}>{m.cost == null ? `at least ${cents(m.knownCost)}` : cents(m.cost)}</td>
@@ -194,7 +212,7 @@ function TotalCard({ total, items, target }: { total: { items: number; sales: nu
           </span>
         </span>
         <Stat label="Sales" value={money(total.sales)} always />
-        <Stat label="Food cost" value={money(total.foodCost)} always />
+        <Stat label={items.some((i) => i.labor > 0 || (i.overhead ?? 0) > 0) ? "Cost to make" : "Food cost"} value={money(total.foodCost)} always />
         <Stat label="Profit" value={money(total.profit)} always />
         <Stat label="Total margin" value={pct(total.marginPct)} strong always />
         <span className="col-span-2 self-center md:col-span-1"><MarginBar pct={total.marginPct} target={target} /></span>

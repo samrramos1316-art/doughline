@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { isoDaysAgo } from "@/lib/dates/localDate";
+import { batchCost, lineCost, laborCost, overheadMultiplier, perServing, marginPctOf, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 const round = (n: number, dp = 2) => Math.round(n * 10 ** dp) / 10 ** dp;
@@ -20,23 +21,24 @@ export type MenuRow = {
 };
 
 export type Mover = { id: string; name: string; unit: string; from: number; to: number; pct: number; menuItems: number };
-export type Driver = { name: string; share: number; perRound: number };
+export type Driver = { name: string; share: number; perRound: number; kind: "ingredient" | "labor" | "overhead" };
 export type InboxItem = { kind: "review" | "failed" | "alert" | "stuck"; title: string; detail: string; href: string; tone: "critical" | "warning" | "neutral"; at: string };
 export type RecentInvoice = { id: string; date: string | null; vendor: string; number: string | null; lines: number; total: number | null; status: string };
 
 // Every panel on the overview, from one pass over the org's data (RLS keeps
 // it to the signed-in business). Margin history is recomputed from price
 // history the same way lib/costing/marginHistory.ts does it, but for all
-// menu items at once instead of four queries per item.
+// menu items at once instead of four queries per item. Costs use the shared
+// formula (lib/costing/recipeCost.ts), waste, labor and overhead included.
 export async function getOverview(supabase: Client, orgId: string) {
   const since90 = isoDaysAgo(90);
   const since30 = isoDaysAgo(30);
 
   const [org, menuItems, recipes, recipeIngredients, ingredients, history, alerts, invoices, unresolved] = await Promise.all([
-    supabase.from("organizations").select("name, target_margin_pct, max_unreviewed_line_items, price_alert_threshold_pct").eq("id", orgId).single(),
+    supabase.from("organizations").select("name, target_margin_pct, max_unreviewed_line_items, price_alert_threshold_pct, default_labor_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch, is_active").order("name"),
-    supabase.from("recipes").select("id, name, batch_yield_qty"),
-    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity"),
+    supabase.from("recipes").select("id, name, batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct"),
+    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct"),
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost"),
     supabase.from("ingredient_price_history").select("ingredient_id, unit_cost, effective_date, created_at").order("effective_date").order("created_at"),
     supabase
@@ -56,10 +58,20 @@ export async function getOverview(supabase: Client, orgId: string) {
   const target = Number(org.data.target_margin_pct);
   const ing = new Map((ingredients.data ?? []).map((i) => [i.id, i]));
   const recipeById = new Map((recipes.data ?? []).map((r) => [r.id, r]));
-  const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number }[]>();
+  const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number; wastePct: number }[]>();
   for (const ri of recipeIngredients.data ?? []) {
-    linesByRecipe.set(ri.recipe_id, [...(linesByRecipe.get(ri.recipe_id) ?? []), { ingredient_id: ri.ingredient_id, quantity: Number(ri.quantity) }]);
+    linesByRecipe.set(ri.recipe_id, [...(linesByRecipe.get(ri.recipe_id) ?? []), { ingredient_id: ri.ingredient_id, quantity: Number(ri.quantity), wastePct: Number(ri.waste_pct) }]);
   }
+  const defaultRate = Number(org.data.default_labor_rate_per_hour);
+  const laborOverheadOf = (recipe: { labor_minutes: number; labor_rate_per_hour: number | null; overhead_pct: number } | undefined): LaborOverhead =>
+    recipe
+      ? {
+          laborMinutes: Number(recipe.labor_minutes),
+          laborRatePerHour: recipe.labor_rate_per_hour == null ? null : Number(recipe.labor_rate_per_hour),
+          defaultLaborRatePerHour: defaultRate,
+          overheadPct: Number(recipe.overhead_pct),
+        }
+      : {};
   const histByIng = new Map<string, { date: string; cost: number }[]>();
   for (const h of history.data ?? []) {
     histByIng.set(h.ingredient_id, [...(histByIng.get(h.ingredient_id) ?? []), { date: h.effective_date, cost: Number(h.unit_cost) }]);
@@ -84,17 +96,10 @@ export async function getOverview(supabase: Client, orgId: string) {
     const lines = (m.recipe_id && linesByRecipe.get(m.recipe_id)) || [];
     const servings = Number(m.servings_per_batch ?? recipe?.batch_yield_qty ?? 0);
     const price = Number(m.selling_price);
-    const cps = (costFn: (id: string) => number | null) => {
-      if (!lines.length || !servings) return null;
-      let total = 0;
-      for (const l of lines) {
-        const c = costFn(l.ingredient_id);
-        if (c == null) return null;
-        total += l.quantity * c;
-      }
-      return total / servings;
-    };
-    const marginOf = (c: number | null) => (c == null || price <= 0 ? null : round(((price - c) / price) * 100));
+    const lo = laborOverheadOf(recipe);
+    const cps = (costFn: (id: string) => number | null) =>
+      perServing(batchCost(lines.map((l) => ({ quantity: l.quantity, unitCost: costFn(l.ingredient_id), wastePct: l.wastePct })), lo)?.total ?? null, servings);
+    const marginOf = (c: number | null) => marginPctOf(price, c);
     const now = cps(currentCost);
     const ago = cps((id) => costOn(id, since30));
     const ids = lines.map((l) => l.ingredient_id);
@@ -151,20 +156,37 @@ export async function getOverview(supabase: Client, orgId: string) {
   movers.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
 
   // ---- where the cost goes: ingredient share of one of each item -----------
+  // Waste counts toward its ingredient; overhead is spread over the item's
+  // ingredients and labor (no overhead, no labor: ingredients only, as before).
   const perIng = new Map<string, number>();
+  let laborPerRound = 0;
+  let overheadPerRound = 0;
   for (const m of menuItems.data ?? []) {
     if (!m.is_active || !m.recipe_id) continue;
     const recipe = recipeById.get(m.recipe_id);
     const servings = Number(m.servings_per_batch ?? recipe?.batch_yield_qty ?? 0);
     if (!servings) continue;
+    const lo = laborOverheadOf(recipe);
+    const oh = overheadMultiplier(lo.overheadPct) - 1;
+    let materials = 0;
     for (const l of linesByRecipe.get(m.recipe_id) ?? []) {
       const c = currentCost(l.ingredient_id);
-      if (c != null) perIng.set(l.ingredient_id, (perIng.get(l.ingredient_id) ?? 0) + (l.quantity * c) / servings);
+      if (c == null) continue;
+      const line = lineCost(l.quantity, c, l.wastePct) / servings;
+      materials += line;
+      perIng.set(l.ingredient_id, (perIng.get(l.ingredient_id) ?? 0) + line);
     }
+    const labor = laborCost(lo) / servings;
+    laborPerRound += labor;
+    overheadPerRound += (materials + labor) * oh;
   }
-  const driverTotal = [...perIng.values()].reduce((a, b) => a + b, 0);
-  const drivers: Driver[] = [...perIng.entries()]
-    .map(([id, v]) => ({ name: ing.get(id)?.name ?? "?", perRound: v, share: driverTotal ? v / driverTotal : 0 }))
+  const driverTotal = [...perIng.values()].reduce((a, b) => a + b, 0) + laborPerRound + overheadPerRound;
+  const drivers: Driver[] = [
+    ...[...perIng.entries()].map(([id, v]) => ({ name: ing.get(id)?.name ?? "?", perRound: v, kind: "ingredient" as const })),
+    ...(laborPerRound > 0 ? [{ name: "Labor", perRound: laborPerRound, kind: "labor" as const }] : []),
+    ...(overheadPerRound > 0 ? [{ name: "Overhead", perRound: overheadPerRound, kind: "overhead" as const }] : []),
+  ]
+    .map((d) => ({ ...d, share: driverTotal ? d.perRound / driverTotal : 0 }))
     .sort((a, b) => b.perRound - a.perRound);
 
   // ---- invoices, spend, inbox --------------------------------------------
