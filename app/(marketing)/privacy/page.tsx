@@ -130,7 +130,7 @@ export default function PrivacyPage() {
       title="Privacy Policy"
       intro={
         <p>
-          DoughTally Software (&ldquo;DoughTally&rdquo;, &ldquo;we&rdquo;) helps small food businesses track ingredient costs and menu margins. That means you trust us with your invoices and your numbers. This page explains, plainly, what we collect, what we do with it, and who else touches it.
+          DoughTally Software (&ldquo;DoughTally&rdquo;, &ldquo;we&rdquo;) helps small businesses that buy supplies on invoices track what they pay and the margins on what they sell. That means you trust us with your invoices and your numbers. This page explains, plainly, what we collect, what we do with it, and who else touches it.
         </p>
       }
       sections={sections}

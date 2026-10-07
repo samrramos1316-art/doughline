@@ -10,8 +10,9 @@ import Lenis from "lenis";
 import { LogoMark } from "@/components/marketing/Logo";
 import { BrowserFrame, PhoneFrame } from "./primitives";
 import { AlertMock, DashboardMock, GridMock, InvoiceReadMock, MarketMock, SwipeMock } from "./mockups";
-import { HeroExample, IndustriesSection } from "./IndustryExamples";
+import { HeroExample, IndustriesSection, INDUSTRY_LINKS } from "./IndustryExamples";
 import type { IndustryId } from "@/lib/industries";
+import { EXAMPLES, workExample } from "@/lib/industries/examples";
 
 gsap.registerPlugin(ScrollTrigger, SplitText, useGSAP);
 
@@ -20,6 +21,7 @@ const NAV = [
   ["How it works", "#how"],
   ["The numbers", "#numbers"],
   ["FAQ", "#faq"],
+  ["Industries", "/#industries"],
 ] as const;
 
 const RECEIPT = [
@@ -38,6 +40,73 @@ const CHAIN = [
   { k: "per croissant", v: 0.5694, fmt: (n: number) => `$${n.toFixed(4)}`, d: "all-in cost, with 1.25 lb of butter in every batch of 12" },
   { k: "croissant margin", v: 87.35, fmt: (n: number) => `${n.toFixed(2)}%`, d: "sold at $4.50. It was 88.64% on Friday." },
 ];
+
+// "Follow one line", per worked example (lib/industries/examples.ts). The
+// bakery's is the original story above; the others are fictional slips whose
+// numbers come from the same examples, so they agree with the hero card.
+// Receipt amounts are line totals, as on the bakery slip.
+type Step = { k: string; v: number; fmt: (n: number) => string; d: string };
+type Story = { vendor: string; meta: string; rows: string[][]; hit: string; total: string; chain: Step[]; stamp: string; tab: string };
+const dollars = (n: number) => `$${n.toFixed(2)}`;
+const percent = (n: number) => `${n.toFixed(2)}%`;
+const ring = workExample(EXAMPLES[1]);
+const arrangement = workExample(EXAMPLES[2]);
+const STORIES: Record<"croissant" | "ring" | "arrangement", Story> = {
+  croissant: {
+    tab: EXAMPLES[0].tab,
+    vendor: "LONE STAR FOODSERVICE",
+    meta: "INV 7719-204583 · 09/26 · ROUTE 14",
+    rows: RECEIPT,
+    hit: "BUTTER",
+    total: "$299.09",
+    chain: CHAIN,
+    stamp: "Fix: $5.02, or 2.82 oz less butter a batch",
+  },
+  ring: {
+    tab: EXAMPLES[1].tab,
+    vendor: "NORTHSTAR REFINING CO.",
+    meta: "INV 30418 · 09/24 · UPS INSURED",
+    rows: [
+      ["STERLING CASTING GRAIN 5 OZT", "1", "186.62"],
+      ["14K YG JUMP RING 4MM 10PK", "1", "18.40"],
+      ["SS LOBSTER CLASP 12MM 10PK", "1", "22.50"],
+      ["SAPPHIRE WHITE RD 3MM", "4", "24.00"],
+      ["METAL SURCHARGE", "1", "4.75"],
+      ["FREIGHT / INSURANCE", "1", "12.00"],
+    ],
+    hit: "STERLING",
+    total: "$268.27",
+    chain: [
+      { k: "the invoice line", v: 186.62, fmt: dollars, d: "5 troy ounces of sterling casting grain" },
+      { k: "per gram", v: 1.2, fmt: dollars, d: "$186.62 ÷ 155.5 g. Last order was $1.00." },
+      { k: "per ring", v: ring.costAfter, fmt: dollars, d: "all-in: 8 g of silver with 5% waste, a $6 stone, 45 min at $24/h" },
+      { k: "ring margin", v: ring.marginAfter, fmt: percent, d: `sold at $95. It was ${percent(ring.marginBefore)} last month.` },
+    ],
+    stamp: `Fix: ${dollars(ring.fixPrice!)} to keep ${percent(ring.marginBefore)}`,
+  },
+  arrangement: {
+    tab: EXAMPLES[2].tab,
+    vendor: "BAYVIEW FLOWER MARKET",
+    meta: "INV B-55120 · 09/25 · WILL CALL",
+    rows: [
+      ["ROSE RED FREEDOM 50CM 25ST", "2", "72.50"],
+      ["EUCALYPTUS SILVER DOLLAR BN", "3", "21.00"],
+      ["WAXFLOWER WHITE BN", "2", "17.00"],
+      ["VASE CYLINDER 8IN CS/12", "1", "38.40"],
+      ["FUEL SURCHARGE", "1", "6.50"],
+    ],
+    hit: "ROSE",
+    total: "$155.40",
+    chain: [
+      { k: "the invoice line", v: 72.5, fmt: dollars, d: "two 25-stem bunches of red roses" },
+      { k: "per stem", v: 1.45, fmt: dollars, d: "$72.50 ÷ 50 stems. Last box was $1.10." },
+      { k: "per arrangement", v: arrangement.costAfter, fmt: dollars, d: "all-in: 12 roses with 10% waste, greens, a vase, 20 min at $18/h" },
+      { k: "arrangement margin", v: arrangement.marginAfter, fmt: percent, d: `sold at $75. It was ${percent(arrangement.marginBefore)} last week.` },
+    ],
+    stamp: `Fix: ${dollars(arrangement.fixPrice!)} to keep ${percent(arrangement.marginBefore)}`,
+  },
+};
+type StoryId = keyof typeof STORIES;
 
 const TOUR = [
   {
@@ -136,6 +205,30 @@ const COPY = {
     leak: "Supplier prices move every week. Your prices move a few times a year. The gap between them is invisible on any one invoice, which is exactly where a small business loses its margin.",
     market: "The USDA's Agricultural Marketing Service for daily wholesale eggs, butter and wheat, and the UN FAO Food Price Index — food commodities only for now. Wholesale markets don't move exactly like your distributor, so it's shown as direction only.",
     footer: "DoughTally Software. Invoice-to-margin tracking for small businesses that make what they sell.",
+    flow: "Invoice → cost → product → margin",
+    leakWords: "A supplier put your main material up twenty percent last month. Your price tag still says",
+    leakHit: "$95.",
+    leakBadge: "−1.8 pts margin",
+    storyTitle: "From the slip to the price tag.",
+    leak2: "Nobody has time to re-cost everything they make when a delivery comes in. So we made the invoice do it: scan it, and the change shows up on the items it actually touches.",
+    tourTitle: "price tag",
+    tourNote: "Screens shown with a bakery's numbers — the same screens use your own words: build sheets, arrangements, jobs.",
+    howIntro: "No accountant, no integrations, no card. Already keep a spreadsheet? Paste it straight in. Have a price list and recipes or build sheets? Photograph them.",
+    howSteps: [
+      ["Photograph your price list and recipes", "We read them, pick the right supplies (bread flour in the croissants, sterling in the rings) and convert what's written into the units you buy."],
+      ["Scan the next delivery", "Every line gets costed per pound, per gram, per stem. The first invoice fills your price list in."],
+      ["Watch the margins", "When a price moves past your threshold you get the affected items and two ways to fix each one."],
+    ],
+    glimpse: "What moved, what it touched, what needs a decision today. Built for a quick look between jobs. (Shown: a bakery's dashboard.)",
+    faq: {
+      0: ["What can it read?", "Phone photos of printed invoices and packing slips, and PDF invoices from email. One at a time from Scan, or up to 25 at once. Price lists and recipes (or build sheets) have their own import. If a photo is too blurry, the invoice opens in a grid for you to type."],
+      2: ["Do I need to set everything up first?", "No. Scanning builds your price history from day one. Add what you make and what you sell when you're ready (typed, pasted, or read from a photo) and margins appear straight away."],
+    } as Record<number, readonly [string, string]>,
+    tour: {
+      0: { body: "Photo on your phone, or a pile of emailed PDFs. Each line comes back as what it actually is and what that works out to per pound, per gram, per stem." },
+      2: { title: "Price moves, in what you sell.", body: "A supply up 16%? You see everything you sell that uses it, the margin each had yesterday and has today, and the exact fix: a new price, or a little less of it." },
+      3: { body: "For food businesses: USDA wholesale eggs, butter and wheat every day, and the FAO's global food indexes, tied to the ingredients you buy. Other industries' markets aren't tracked yet." },
+    } as Record<number, { title?: string; body?: string }>,
   },
   food: {
     strip: "For bakeries, trucks, caterers & carts",
@@ -150,12 +243,36 @@ const COPY = {
     leak: "Wholesale prices move every week. Menu prices move a few times a year. The gap between them is invisible on any one invoice, which is exactly where a small food business loses its margin.",
     market: FAQ[3][1],
     footer: "DoughTally Software. Invoice-to-menu margin tracking for small food businesses.",
+    flow: "Invoice → cost → recipe → margin",
+    leakWords: "A case of butter went up twenty dollars last month. Your croissants still cost",
+    leakHit: "$4.50.",
+    leakBadge: "−1.3 pts margin",
+    storyTitle: "From the slip to the menu board.",
+    leak2: "Nobody has time to re-cost every recipe when a delivery comes in. So we made the invoice do it: scan it, and the change shows up on the items it actually touches.",
+    tourTitle: "menu board",
+    tourNote: "",
+    howIntro: "No accountant, no integrations, no card. Already keep a spreadsheet? Paste it straight in. Have a menu and recipe cards? Photograph them.",
+    howSteps: [
+      ["Photograph your menu and recipes", "We read them, pick the right ingredients (bread flour in the croissants, not the muffins) and convert the cups and sticks into what you buy."],
+      ["Scan the next delivery", "Every line gets costed per pound, per dozen, per gallon. The first invoice fills your price list in."],
+      ["Watch the margins", "When a price moves past your threshold you get the affected items and two ways to fix each one."],
+    ],
+    glimpse: "What moved, what it touched, what needs a decision today. Built for a quick look between batches.",
+    faq: {} as Record<number, readonly [string, string]>,
+    tour: {} as Record<number, { title?: string; body?: string }>,
   },
-} as const;
+};
 
 export function Landing({ variant = "general", enabled = [] }: { variant?: "general" | "food"; enabled?: IndustryId[] }) {
   const copy = COPY[variant];
-  const faq = FAQ.map(([q, a], i) => [q, i === 3 ? copy.market : a] as const);
+  const faq = FAQ.map(([q, a], i) => copy.faq[i] ?? ([q, i === 3 ? copy.market : a] as const));
+  const tour = TOUR.map((t, i) => ({ ...t, ...copy.tour[i] }));
+  // The general page lets you follow a jeweler's or a florist's line too; the
+  // scroll animation plays on the first one shown (the bakery's).
+  const [storyId, setStoryId] = useState<StoryId>("croissant");
+  // After a switch the slip is remounted outside the animation, so its line is marked statically.
+  const [switched, setSwitched] = useState(false);
+  const story = STORIES[storyId];
   const root = useRef<HTMLDivElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -408,9 +525,23 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
         <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white">
           ✕
         </button>
-        <p className="font-ledger text-[10px] tracking-[0.25em] text-[#8f877b] uppercase">Sections</p>
+        <p className="font-ledger text-[10px] tracking-[0.25em] text-[#8f877b] uppercase">Industries</p>
+        <nav aria-label="Industries" className="mt-3 flex flex-col">
+          {INDUSTRY_LINKS.map((l, i) => (
+            <Link
+              key={l.label}
+              href={l.href}
+              onClick={() => setMenuOpen(false)}
+              style={{ transitionDelay: menuOpen ? `${80 + i * 50}ms` : "0ms" }}
+              className={`border-b border-white/[0.07] py-3 font-display text-lg font-semibold tracking-tight text-white transition duration-500 ${menuOpen ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"}`}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </nav>
+        <p className="mt-8 font-ledger text-[10px] tracking-[0.25em] text-[#8f877b] uppercase">Sections</p>
         <nav className="mt-4 flex flex-col">
-          {NAV.map(([label, href], i) => (
+          {NAV.filter(([, href]) => href !== "/#industries").map(([label, href], i) => (
             <a
               key={href}
               href={href}
@@ -453,7 +584,7 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
 
           <div className="relative mx-auto max-w-[1400px] px-4 sm:px-8">
             <div className="hero-fade flex flex-wrap items-center justify-between gap-3 border-y border-white/10 py-2 font-ledger text-[10px] tracking-[0.2em] text-[#8f877b] uppercase sm:text-[11px]">
-              <span>Invoice → cost → recipe → margin</span>
+              <span>{copy.flow}</span>
               <span className="hidden sm:inline">{copy.strip}</span>
               <span className="text-[#ff5b1f]">● Live on doughtally.app</span>
             </div>
@@ -545,21 +676,21 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
         <section className="relative mx-auto max-w-[1400px] px-4 py-24 sm:px-8 sm:py-32">
           <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">The quiet leak</p>
           <p className="lit mt-8 max-w-[22ch] font-display text-[9.5vw] leading-[1] font-semibold tracking-[-0.035em] text-white sm:text-[6vw] lg:text-[4.4vw]">
-            {"A case of butter went up twenty dollars last month. Your croissants still cost".split(" ").map((w, i) => (
+            {copy.leakWords.split(" ").map((w, i) => (
               <span key={i} className="lit-word">
                 {w}{" "}
               </span>
             ))}
             <span className="lit-word relative inline-block">
-              $4.50.
+              {copy.leakHit}
               <span className="lit-hit absolute -top-3 -right-4 rotate-6 rounded-sm bg-[#ff5b1f] px-2 py-0.5 font-ledger text-[0.18em] leading-tight font-semibold tracking-wider whitespace-nowrap text-[#0c0b09] uppercase sm:-right-10">
-                −1.3 pts margin
+                {copy.leakBadge}
               </span>
             </span>
           </p>
           <div className="mt-16 grid gap-x-16 gap-y-6 text-[17px] leading-relaxed text-[#a79f92] md:grid-cols-[1fr_1fr] lg:ml-[30%]">
             <p>{copy.leak}</p>
-            <p>Nobody has time to re-cost every recipe when a delivery comes in. So we made the invoice do it: scan it, and the change shows up on the items it actually touches.</p>
+            <p>{copy.leak2}</p>
           </div>
         </section>
 
@@ -569,18 +700,37 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
             <div>
               <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">Follow one line</p>
               <h2 data-lines className="mt-4 font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-5xl">
-                From the slip to the menu board.
+                {copy.storyTitle}
               </h2>
-              <div className="relative mt-10 max-w-md">
+              {variant === "general" && (
+                <div role="tablist" aria-label="Whose invoice" className="mt-6 inline-flex gap-1 rounded-full border border-white/10 p-1">
+                  {(Object.keys(STORIES) as StoryId[]).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={id === storyId}
+                      onClick={() => {
+                        setStoryId(id);
+                        setSwitched(true);
+                      }}
+                      className={`rounded-full px-3.5 py-1.5 font-ledger text-[12px] transition-colors ${id === storyId ? "bg-[#ff5b1f] text-[#0c0b09]" : "text-[#a79f92] hover:text-white"}`}
+                    >
+                      {STORIES[id].tab}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div key={storyId} className="relative mt-10 max-w-md">
                 {/* the printer slot */}
                 <div className="relative z-10 h-3 rounded-full bg-[#2a2620] shadow-[inset_0_2px_4px_rgba(0,0,0,.8)]" />
                 <div className="-mt-1.5 overflow-hidden px-3">
                   <div className="rc-paper dt-receipt bg-[#f3ebdd] px-5 pt-6 pb-10 font-ledger text-[12px] text-[#2b2620] shadow-2xl">
-                    <p className="text-center text-[13px] font-semibold tracking-[0.2em]">LONE STAR FOODSERVICE</p>
-                    <p className="mt-1 text-center text-[10px] text-[#6d665c]">INV 7719-204583 · 09/26 · ROUTE 14</p>
+                    <p className="text-center text-[13px] font-semibold tracking-[0.2em]">{story.vendor}</p>
+                    <p className="mt-1 text-center text-[10px] text-[#6d665c]">{story.meta}</p>
                     <div className="my-3 border-t border-dashed border-[#2b2620]/40" />
-                    {RECEIPT.map(([item, qty, amt]) => (
-                      <div key={item} className={`rc-row flex justify-between gap-3 px-1 py-[3px] ${item.startsWith("BUTTER") ? "rc-hit" : ""}`}>
+                    {story.rows.map(([item, qty, amt]) => (
+                      <div key={item} className={`rc-row flex justify-between gap-3 px-1 py-[3px] ${item.startsWith(story.hit) ? (switched ? "bg-[#ff5b1f] text-[#0c0b09]" : "rc-hit") : ""}`}>
                         <span className="truncate">{item}</span>
                         <span className="shrink-0 tabular-nums">
                           {qty} × {amt}
@@ -590,16 +740,16 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
                     <div className="my-3 border-t border-dashed border-[#2b2620]/40" />
                     <div className="flex justify-between font-semibold">
                       <span>TOTAL</span>
-                      <span className="tabular-nums">$299.09</span>
+                      <span className="tabular-nums">{story.total}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <ol className="relative flex flex-col gap-5 lg:pl-10">
+            <ol key={storyId} className="relative flex flex-col gap-5 lg:pl-10">
               <span aria-hidden className="chain-wire absolute top-2 bottom-2 left-[7px] hidden w-px bg-gradient-to-b from-[#ff5b1f] via-[#ff5b1f]/60 to-transparent lg:block" />
-              {CHAIN.map((c, i) => (
+              {story.chain.map((c, i) => (
                 <li key={c.k} className="chain-step relative lg:pl-8">
                   <span aria-hidden className="absolute top-3 -left-[3px] hidden h-[15px] w-[15px] rounded-full border-2 border-[#ff5b1f] bg-[#0c0b09] lg:block" />
                   <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-white/10 pb-4">
@@ -612,14 +762,14 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
                 </li>
               ))}
               <li className="chain-stamp mt-2 self-start rounded-sm border-2 border-[#ff5b1f] px-4 py-2 font-ledger text-sm font-semibold tracking-[0.15em] text-[#ff5b1f] uppercase lg:ml-8 lg:-rotate-3">
-                Fix: $5.02, or 2.82 oz less butter a batch
+                {story.stamp}
               </li>
             </ol>
           </div>
         </section>
 
         {/* ------------------------------------------------- product tour */}
-        <TourStrip />
+        <TourStrip tour={tour} title={copy.tourTitle} note={copy.tourNote} />
 
         {/* ------------------------------------------------- how it works */}
         <section id="how" className="relative scroll-mt-16 border-t border-white/10">
@@ -628,14 +778,10 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
               <h2 data-lines className="font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-6xl">
                 Set up in one afternoon.
               </h2>
-              <p className="max-w-md text-[17px] text-[#a79f92] lg:justify-self-end">No accountant, no integrations, no card. Already keep a spreadsheet? Paste it straight in. Have a menu and recipe cards? Photograph them.</p>
+              <p className="max-w-md text-[17px] text-[#a79f92] lg:justify-self-end">{copy.howIntro}</p>
             </div>
             <ol className="mt-16 flex flex-col">
-              {[
-                ["Photograph your menu and recipes", "We read them, pick the right ingredients (bread flour in the croissants, not the muffins) and convert the cups and sticks into what you buy."],
-                ["Scan the next delivery", "Every line gets costed per pound, per dozen, per gallon. The first invoice fills your price list in."],
-                ["Watch the margins", "When a price moves past your threshold you get the affected items and two ways to fix each one."],
-              ].map(([title, body], i) => (
+              {copy.howSteps.map(([title, body], i) => (
                 <li key={title} className="step grid items-center gap-4 border-t border-white/10 py-10 last:border-b sm:grid-cols-[auto_1fr_1fr] sm:gap-12">
                   <span className="relative font-display text-[5.5rem] leading-none font-extrabold tracking-tighter sm:text-[8rem]">
                     <span className="dt-outline text-white/30">{i + 1}</span>
@@ -659,7 +805,7 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
               <h2 data-lines className="mt-4 font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-5xl">
                 Every item, every margin, one screen.
               </h2>
-              <p className="mt-6 max-w-sm text-[17px] text-[#a79f92]">What moved, what it touched, what needs a decision today. Built for a quick look between batches.</p>
+              <p className="mt-6 max-w-sm text-[17px] text-[#a79f92]">{copy.glimpse}</p>
             </div>
             <div className="-mr-[20vw] rotate-[-2deg] lg:-mr-[12vw]">
               <BrowserFrame url="doughtally.app/dashboard">
@@ -726,7 +872,7 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
 
       {/* -------------------------------------------------------- footer */}
       <footer className="relative overflow-hidden border-t border-white/10">
-        <div className="mx-auto grid max-w-[1400px] gap-10 px-4 pt-14 text-sm sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
+        <div className="mx-auto grid max-w-[1400px] gap-10 px-4 pt-14 text-sm sm:px-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <p className="max-w-xs text-[#8f877b]">{copy.footer}</p>
           <ul className="space-y-2">
             {NAV.map(([label, href]) => (
@@ -734,6 +880,15 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
                 <a href={href} className="text-[#a79f92] hover:text-white">
                   {label}
                 </a>
+              </li>
+            ))}
+          </ul>
+          <ul className="space-y-2" aria-label="Industries">
+            {INDUSTRY_LINKS.map((l) => (
+              <li key={l.label}>
+                <Link href={l.href} className="text-[#a79f92] hover:text-white">
+                  {l.label}
+                </Link>
               </li>
             ))}
           </ul>
@@ -767,7 +922,7 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
 
 // The product tour as its own sideways strip: swipe, drag, or use the
 // arrows. It never hijacks the page's vertical scroll.
-function TourStrip() {
+function TourStrip({ tour, title, note }: { tour: typeof TOUR; title: string; note: string }) {
   const track = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; left: number } | null>(null);
   const [progress, setProgress] = useState(0);
@@ -802,12 +957,13 @@ function TourStrip() {
         <div>
           <p className="font-ledger text-[11px] tracking-[0.25em] text-[#ff5b1f] uppercase">The product</p>
           <h2 data-lines className="mt-3 font-display text-4xl leading-[0.95] font-extrabold tracking-[-0.04em] text-white uppercase sm:text-5xl">
-            Door to <span className="dt-outline-ember">menu</span> board.
+            Door to <span className="dt-outline-ember">{title.split(" ")[0]}</span> {title.split(" ").slice(1).join(" ")}.
           </h2>
+          {note && <p className="mt-3 max-w-md text-[13px] text-[#8f877b]">{note}</p>}
         </div>
         <div className="flex items-center gap-4">
           <span className="font-ledger text-[12px] text-[#8f877b] tabular-nums">
-            <span className="text-white">{String(active + 1).padStart(2, "0")}</span> / {String(TOUR.length).padStart(2, "0")}
+            <span className="text-white">{String(active + 1).padStart(2, "0")}</span> / {String(tour.length).padStart(2, "0")}
           </span>
           <button type="button" aria-label="Previous" onClick={() => step(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-white transition hover:border-[#ff5b1f] hover:text-[#ff5b1f] disabled:opacity-30" disabled={progress < 0.01}>
             <Arrow className="h-4 w-4 rotate-180" />
@@ -830,7 +986,7 @@ function TourStrip() {
           // the last card (it can't scroll all the way to the edge).
           const card = el.querySelector<HTMLElement>("[data-card]");
           const stride = card ? card.offsetWidth + 24 : el.clientWidth;
-          setActive(el.scrollLeft >= max - 2 ? TOUR.length - 1 : Math.min(TOUR.length - 1, Math.round(el.scrollLeft / stride)));
+          setActive(el.scrollLeft >= max - 2 ? tour.length - 1 : Math.min(tour.length - 1, Math.round(el.scrollLeft / stride)));
         }}
         onPointerDown={(e) => {
           if (e.pointerType !== "mouse" || !track.current) return;
@@ -850,7 +1006,7 @@ function TourStrip() {
         }}
         className={`mt-10 flex scroll-px-4 gap-6 overflow-x-auto px-4 pb-4 outline-none [scrollbar-width:none] sm:scroll-px-8 sm:px-8 xl:scroll-px-[max(2rem,calc((100vw-1400px)/2+2rem))] xl:px-[max(2rem,calc((100vw-1400px)/2+2rem))] [&::-webkit-scrollbar]:hidden ${dragging ? "cursor-grabbing select-none" : "cursor-grab snap-x snap-mandatory"}`}
       >
-        {TOUR.map((t, i) => (
+        {tour.map((t, i) => (
           <article
             key={t.n}
             data-card={i}

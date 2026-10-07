@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     // Splash screen: the icon's dark stone; status bar: the app's white header.
     background_color: "#1c1917",
     theme_color: "#ffffff",
-    categories: ["business", "food", "productivity"],
+    categories: ["business", "productivity"],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

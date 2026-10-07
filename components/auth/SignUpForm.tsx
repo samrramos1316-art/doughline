@@ -28,9 +28,9 @@ export function SignUpForm({ industries, defaultIndustry = "" }: { industries: I
           ))}
         </select>
       </div>
-      <Field id="businessName" label="Business name" required autoComplete="organization" placeholder="Sweet Crumb Bakery" />
+      <Field id="businessName" label="Business name" required autoComplete="organization" placeholder="Maple Street Studio" />
       <Field id="fullName" label="Your name" autoComplete="name" placeholder="Optional" />
-      <Field id="email" label="Email" type="email" required autoComplete="email" placeholder="you@yourbakery.com" />
+      <Field id="email" label="Email" type="email" required autoComplete="email" placeholder="you@yourbusiness.com" />
       <PasswordField autoComplete="new-password" required minLength={8} hint="At least 8 characters." />
       <label htmlFor="acceptTerms" className="flex items-start gap-2.5 text-sm leading-snug text-stone-700">
         <input id="acceptTerms" name="acceptTerms" type="checkbox" value="yes" required className="mt-0.5 h-4 w-4 shrink-0 accent-stone-900" />

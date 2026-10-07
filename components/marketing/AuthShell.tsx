@@ -14,7 +14,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
         </Link>
         <div className="relative max-w-sm">
           <p className="text-2xl leading-snug font-semibold text-white">
-            Every invoice, read. Every price change, traced to your menu.
+            Every invoice, read. Every price change, traced to what you sell.
           </p>
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
             <p className="text-xs font-medium tracking-wide text-amber-300 uppercase">Price alert</p>
@@ -35,7 +35,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
             </div>
           </div>
         </div>
-        <p className="relative text-xs text-stone-500">Built for home bakeries, food trucks and caterers.</p>
+        <p className="relative text-xs text-stone-500">Built for bakeries, caterers and other small businesses that make what they sell.</p>
       </aside>
 
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">

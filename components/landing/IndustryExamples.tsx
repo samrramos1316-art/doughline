@@ -92,6 +92,10 @@ const CARDS: { key: string; title: string; industries: IndustryId[]; href: strin
   { key: "other", title: "Other makers & shops", industries: ["other"], href: "/signup", blurb: "If you buy supplies on invoices and sell what you make from them, the same costing works for you." },
 ];
 
+// For the site menu and footer: one link per industry card. "Other makers &
+// shops" has no page of its own, so it goes to the cards.
+export const INDUSTRY_LINKS = CARDS.map((c) => ({ label: c.title, href: c.key === "other" ? "/#industries" : c.href }));
+
 export function IndustriesSection({ enabled }: { enabled: IndustryId[] }) {
   return (
     <section id="industries" aria-labelledby="industries-title" className="relative scroll-mt-16 border-t border-white/10">
