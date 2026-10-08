@@ -3,6 +3,8 @@
 import { useActionState } from "react";
 import { saveSettingsAction, type SettingsState } from "@/app/(app)/settings/actions";
 import type { IndustryOption } from "@/lib/industries/gate";
+import { useVocab } from "@/components/app/VocabProvider";
+import { lower } from "@/lib/vocab";
 
 type Initial = { name: string; target_margin_pct: number; price_alert_threshold_pct: number; max_unreviewed_line_items: number; default_labor_rate_per_hour: number; business_type: string };
 
@@ -21,13 +23,14 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint:
 }
 
 export function SettingsForm({ initial, industries }: { initial: Initial; industries: IndustryOption[] }) {
+  const v = useVocab();
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettingsAction, null);
   return (
     <form action={action} className="space-y-5">
       <Field id="name" label="Business name" hint="Shown in the sidebar.">
         <input id="name" name="name" required defaultValue={initial.name} className={input} />
       </Field>
-      <Field id="business_type" label="Industry" hint="Sets the words the app uses, the unit and category suggestions, and how invoices are read. Your existing recipes, prices and invoices stay exactly as they are.">
+      <Field id="business_type" label="Industry" hint={`Sets the words the app uses, the unit and category suggestions, and how invoices are read. Your existing ${lower(v.recipes)}, prices and invoices stay exactly as they are.`}>
         <select id="business_type" name="business_type" defaultValue={initial.business_type} className={`${input} max-w-72`}>
           <option value="">Other / prefer not to say</option>
           {industries.map((i) => (
@@ -46,7 +49,7 @@ export function SettingsForm({ initial, industries }: { initial: Initial; indust
       <Field id="max_unreviewed_line_items" label="Pause scanning after (lines to review)" hint="Keeps unchecked matches from piling up and quietly skewing your costs.">
         <input id="max_unreviewed_line_items" name="max_unreviewed_line_items" type="number" min="1" max="500" step="1" required defaultValue={initial.max_unreviewed_line_items} className={`${input} max-w-32`} />
       </Field>
-      <Field id="default_labor_rate_per_hour" label="Default labor rate per hour ($)" hint="Only for recipes where you log labor time. Leave at 0 if you don't cost labor.">
+      <Field id="default_labor_rate_per_hour" label="Default labor rate per hour ($)" hint={`Only for ${lower(v.recipes)} where you log labor time. Leave at 0 if you don't cost labor.`}>
         <input id="default_labor_rate_per_hour" name="default_labor_rate_per_hour" type="number" min="0" step="0.01" defaultValue={initial.default_labor_rate_per_hour} className={`${input} max-w-32`} />
       </Field>
       <div className="flex items-center gap-3 border-t border-stone-100 pt-4">

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { SwipeCard } from "./SwipeCard";
 import { SUGGESTION_DISPLAY_THRESHOLD } from "@/lib/matching/thresholds";
 import { canonicalUnit } from "@/lib/costing/units";
+import { useVocab } from "@/components/app/VocabProvider";
+import { cap, lower, withArticle } from "@/lib/vocab";
 
 type Candidate = { ingredient_id: string; name: string; similarity: number };
 
@@ -77,6 +79,7 @@ export function SwipeDeck({
   doneLabel: string;
   suggest?: { units: string[]; categories: string[] }; // the industry's lists (lib/industries); left out, the food ones
 }) {
+  const v = useVocab();
   const router = useRouter();
   const [queue, setQueue] = useState(lineItems);
   const [index, setIndex] = useState(0);
@@ -179,7 +182,7 @@ export function SwipeDeck({
         <p className="text-lg font-medium text-zinc-900">All caught up</p>
         <p className="text-sm text-zinc-500">
           {tally.confirmed} confirmed · {tally.created} added as new
-          {tally.ignored > 0 && ` · ${tally.ignored} not ingredients`} · {tally.skipped} skipped for now
+          {tally.ignored > 0 && ` · ${tally.ignored} not ${lower(v.ingredients)}`} · {tally.skipped} skipped for now
         </p>
         <Link href={doneHref} className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white">
           {doneLabel}
@@ -201,7 +204,7 @@ export function SwipeDeck({
           className="flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-6 shadow-lg"
         >
           <div>
-            <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">New ingredient for</p>
+            <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">New {lower(v.ingredient)} for</p>
             <p className="mt-1 font-medium text-zinc-900">{current.raw_text}</p>
           </div>
           <label className="flex flex-col gap-1 text-sm text-zinc-700">
@@ -297,15 +300,15 @@ export function SwipeDeck({
 
       {!form && (
         <label className="flex w-full max-w-sm flex-col gap-1 text-xs text-zinc-500">
-          {shown ? "Not in the suggestions? Search your ingredients:" : "Or search your ingredients:"}
+          {shown ? `Not in the suggestions? Search your ${lower(v.ingredients)}:` : `Or search your ${lower(v.ingredients)}:`}
           <select
-            aria-label="Search your ingredients"
+            aria-label={`Search your ${lower(v.ingredients)}`}
             value=""
             disabled={busy}
             onChange={(e) => e.target.value && confirm(e.target.value)}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
           >
-            <option value="">Choose an ingredient…</option>
+            <option value="">Choose {withArticle(lower(v.ingredient))}…</option>
             {ingredients.map((ing) => (
               <option key={ing.id} value={ing.id}>
                 {ing.name}
@@ -322,7 +325,7 @@ export function SwipeDeck({
           disabled={busy}
           className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-900 disabled:opacity-50"
         >
-          Not an ingredient (supplies, fees) — don&apos;t track it
+          {cap(`not ${withArticle(lower(v.ingredient))}`)} (supplies, fees) — don&apos;t track it
         </button>
       )}
 

@@ -93,7 +93,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
     await supabase.from("invoices").delete().eq("id", id);
     return NextResponse.json(
-      { error: wrongKindMessage("invoice", kind), not_invoice: true, document_type: kind, import_url: importUrl },
+      { error: wrongKindMessage("invoice", kind, (await getIndustry()).vocab), not_invoice: true, document_type: kind, import_url: importUrl },
       { status: 422 },
     );
   }

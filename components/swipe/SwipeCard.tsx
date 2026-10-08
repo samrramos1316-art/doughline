@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useVocab } from "@/components/app/VocabProvider";
+import { lower } from "@/lib/vocab";
 
 type Candidate = { ingredient_id: string; name: string; similarity: number };
 
@@ -33,6 +35,7 @@ export function SwipeCard({
   disabled?: boolean;
   onSwipe: (direction: "left" | "right") => void;
 }) {
+  const v = useVocab();
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [exiting, setExiting] = useState<"left" | "right" | null>(null);
@@ -125,7 +128,7 @@ export function SwipeCard({
         ) : (
           <>
             <p className="text-xl font-semibold text-zinc-900">No match found</p>
-            <p className="mt-1 text-sm text-zinc-500">Create it as a new ingredient, or search your ingredients below.</p>
+            <p className="mt-1 text-sm text-zinc-500">Create it as a new {lower(v.ingredient)}, or search your {lower(v.ingredients)} below.</p>
           </>
         )}
       </div>

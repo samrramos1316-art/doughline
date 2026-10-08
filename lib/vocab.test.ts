@@ -27,3 +27,21 @@ test("non-food industries relabel", () => {
   assert.equal(vocabFor(" Food Truck ").recipes, "Recipes"); // free-text column: tolerate case/spaces
   assert.equal(vocabFor("Metalworking").menu, "Quotes");
 });
+
+test("phrase helpers: articles, capitals, the menu document", async () => {
+  const { withArticle, cap, menuDoc } = await import("./vocab.ts");
+  assert.equal(withArticle("recipe"), "a recipe");
+  assert.equal(withArticle("arrangement"), "an arrangement");
+  assert.equal(withArticle("ingredient"), "an ingredient");
+  assert.equal(withArticle("material"), "a material");
+  assert.equal(cap("on the menu"), "On the menu");
+  assert.equal(menuDoc(vocabFor("bakery")), "menu");
+  assert.equal(menuDoc(vocabFor("jewelry")), "product list");
+  assert.equal(menuDoc(vocabFor("florist")), "package list");
+});
+
+test("serving words: food keeps 'serving', trades count pieces", () => {
+  assert.deepEqual([vocabFor("caterer").serving, vocabFor("caterer").servings, vocabFor("caterer").onMenu], ["serving", "servings", "on the menu"]);
+  assert.deepEqual([vocabFor("jewelry").serving, vocabFor("florist").serving, vocabFor("metalworking").serving], ["piece", "arrangement", "part"]);
+  assert.deepEqual([vocabFor("jewelry").onMenu, vocabFor("metalworking").onMenu], ["for sale", "quoted"]);
+});

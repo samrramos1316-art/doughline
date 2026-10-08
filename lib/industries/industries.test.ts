@@ -114,6 +114,10 @@ test("snapshot: a food org's labels are exactly today's", () => {
     ingredient: "Ingredient",
     ingredients: "Ingredients",
     yield: "Batch makes",
+    serving: "serving",
+    servings: "servings",
+    onMenu: "on the menu",
+    yieldExample: "cookies",
   };
   for (const t of ["bakery", "food_truck", "caterer", "other", null, "anything else"]) assert.deepEqual(vocabFor(t), today);
   assert.deepEqual(

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Panel, Kpi, PageHeader, Pill, Delta, Empty, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { getVocab } from "@/lib/supabase/vocab";
+import { lower, withArticle } from "@/lib/vocab";
 
 const TABS = [
   { key: "open", label: "Open" },
@@ -11,12 +13,13 @@ const TABS = [
 export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab = "open" } = await searchParams;
   const supabase = await createClient();
-  const [{ data: alerts, error }, { data: org }] = await Promise.all([
+  const [{ data: alerts, error }, { data: org }, v] = await Promise.all([
     supabase
       .from("price_alerts")
       .select("id, previous_unit_cost, new_unit_cost, pct_change, acknowledged, created_at, ingredients(name, base_unit), invoices(invoice_number, invoice_date, vendors(name)), menu_item_margin_impacts(id, margin_pct_delta, menu_items(name))")
       .order("created_at", { ascending: false }),
     supabase.from("organizations").select("price_alert_threshold_pct").maybeSingle(),
+    getVocab(),
   ]);
   if (error) throw new Error("loading price alerts failed: " + error.message);
   const all = alerts ?? [];
@@ -30,27 +33,27 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader
         title="Price alerts"
-        subtitle={`An alert fires when a confirmed invoice moves an ingredient more than ${Number(org?.price_alert_threshold_pct ?? 8)}% — change that in Settings`}
+        subtitle={`An alert fires when a confirmed invoice moves ${withArticle(lower(v.ingredient))} more than ${Number(org?.price_alert_threshold_pct ?? 8)}% — change that in Settings`}
         tabs={TABS.map((t) => ({ href: t.key === "open" ? "/alerts" : `/alerts?tab=${t.key}`, label: t.label, active: t.key === tab, count: t.key === "open" ? open.length : t.key === "handled" ? all.length - open.length : all.length }))}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Open alerts" value={open.length} tone={open.length ? "critical" : "good"} />
         <Kpi label="Biggest rise" value={worst ? `+${Number(worst.pct_change).toFixed(1)}%` : "—"} sub={worst?.ingredients?.name ?? "nothing open"} tone={worst ? "critical" : "neutral"} />
-        <Kpi label="Menu items hit" value={hit.size} sub={[...hit].slice(0, 3).join(", ") || "none"} tone={hit.size ? "warning" : "neutral"} />
+        <Kpi label={`${v.menuItems} hit`} value={hit.size} sub={[...hit].slice(0, 3).join(", ") || "none"} tone={hit.size ? "warning" : "neutral"} />
         <Kpi label="All time" value={all.length} />
       </div>
       <Panel title={`${TABS.find((t) => t.key === tab)?.label ?? "Open"} alerts`} flush>
         {shown.length === 0 ? (
-          <Empty>{all.length ? "Nothing here." : "No price alerts yet. When a confirmed invoice moves a price past your threshold, it lands here with the menu items it affects."}</Empty>
+          <Empty>{all.length ? "Nothing here." : `No price alerts yet. When a confirmed invoice moves a price past your threshold, it lands here with the ${lower(v.menuItems)} it affects.`}</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr>
-                  <th className={th}>Ingredient</th>
+                  <th className={th}>{v.ingredient}</th>
                   <th className={thNum}>Change</th>
                   <th className={thNum}>Price</th>
-                  <th className={th}>Menu items hit</th>
+                  <th className={th}>{v.menuItems} hit</th>
                   <th className={thNum}>Worst hit</th>
                   <th className={th}>From</th>
                   <th className={th}>Status</th>
@@ -65,7 +68,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
                   return (
                     <tr key={a.id} className={row}>
                       <td className={td}>
-                        <Link href={`/alerts/${a.id}`} className="font-medium text-stone-900 hover:underline">{a.ingredients?.name ?? "Ingredient"}</Link>
+                        <Link href={`/alerts/${a.id}`} className="font-medium text-stone-900 hover:underline">{a.ingredients?.name ?? v.ingredient}</Link>
                       </td>
                       <td className={tdNum}><Delta value={pct} /></td>
                       <td className={tdNum}>{unitMoney(Number(a.previous_unit_cost))} → {unitMoney(Number(a.new_unit_cost))}{u}</td>

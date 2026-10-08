@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getOverview } from "@/lib/dashboard/overview";
 import { getVocab } from "@/lib/supabase/vocab";
-import { lower } from "@/lib/vocab";
+import { lower, withArticle } from "@/lib/vocab";
 import { NewMenuItemForm } from "@/components/menu/NewMenuItemForm";
 import { EditMenuItem } from "@/components/menu/EditMenuItem";
 import { Panel, Kpi, PageHeader, ButtonLink, Pill, Delta, MarginBar, Empty, marginTone, money, CameraIcon, th, thNum, td, tdNum, row } from "@/components/ui/dash";
@@ -44,7 +44,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
           <>
             <ButtonLink href="/margins">See how each margin is worked out</ButtonLink>
             <ButtonLink href="/onboarding/import?kind=menu" primary>
-              <CameraIcon /> Import menu from a photo
+              <CameraIcon /> Import {lower(v.menu)} from a photo
             </ButtonLink>
           </>
         }
@@ -60,7 +60,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
         <Panel title={`Every ${lower(v.menuItem)}`} flush className="xl:col-span-9">
           {items.length === 0 ? (
             <Empty>
-              No {lower(v.menuItems)} yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your menu from a photo</Link>, or add one by hand.
+              No {lower(v.menuItems)} yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your {lower(v.menu)} from a photo</Link>, or add one by hand.
             </Empty>
           ) : (
             <div className="overflow-x-auto">
@@ -87,7 +87,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
                           {recipeOf.get(m.id) ? (
                             <Link href={`/recipes/${recipeOf.get(m.id)}`} className="block text-[11px] text-stone-500 hover:underline">{m.recipeName}</Link>
                           ) : (
-                            <span className="block text-[11px] text-stone-400">no recipe</span>
+                            <span className="block text-[11px] text-stone-400">no {lower(v.recipe)}</span>
                           )}
                         </td>
                         <td className={tdNum}>{money(m.price)}</td>
@@ -103,7 +103,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
                               <Pill tone="warning">{m.unpriced.length === 1 ? "Needs a price" : `Needs ${m.unpriced.length} prices`}</Pill>
                             </Link>
                           ) : m.recipeName == null ? (
-                            <Pill tone="neutral">No recipe</Pill>
+                            <Pill tone="neutral">No {lower(v.recipe)}</Pill>
                           ) : (
                             <Pill tone={tone}>{TONE_TEXT[tone]}</Pill>
                           )}
@@ -125,7 +125,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
         <Panel title={`Add a ${lower(v.menuItem)} by hand`} className="xl:col-span-3">
           <NewMenuItemForm recipeOptions={recipeChoices} />
           <p className="mt-3 text-xs text-stone-500">
-            Cost per serving comes from the recipe; each invoice that changes an ingredient price moves it automatically.
+            Cost per {v.serving} comes from the {lower(v.recipe)}; each invoice that changes {withArticle(lower(v.ingredient))} price moves it automatically.
           </p>
         </Panel>
       </div>

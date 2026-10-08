@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewRecipeForm } from "@/components/recipes/NewRecipeForm";
 import { getVocab } from "@/lib/supabase/vocab";
-import { lower } from "@/lib/vocab";
+import { cap, lower } from "@/lib/vocab";
 import { Panel, Kpi, PageHeader, ButtonLink, Empty, CameraIcon, money, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 export default async function RecipesPage() {
@@ -27,18 +27,18 @@ export default async function RecipesPage() {
     <>
       <PageHeader
         title={v.recipes}
-        subtitle="What each batch costs to make, live from today's ingredient prices"
+        subtitle={`What each batch costs to make, live from today's ${lower(v.ingredient)} prices`}
         actions={
           <ButtonLink href="/onboarding/import?kind=recipe" primary>
-            <CameraIcon /> Import recipes from a photo
+            <CameraIcon /> Import {lower(v.recipes)} from a photo
           </ButtonLink>
         }
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi label="Recipes" value={list.length} />
-        <Kpi label="On the menu" value={list.length - unused} sub={unused ? `${unused} not sold yet` : "all in use"} tone={unused ? "warning" : "neutral"} />
-        <Kpi label="Missing ingredients" value={empty} tone={empty ? "warning" : "good"} sub={empty ? "no cost until filled in" : "every recipe costed"} />
-        <Kpi label="Menu items" value={(menu ?? []).filter((m) => m.is_active).length} href="/menu" />
+        <Kpi label={v.recipes} value={list.length} />
+        <Kpi label={cap(v.onMenu)} value={list.length - unused} sub={unused ? `${unused} not sold yet` : "all in use"} tone={unused ? "warning" : "neutral"} />
+        <Kpi label={`Missing ${lower(v.ingredients)}`} value={empty} tone={empty ? "warning" : "good"} sub={empty ? "no cost until filled in" : `every ${lower(v.recipe)} costed`} />
+        <Kpi label={v.menuItems} value={(menu ?? []).filter((m) => m.is_active).length} href="/menu" />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <Panel title={`All ${lower(v.recipes)}`} flush className="xl:col-span-9">
@@ -49,11 +49,11 @@ export default async function RecipesPage() {
               <table className="w-full">
                 <thead>
                   <tr>
-                    <th className={th}>Recipe</th>
-                    <th className={thNum}>Batch makes</th>
-                    <th className={thNum}>Ingredients</th>
+                    <th className={th}>{v.recipe}</th>
+                    <th className={thNum}>{v.yield}</th>
+                    <th className={thNum}>{v.ingredients}</th>
                     <th className={thNum}>Batch cost</th>
-                    <th className={thNum}>Cost/serving</th>
+                    <th className={thNum}>Cost/{v.serving}</th>
                     <th className={th}>Sold as</th>
                   </tr>
                 </thead>
@@ -77,7 +77,7 @@ export default async function RecipesPage() {
                             <Link href="/ingredients" className="text-xs font-medium text-amber-700 hover:underline">{c.unpriced_ingredients} without a price</Link>
                           ) : c?.cost_per_serving == null ? "—" : `$${Number(c.cost_per_serving).toFixed(4)}`}
                         </td>
-                        <td className={`${td} text-stone-500`}>{menuBy.get(r.id)?.join(", ") ?? <span className="text-stone-400">Not on the menu</span>}</td>
+                        <td className={`${td} text-stone-500`}>{menuBy.get(r.id)?.join(", ") ?? <span className="text-stone-400">Not {v.onMenu}</span>}</td>
                       </tr>
                     );
                   })}
@@ -87,7 +87,7 @@ export default async function RecipesPage() {
           )}
         </Panel>
         <Panel title={`New ${lower(v.recipe)} by hand`} className="xl:col-span-3">
-          <NewRecipeForm />
+          <NewRecipeForm labels={{ recipe: lower(v.recipe), yield: v.yield, yieldExample: v.yieldExample }} />
         </Panel>
       </div>
     </>

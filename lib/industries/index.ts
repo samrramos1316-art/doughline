@@ -22,8 +22,12 @@ export type Vocab = {
   ingredient: string;
   ingredients: string;
   yield: string; // "Batch makes" — what one recipe produces
+  serving: string; // one of what a batch makes, mid-sentence: "cost per serving"
+  servings: string;
+  onMenu: string; // mid-sentence: "not on the menu yet"
+  yieldExample: string; // the new-recipe form's "Of what" placeholder
 };
-export const VOCAB_KEYS = ["recipe", "recipes", "menuItem", "menuItems", "menu", "ingredient", "ingredients", "yield"] as const satisfies readonly (keyof Vocab)[];
+export const VOCAB_KEYS = ["recipe", "recipes", "menuItem", "menuItems", "menu", "ingredient", "ingredients", "yield", "serving", "servings", "onMenu", "yieldExample"] as const satisfies readonly (keyof Vocab)[];
 
 export type MarketSeries = {
   code: string;
@@ -68,6 +72,10 @@ const FOOD_VOCAB: Vocab = {
   ingredient: "Ingredient",
   ingredients: "Ingredients",
   yield: "Batch makes",
+  serving: "serving",
+  servings: "servings",
+  onMenu: "on the menu",
+  yieldExample: "cookies",
 };
 
 // The spec's food list plus gal and qt, which food screens offer today and
@@ -126,6 +134,10 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
       ingredient: "Material",
       ingredients: "Materials",
       yield: "Build makes",
+      serving: "piece",
+      servings: "pieces",
+      onMenu: "for sale",
+      yieldExample: "rings",
     },
     // Stones are counted (each) or weighed in carats; chain is bought by length.
     units: ["g", "dwt", "troy oz", "carat", "each", "in", "cm"],
@@ -166,6 +178,10 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
       ingredient: "Stem or supply",
       ingredients: "Stems & supplies",
       yield: "Arrangement makes",
+      serving: "arrangement",
+      servings: "arrangements",
+      onMenu: "for sale",
+      yieldExample: "bouquets",
     },
     units: ["stem", "bunch", "each", "ft", "in"],
     categories: ["cut_flower", "greens", "vase_container", "foam_supplies", "ribbon_packaging"],
@@ -200,6 +216,10 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
       ingredient: "Material",
       ingredients: "Materials",
       yield: "Job makes",
+      serving: "part",
+      servings: "parts",
+      onMenu: "quoted",
+      yieldExample: "brackets",
     },
     units: ["kg", "lb", "ft", "in", "m", "sheet", "each"],
     categories: ["bar_stock", "sheet_plate", "tube_pipe", "fasteners", "consumables", "finishing_coating", "outsourced_service"],

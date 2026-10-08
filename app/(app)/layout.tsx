@@ -8,6 +8,7 @@ import { ActionRequiredGate } from "@/components/review/ActionRequiredGate";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { Sidebar, MobileNav, type NavCounts } from "@/components/app/Sidebar";
 import { getIndustry } from "@/lib/supabase/vocab";
+import { VocabProvider } from "@/components/app/VocabProvider";
 import { isAdmin } from "@/lib/admin/access";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -46,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
 
   return (
+    <VocabProvider vocab={vocab}>
     <div className="flex min-h-dvh flex-1 bg-[#f3f1ed]">
       {backlog?.blocked && <ActionRequiredGate unresolved={backlog.unresolved} cap={backlog.cap} />}
       {/* The rail's dark background runs the full page height; the rail itself stays pinned. */}
@@ -59,5 +61,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <InstallPrompt />
     </div>
+    </VocabProvider>
   );
 }

@@ -12,6 +12,7 @@ import {
   type GridRow,
 } from "@/components/grid/EditableGrid";
 import { LOCAL_DATE_HEADER, browserLocalDate } from "@/lib/dates/localDate";
+import { useVocab } from "@/components/app/VocabProvider";
 
 export type IngredientRecord = {
   id: string;
@@ -84,6 +85,7 @@ function IngredientsGridForm({
   suggest?: Suggestions;
   waste?: { defaultPct: number };
 }) {
+  const v = useVocab();
   const wasteDefault = waste?.defaultPct;
   const COLUMNS = useMemo(() => {
     const base = suggest ? columnsFor(suggest.categories, suggest.units) : FOOD_COLUMNS;
@@ -172,7 +174,7 @@ function IngredientsGridForm({
           ref={fileRef}
           type="file"
           accept=".csv,text/csv"
-          aria-label="Import ingredients CSV"
+          aria-label={`Import ${v.ingredients.toLowerCase()} CSV`}
           className="sr-only"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -192,7 +194,7 @@ function IngredientsGridForm({
       </div>
 
       <EditableGrid
-        label="Ingredients"
+        label={v.ingredients}
         columns={COLUMNS}
         rows={rows}
         onChange={setRows}

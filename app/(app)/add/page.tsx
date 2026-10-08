@@ -1,36 +1,39 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/dash";
+import { getVocab } from "@/lib/supabase/vocab";
+import { cap, lower, withArticle, type Vocab } from "@/lib/vocab";
 
 // One place to start any photo import, linked from the sidebar and the phone
 // top bar. Each kind has its own reader: an invoice goes to the invoice
 // scanner (it turns menus and recipes away), menus and recipes to their own
-// import screens.
-const KINDS = [
+// import screens. Worded for the business's industry (lib/industries).
+const kindsFor = (v: Vocab) => [
   {
     href: "/invoices/scan",
     title: "A supplier invoice or receipt",
-    body: "What you paid. Prices go into your ingredient costs and your margins move with them.",
+    body: `What you paid. Prices go into your ${lower(v.ingredient)} costs and your margins move with them.`,
     cta: "Scan an invoice",
     alt: { href: "/invoices/import", label: "Upload several PDFs" },
     icon: "M6 2h9l4 4v16H6zM15 2v4h4M9 11h7M9 15h7M9 19h4",
   },
   {
     href: "/onboarding/import?kind=menu",
-    title: "Your menu",
-    body: "What you sell and for how much. Each item is linked to the recipe it's made from.",
-    cta: "Import your menu",
+    title: `Your ${lower(v.menu)}`,
+    body: `What you sell and for how much. Each item is linked to the ${lower(v.recipe)} it's made from.`,
+    cta: `Import your ${lower(v.menu)}`,
     icon: "M4 4h16v16H4zM8 8h8M8 12h8M8 16h5",
   },
   {
     href: "/onboarding/import?kind=recipe",
-    title: "A recipe",
-    body: "What goes into a batch. Ingredients are matched to your price list so each batch is costed.",
-    cta: "Import recipes",
+    title: cap(withArticle(lower(v.recipe))),
+    body: `What goes into a batch. ${v.ingredients} are matched to your price list so each batch is costed.`,
+    cta: `Import ${lower(v.recipes)}`,
     icon: "M5 3h11a3 3 0 0 1 3 3v15H8a3 3 0 0 1-3-3zM5 18a3 3 0 0 1 3-3h11M9 7h6M9 10h4",
   },
 ] as const;
 
-export default function AddPage() {
+export default async function AddPage() {
+  const KINDS = kindsFor(await getVocab());
   return (
     <>
       <PageHeader title="Add from a photo" subtitle="Take a picture or upload a PDF. Pick what it is so the right reader handles it." />

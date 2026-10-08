@@ -4,8 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { BulkImportClient } from "@/components/invoices/BulkImportClient";
 import { PageHeader, Panel } from "@/components/ui/dash";
+import { getVocab } from "@/lib/supabase/vocab";
+import { cap, lower, menuDoc } from "@/lib/vocab";
 
 export default async function ImportInvoicesPage() {
+  const v = await getVocab();
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
@@ -30,10 +33,10 @@ export default async function ImportInvoicesPage() {
         </div>
         <Panel title="Good to know" className="xl:col-span-4">
           <ul className="space-y-2 text-[13px] text-stone-600">
-            <li>Each file is read and matched to your ingredients exactly like a scan.</li>
+            <li>Each file is read and matched to your {lower(v.ingredients)} exactly like a scan.</li>
             <li><b className="text-stone-800">Older invoices</b> go into price history without changing today&apos;s costs or raising alerts.</li>
             <li>Anything unreadable is flagged so you can type it in by hand.</li>
-            <li><b className="text-stone-800">Menus and recipes</b> have their own import: <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your menu</Link> and <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">Import recipes</Link>. Drop one here by mistake and it&apos;s spotted and handed over — nothing is saved as an invoice.</li>
+            <li><b className="text-stone-800">{cap(`${menuDoc(v)}s`)} and {lower(v.recipes)}</b> have their own import: <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your {lower(v.menu)}</Link> and <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">Import {lower(v.recipes)}</Link>. Drop one here by mistake and it&apos;s spotted and handed over — nothing is saved as an invoice.</li>
             <li>For today&apos;s delivery on your phone, use <Link href="/invoices/scan" className="font-medium text-amber-700 underline">Scan</Link>.</li>
           </ul>
         </Panel>

@@ -1,16 +1,22 @@
-import { STATUS_COLORS, type StatusKey } from "@/lib/visual/statusColors";
+"use client";
 
-const STATUS_MAP: Record<string, { key: StatusKey; label: string }> = {
+import { STATUS_COLORS, type StatusKey } from "@/lib/visual/statusColors";
+import { useVocab } from "@/components/app/VocabProvider";
+import { lower, withArticle, type Vocab } from "@/lib/vocab";
+
+// Labels naming an ingredient use the industry's word (lib/industries).
+const STATUS_MAP: Record<string, { key: StatusKey; label: string | ((v: Vocab) => string) }> = {
   pending: { key: "neutral", label: "Pending" },
   auto_matched: { key: "good", label: "Matched" },
   confirmed: { key: "good", label: "Confirmed" },
   needs_review: { key: "warning", label: "Needs review" },
-  new_ingredient: { key: "serious", label: "New ingredient?" },
+  new_ingredient: { key: "serious", label: (v) => `New ${lower(v.ingredient)}?` },
   rejected: { key: "critical", label: "Rejected" },
-  not_ingredient: { key: "neutral", label: "Not an ingredient" },
+  not_ingredient: { key: "neutral", label: (v) => `Not ${withArticle(lower(v.ingredient))}` },
 };
 
 export function LineItemStatusBadge({ status }: { status: string }) {
+  const v = useVocab();
   const entry = STATUS_MAP[status] ?? STATUS_MAP.pending;
   const { color, bg } = STATUS_COLORS[entry.key];
 
@@ -20,7 +26,7 @@ export function LineItemStatusBadge({ status }: { status: string }) {
       style={{ backgroundColor: bg, color }}
     >
       <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-      {entry.label}
+      {typeof entry.label === "function" ? entry.label(v) : entry.label}
     </span>
   );
 }

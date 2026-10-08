@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useVocab } from "@/components/app/VocabProvider";
+import { lower, menuDoc } from "@/lib/vocab";
 import { usePathname } from "next/navigation";
 import { LogoMark } from "@/components/marketing/Logo";
 import { CameraIcon } from "@/components/ui/dash";
@@ -83,6 +85,7 @@ function Badge({ n, tone }: { n: number; tone: "red" | "amber" }) {
 
 // Desktop: a fixed dark rail with every section and its live counts.
 export function Sidebar({ business, owner, counts, logOut, admin = false, labels }: { business: string; owner: string | null; counts: NavCounts; logOut: React.ReactNode; admin?: boolean; labels?: NavLabels }) {
+  const v = useVocab();
   const path = usePathname();
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-[#1a1714] text-stone-300 lg:flex">
@@ -101,7 +104,7 @@ export function Sidebar({ business, owner, counts, logOut, admin = false, labels
         >
           <CameraIcon /> Add from a photo
         </Link>
-        <p className="mt-1.5 text-center text-[11px] text-stone-500">Invoice, menu or recipe</p>
+        <p className="mt-1.5 text-center text-[11px] text-stone-500">Invoice, {menuDoc(v)} or {lower(v.recipe)}</p>
       </div>
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3">
         {groupsFor(admin, labels).map((g) => (

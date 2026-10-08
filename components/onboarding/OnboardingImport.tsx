@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/media/compressImage";
 import { canonicalUnit, conversionFactor } from "@/lib/costing/units";
 import { LOCAL_DATE_HEADER, browserLocalDate } from "@/lib/dates/localDate";
+import { useVocab } from "@/components/app/VocabProvider";
+import { cap, lower, menuDoc, withArticle, type Vocab } from "@/lib/vocab";
 
 type Ingredient = { id: string; name: string; base_unit: string };
 type Recipe = { id: string; name: string; yieldQty: number | null; yieldUnit: string | null; ingredients: string[] };
@@ -114,7 +116,8 @@ async function postJson(url: string, body: unknown, method = "POST") {
 
 // The reader said this upload is something else (import-menu / import-recipe 422).
 const wrongKind = (err: unknown) => (err instanceof ApiError && err.body.wrong_kind ? (err.body.document_type as "invoice" | "menu" | "recipe" | "other") : null);
-const KIND_WORD: Record<Kind, string> = { menu: "a menu", recipe: "a recipe" };
+// "a menu" / "a recipe" in the industry's words (lib/industries).
+const kindWord = (kind: Kind, v: Vocab) => withArticle(kind === "menu" ? menuDoc(v) : lower(v.recipe));
 
 // §9.3: upload menus and recipes (photos or PDFs), let the vision model do
 // the first pass, then confirm everything in one editable review screen —
@@ -140,6 +143,8 @@ export function OnboardingImport({
   preloaded?: { path: string; kind: Kind }[];
   suggest?: { units: string[]; categories: string[] }; // the industry's lists (lib/industries); left out, the food ones
 }) {
+  const v = useVocab();
+  const pickIngredient = `Pick ${withArticle(lower(v.ingredient))}`;
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>(() =>
     preloaded.map((p) => ({ key: newKey(), name: `The file from Invoices (${p.path.split(".").pop()?.toUpperCase()})`, path: p.path, kind: p.kind, status: "ready" as const })),
@@ -207,7 +212,7 @@ export function OnboardingImport({
       source,
       name: recipe.name_guess ?? source.replace(/\.[^.]+$/, ""),
       yieldQty: recipe.yield_qty_guess == null ? "" : String(recipe.yield_qty_guess),
-      yieldUnit: recipe.yield_unit_guess ?? "servings",
+      yieldUnit: recipe.yield_unit_guess ?? v.servings,
       lines: draftLines,
     };
   }
@@ -237,7 +242,7 @@ export function OnboardingImport({
             } else {
               const draft = await readRecipe(path, f.name);
               newDrafts.push(draft);
-              patchFile(f.key, { kind, movedFrom, status: draft.lines.length ? "done" : "failed", note: draft.lines.length ? `${draft.name} · ${draft.lines.length} ingredients` : "No ingredients found" });
+              patchFile(f.key, { kind, movedFrom, status: draft.lines.length ? "done" : "failed", note: draft.lines.length ? `${draft.name} · ${draft.lines.length} ${lower(v.ingredients)}` : `No ${lower(v.ingredients)} found` });
             }
             break;
           } catch (err) {
@@ -245,11 +250,11 @@ export function OnboardingImport({
             if ((actual === "menu" || actual === "recipe") && attempt === 0) {
               movedFrom = kind;
               kind = actual;
-              patchFile(f.key, { note: `This is ${KIND_WORD[actual]}, not ${KIND_WORD[movedFrom]} — reading it as ${KIND_WORD[actual]}…` });
+              patchFile(f.key, { note: `This is ${kindWord(actual, v)}, not ${kindWord(movedFrom, v)} — reading it as ${kindWord(actual, v)}…` });
               continue;
             }
             if (actual === "invoice") {
-              patchFile(f.key, { status: "invoice", note: "This is a supplier invoice or receipt, not a menu or recipe." });
+              patchFile(f.key, { status: "invoice", note: `This is a supplier invoice or receipt, not ${kindWord("menu", v)} or ${lower(v.recipe)}.` });
               break;
             }
             throw err;
@@ -344,13 +349,13 @@ export function OnboardingImport({
   const num = (s: string) => (s.trim() === "" ? NaN : Number(s.replace(/[$,]/g, "")));
   const lineError = (l: LineDraft) => {
     if (!l.include) return null;
-    if (!l.choice) return "Pick an ingredient";
+    if (!l.choice) return pickIngredient;
     if (l.choice === "new" && (!l.newName.trim() || !l.newUnit.trim())) return "Name and unit";
     if (!(num(l.qty) > 0)) return "Quantity";
     return null;
   };
   const recipeError = (d: RecipeDraft) =>
-    !d.include ? null : !d.name.trim() ? "Name the recipe" : !(num(d.yieldQty) > 0) ? "How many does a batch make?" : d.lines.some(lineError) ? "Finish the highlighted lines" : null;
+    !d.include ? null : !d.name.trim() ? `Name the ${lower(v.recipe)}` : !(num(d.yieldQty) > 0) ? "How many does a batch make?" : d.lines.some(lineError) ? "Finish the highlighted lines" : null;
   const rowError = (m: MenuDraft) =>
     !m.include ? null : !m.name.trim() ? "Name" : !(num(m.price) >= 0) ? "Price" : m.servings.trim() !== "" && !(num(m.servings) > 0) ? "Servings" : null;
   const included = drafts.filter((d) => d.include);
@@ -418,9 +423,9 @@ export function OnboardingImport({
       <div className="rounded-lg border border-emerald-200 bg-white p-6">
         <p className="text-lg font-semibold text-stone-900">You&apos;re set up.</p>
         <p className="mt-1 text-sm text-stone-600">
-          Added {saved.recipes} recipe{saved.recipes === 1 ? "" : "s"}, {saved.menu} menu item{saved.menu === 1 ? "" : "s"}
-          {saved.ingredients ? ` and ${saved.ingredients} new ingredient${saved.ingredients === 1 ? "" : "s"}` : ""}.
-          {saved.ingredients ? " New ingredients have no price yet — scan an invoice or add prices on Ingredients, and your margins fill in." : ""}
+          Added {saved.recipes} {lower(saved.recipes === 1 ? v.recipe : v.recipes)}, {saved.menu} {lower(saved.menu === 1 ? v.menuItem : v.menuItems)}
+          {saved.ingredients ? ` and ${saved.ingredients} new ${lower(saved.ingredients === 1 ? v.ingredient : v.ingredients)}` : ""}.
+          {saved.ingredients ? ` New ${lower(v.ingredients)} have no price yet — scan an invoice or add prices on ${v.ingredients}, and your margins fill in.` : ""}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/dashboard" className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white">Go to Overview</Link>
@@ -455,8 +460,8 @@ export function OnboardingImport({
       {(phase === "pick" || phase === "reading") && (
         <>
           <div className={`grid gap-4 ${only ? "" : "md:grid-cols-2"}`}>
-            {only !== "recipe" && <DropZone kind="menu" title="Your menu" hint="A photo of the board, a printed menu, or the PDF you print from." onFiles={addFiles} disabled={phase === "reading"} />}
-            {only !== "menu" && <DropZone kind="recipe" title="Your recipes" hint="One recipe per photo or PDF — cards, notebook pages, docs. Add as many as you like." onFiles={addFiles} disabled={phase === "reading"} />}
+            {only !== "recipe" && <DropZone kind="menu" title={`Your ${lower(v.menu)}`} hint={v.menu === "Menu" ? "A photo of the board, a printed menu, or the PDF you print from." : `A photo or PDF of your ${lower(v.menu)} list with prices.`} onFiles={addFiles} disabled={phase === "reading"} />}
+            {only !== "menu" && <DropZone kind="recipe" title={`Your ${lower(v.recipes)}`} hint={`One ${lower(v.recipe)} per photo or PDF — cards, notebook pages, docs. Add as many as you like.`} onFiles={addFiles} disabled={phase === "reading"} />}
           </div>
           {files.length > 0 && (
             <ul aria-label="Files to read" className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
@@ -496,12 +501,12 @@ export function OnboardingImport({
               <ul className="mt-1.5 flex flex-col gap-1.5">
                 {files.filter((f) => f.movedFrom).map((f) => (
                   <li key={f.key} data-testid="moved-file">
-                    <b>{f.name}</b> was uploaded as {KIND_WORD[f.movedFrom!]}, but it&apos;s {KIND_WORD[f.kind]} — we read it as {KIND_WORD[f.kind]}{f.kind === "recipe" ? " (under Recipes below)" : " (under Menu items below)"}.
+                    <b>{f.name}</b> was uploaded as {kindWord(f.movedFrom!, v)}, but it&apos;s {kindWord(f.kind, v)} — we read it as {kindWord(f.kind, v)}{f.kind === "recipe" ? ` (under ${v.recipes} below)` : ` (under ${v.menuItems} below)`}.
                   </li>
                 ))}
                 {files.filter((f) => f.status === "invoice" || f.status === "sending" || f.status === "sent").map((f) => (
                   <li key={f.key} data-testid="invoice-file" className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span><b>{f.name}</b>: {f.status === "invoice" ? "this is a supplier invoice or receipt, not a menu or recipe." : f.note}</span>
+                    <span><b>{f.name}</b>: {f.status === "invoice" ? `this is a supplier invoice or receipt, not ${kindWord("menu", v)} or ${lower(v.recipe)}.` : f.note}</span>
                     {f.status === "invoice" && (
                       <button type="button" onClick={() => sendToInvoices(f)} className="rounded-md bg-stone-900 px-3 py-1 text-xs font-semibold text-white hover:bg-stone-800">
                         Read it as an invoice
@@ -524,19 +529,19 @@ export function OnboardingImport({
           )}
 
           {(only !== "menu" || drafts.length > 0) && (
-          <section aria-label="Recipes to add" className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <section aria-label={`${v.recipes} to add`} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
             <header className="flex items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3 py-2">
-              <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">Recipes · {included.length}</h2>
-              <button type="button" onClick={() => setDrafts((ds) => [...ds, { key: newKey(), include: true, source: "typed in", name: "", yieldQty: "", yieldUnit: "servings", lines: [] }])} className="text-xs font-medium text-amber-700">+ Add a recipe</button>
+              <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">{v.recipes} · {included.length}</h2>
+              <button type="button" onClick={() => setDrafts((ds) => [...ds, { key: newKey(), include: true, source: "typed in", name: "", yieldQty: "", yieldUnit: v.servings, lines: [] }])} className="text-xs font-medium text-amber-700">+ Add {withArticle(lower(v.recipe))}</button>
             </header>
-            {drafts.length === 0 && <p className="px-3 py-4 text-sm text-stone-500">No recipes read. Add one above, or skip — you can build recipes any time.</p>}
+            {drafts.length === 0 && <p className="px-3 py-4 text-sm text-stone-500">No {lower(v.recipes)} read. Add one above, or skip — you can build {lower(v.recipes)} any time.</p>}
             {drafts.map((d) => {
               const err = showErrors ? recipeError(d) : null;
               return (
                 <div key={d.key} data-testid="recipe-draft" className={`border-t border-stone-100 px-3 py-3 first:border-t-0 ${d.include ? "" : "opacity-50"}`}>
                   <div className="flex flex-wrap items-end gap-2">
                     <label className="flex items-center gap-1.5 self-center text-xs text-stone-600">
-                      <input type="checkbox" checked={d.include} onChange={(e) => setDraft(d.key, { include: e.target.checked })} aria-label={`Include ${d.name || "recipe"}`} /> Add
+                      <input type="checkbox" checked={d.include} onChange={(e) => setDraft(d.key, { include: e.target.checked })} aria-label={`Include ${d.name || lower(v.recipe)}`} /> Add
                     </label>
                     <label className="flex min-w-48 flex-1 flex-col gap-0.5 text-[11px] font-semibold tracking-wider text-stone-500 uppercase">
                       Recipe name
@@ -559,7 +564,7 @@ export function OnboardingImport({
                         <tr>
                           <th className={`${th} w-8`} />
                           <th className={th}>As written</th>
-                          <th className={th}>Ingredient</th>
+                          <th className={th}>{v.ingredient}</th>
                           <th className={`${th} w-28 text-right`}>Qty per batch</th>
                           <th className={`${th} w-28`}>Unit</th>
                         </tr>
@@ -576,14 +581,14 @@ export function OnboardingImport({
                               <td className="px-2 py-1.5 text-[13px] text-stone-800">
                                 {l.raw}
                                 <span className={`ml-1.5 rounded px-1 text-[10px] font-semibold ${l.status === "free" ? "bg-stone-100 text-stone-600" : l.choice === "new" ? "bg-orange-50 text-orange-700" : l.status === "auto_matched" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                                  {l.status === "free" ? "No cost" : l.choice === "new" ? "New ingredient?" : l.status === "auto_matched" ? "Matched" : "Check"}
+                                  {l.status === "free" ? "No cost" : l.choice === "new" ? `New ${lower(v.ingredient)}?` : l.status === "auto_matched" ? "Matched" : "Check"}
                                 </span>
                                 {l.note && <span data-testid="line-note" className="mt-0.5 block text-[11px] text-stone-500">{l.note}</span>}
                               </td>
                               <td className="px-2 py-1.5">
                                 <select
-                                  aria-label={`Ingredient for ${l.raw}`}
-                                  className={`${cell} ${lerr === "Pick an ingredient" ? "border-red-400" : ""}`}
+                                  aria-label={`${v.ingredient} for ${l.raw}`}
+                                  className={`${cell} ${lerr === pickIngredient ? "border-red-400" : ""}`}
                                   value={l.choice}
                                   onChange={(e) => {
                                     const choice = e.target.value;
@@ -592,7 +597,7 @@ export function OnboardingImport({
                                   }}
                                 >
                                   <option value="">Choose…</option>
-                                  <option value="new">➕ New ingredient</option>
+                                  <option value="new">➕ New {lower(v.ingredient)}</option>
                                   {l.candidates.length > 0 && (
                                     <optgroup label="Suggested">
                                       {l.candidates.map((c) => (
@@ -600,7 +605,7 @@ export function OnboardingImport({
                                       ))}
                                     </optgroup>
                                   )}
-                                  <optgroup label="All ingredients">
+                                  <optgroup label={`All ${lower(v.ingredients)}`}>
                                     {ingredients.map((i) => (
                                       <option key={i.id} value={i.id}>{i.name}</option>
                                     ))}
@@ -608,7 +613,7 @@ export function OnboardingImport({
                                 </select>
                                 {l.choice === "new" && (
                                   <div className="mt-1 grid grid-cols-[minmax(0,1fr)_110px] gap-1">
-                                    <input aria-label={`New ingredient name for ${l.raw}`} className={cell} value={l.newName} onChange={(e) => setLine(d.key, l.key, { newName: e.target.value })} placeholder="Name" />
+                                    <input aria-label={`New ${lower(v.ingredient)} name for ${l.raw}`} className={cell} value={l.newName} onChange={(e) => setLine(d.key, l.key, { newName: e.target.value })} placeholder="Name" />
                                     <select aria-label={`Category for ${l.raw}`} className={cell} value={l.newCategory} onChange={(e) => setLine(d.key, l.key, { newCategory: e.target.value })}>
                                       <option value="">Category…</option>
                                       {(suggest?.categories ?? CATEGORIES).map((c) => <option key={c} value={c}>{c.replace("_", " ")}</option>)}
@@ -626,7 +631,7 @@ export function OnboardingImport({
                               </td>
                               <td className="px-2 py-1.5">
                                 {l.choice === "new" ? (
-                                  <input aria-label={`Unit for new ingredient ${l.raw}`} className={cell} value={l.newUnit} onChange={(e) => setLine(d.key, l.key, { newUnit: e.target.value })} list="onboarding-units" />
+                                  <input aria-label={`Unit for new ${lower(v.ingredient)} ${l.raw}`} className={cell} value={l.newUnit} onChange={(e) => setLine(d.key, l.key, { newUnit: e.target.value })} list="onboarding-units" />
                                 ) : (
                                   <span className="block px-2 py-1 text-[13px] text-stone-500">{base ?? "—"}</span>
                                 )}
@@ -650,16 +655,16 @@ export function OnboardingImport({
           )}
 
           {(only !== "recipe" || menu.length > 0) && (
-          <section aria-label="Menu items to add" className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <section aria-label={`${v.menuItems} to add`} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
             <header className="flex items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3 py-2">
               <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">
                 Menu items · {includedMenu.length}
-                {linking && <span className="ml-2 font-normal tracking-normal text-amber-700 normal-case">matching to recipes…</span>}
+                {linking && <span className="ml-2 font-normal tracking-normal text-amber-700 normal-case">matching to {lower(v.recipes)}…</span>}
               </h2>
-              <button type="button" onClick={() => setMenu((ms) => [...ms, { key: newKey(), include: true, name: "", price: "", recipe: "", servings: "", note: "" }])} className="text-xs font-medium text-amber-700">+ Add a menu item</button>
+              <button type="button" onClick={() => setMenu((ms) => [...ms, { key: newKey(), include: true, name: "", price: "", recipe: "", servings: "", note: "" }])} className="text-xs font-medium text-amber-700">+ Add {withArticle(lower(v.menuItem))}</button>
             </header>
             {menu.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-stone-500">No menu items read. Add them above, or skip — you can add them on Menu any time.</p>
+              <p className="px-3 py-4 text-sm text-stone-500">No {lower(v.menuItems)} read. Add them above, or skip — you can add them on {v.menu} any time.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[680px]">
@@ -668,7 +673,7 @@ export function OnboardingImport({
                       <th className={`${th} w-8`} />
                       <th className={th}>Name</th>
                       <th className={`${th} w-28 text-right`}>Price</th>
-                      <th className={th}>Made from recipe</th>
+                      <th className={th}>Made from {lower(v.recipe)}</th>
                       <th className={`${th} w-32 text-right`}>Per batch</th>
                     </tr>
                   </thead>
@@ -678,18 +683,18 @@ export function OnboardingImport({
                       return (
                         <tr key={m.key} data-testid="menu-draft" className={`border-t border-stone-100 ${m.include ? "" : "opacity-50"}`}>
                           <td className="px-2 py-1.5"><input type="checkbox" checked={m.include} onChange={(e) => setRow(m.key, { include: e.target.checked })} aria-label={`Include ${m.name}`} /></td>
-                          <td className="px-2 py-1.5"><input aria-label="Menu item name" className={`${cell} ${err === "Name" ? "border-red-400 bg-red-50" : ""}`} value={m.name} onChange={(e) => setRow(m.key, { name: e.target.value })} /></td>
+                          <td className="px-2 py-1.5"><input aria-label={`${v.menuItem} name`} className={`${cell} ${err === "Name" ? "border-red-400 bg-red-50" : ""}`} value={m.name} onChange={(e) => setRow(m.key, { name: e.target.value })} /></td>
                           <td className="px-2 py-1.5"><input aria-label={`Price for ${m.name}`} inputMode="decimal" className={`${cell} text-right tabular-nums ${err === "Price" ? "border-red-400 bg-red-50" : ""}`} value={m.price} onChange={(e) => setRow(m.key, { price: e.target.value })} /></td>
                           <td className="px-2 py-1.5">
-                            <select aria-label={`Recipe for ${m.name}`} className={cell} value={m.recipe} onChange={(e) => setRow(m.key, { recipe: e.target.value, note: "" })}>
-                              <option value="">No recipe yet</option>
+                            <select aria-label={`${v.recipe} for ${m.name}`} className={cell} value={m.recipe} onChange={(e) => setRow(m.key, { recipe: e.target.value, note: "" })}>
+                              <option value="">No {lower(v.recipe)} yet</option>
                               {recipeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
                             {m.note && <span data-testid="menu-note" className="mt-0.5 block text-[11px] text-stone-500">{m.note}</span>}
                           </td>
                           <td className="px-2 py-1.5">
                             <input
-                              aria-label={`Servings per batch for ${m.name}`}
+                              aria-label={`${cap(v.servings)} per batch for ${m.name}`}
                               inputMode="decimal"
                               disabled={!m.recipe}
                               className={`${cell} text-right tabular-nums disabled:bg-stone-50 ${err === "Servings" ? "border-red-400 bg-red-50" : ""}`}
@@ -710,7 +715,7 @@ export function OnboardingImport({
 
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={save} disabled={phase === "saving" || linking || (!included.length && !includedMenu.length)} className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-40">
-              {phase === "saving" ? "Saving…" : `Save ${[only !== "menu" || included.length ? `${included.length} recipe${included.length === 1 ? "" : "s"}` : "", only !== "recipe" || includedMenu.length ? `${includedMenu.length} menu item${includedMenu.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ")}`}
+              {phase === "saving" ? "Saving…" : `Save ${[only !== "menu" || included.length ? `${included.length} ${lower(included.length === 1 ? v.recipe : v.recipes)}` : "", only !== "recipe" || includedMenu.length ? `${includedMenu.length} ${lower(includedMenu.length === 1 ? v.menuItem : v.menuItems)}` : ""].filter(Boolean).join(" and ")}`}
             </button>
             <button type="button" onClick={() => setPhase("pick")} disabled={phase === "saving"} className="text-sm text-stone-600 underline">
               Add more files
@@ -724,6 +729,8 @@ export function OnboardingImport({
 }
 
 function DropZone({ kind, title, hint, onFiles, disabled }: { kind: Kind; title: string; hint: string; onFiles: (f: FileList | null, k: Kind) => void; disabled: boolean }) {
+  const v = useVocab();
+  const what = kind === "menu" ? menuDoc(v) : lower(v.recipe);
   const ref = useRef<HTMLInputElement>(null);
   const cam = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -744,8 +751,8 @@ function DropZone({ kind, title, hint, onFiles, disabled }: { kind: Kind; title:
       <p className="text-base font-semibold text-stone-900">{title}</p>
       <p className="max-w-xs text-sm text-stone-600">{hint}</p>
       <p className="hidden text-xs text-stone-500 md:block">Drag files here, or</p>
-      <input ref={ref} type="file" multiple accept="image/*,application/pdf" aria-label={`Choose ${kind === "menu" ? "menu" : "recipe"} files`} className="sr-only" onChange={(e) => { onFiles(e.target.files, kind); e.target.value = ""; }} />
-      <input ref={cam} type="file" accept="image/*" capture="environment" aria-label={`Take a photo of your ${kind}`} className="sr-only" onChange={(e) => { onFiles(e.target.files, kind); e.target.value = ""; }} />
+      <input ref={ref} type="file" multiple accept="image/*,application/pdf" aria-label={`Choose ${what} files`} className="sr-only" onChange={(e) => { onFiles(e.target.files, kind); e.target.value = ""; }} />
+      <input ref={cam} type="file" accept="image/*" capture="environment" aria-label={`Take a photo of your ${what}`} className="sr-only" onChange={(e) => { onFiles(e.target.files, kind); e.target.value = ""; }} />
       <div className="mt-1 flex flex-wrap justify-center gap-2">
         <button type="button" disabled={disabled} onClick={() => cam.current?.click()} className="rounded-md bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-40 md:hidden">
           Take a photo

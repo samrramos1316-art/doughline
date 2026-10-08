@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { isoDaysAgo } from "@/lib/dates/localDate";
+import { lower, vocabFor, type Vocab } from "@/lib/vocab";
 import { batchCost, effectiveWastePct, lineCost, laborCost, overheadMultiplier, perServing, marginPctOf, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
@@ -30,7 +31,8 @@ export type RecentInvoice = { id: string; date: string | null; vendor: string; n
 // history the same way lib/costing/marginHistory.ts does it, but for all
 // menu items at once instead of four queries per item. Costs use the shared
 // formula (lib/costing/recipeCost.ts), waste, labor and overhead included.
-export async function getOverview(supabase: Client, orgId: string) {
+// `v`: the business's words for the alert lines (lib/industries); left out, food.
+export async function getOverview(supabase: Client, orgId: string, v: Vocab = vocabFor(null)) {
   const since90 = isoDaysAgo(90);
   const since30 = isoDaysAgo(30);
 
@@ -244,7 +246,7 @@ export async function getOverview(supabase: Client, orgId: string) {
     inbox.push({
       kind: "alert",
       title: `${a.ingredients?.name ?? "An ingredient"} up ${Number(a.pct_change).toFixed(1)}%`,
-      detail: `$${Number(a.previous_unit_cost).toFixed(2)} → $${Number(a.new_unit_cost).toFixed(2)}/${a.ingredients?.base_unit ?? "unit"} · ${n ? `hits ${n} menu item${n === 1 ? "" : "s"}` : "no menu items use it"}`,
+      detail: `$${Number(a.previous_unit_cost).toFixed(2)} → $${Number(a.new_unit_cost).toFixed(2)}/${a.ingredients?.base_unit ?? "unit"} · ${n ? `hits ${n} ${lower(n === 1 ? v.menuItem : v.menuItems)}` : `no ${lower(v.menuItems)} use it`}`,
       href: `/alerts/${a.id}`,
       tone: Number(a.pct_change) >= 20 ? "critical" : "warning",
       at: a.created_at,

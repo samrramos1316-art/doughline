@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   try {
     const { document_type, items } = await getVisionProvider().extractMenu(file.buffer, file.mimeType, { hints: extractionHints((await getIndustry()).id, "menu") });
     // Not a menu (a recipe, an invoice…): say what it is so the screen can route it.
-    if (document_type !== "menu") return NextResponse.json(wrongKindBody("menu", document_type, file.path), { status: 422 });
+    if (document_type !== "menu") return NextResponse.json(wrongKindBody("menu", document_type, file.path, (await getIndustry()).vocab), { status: 422 });
     return NextResponse.json({ items: items.filter((i) => i.name_guess.trim()) });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't read this menu" }, { status: 502 });

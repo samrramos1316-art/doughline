@@ -6,10 +6,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/media/compressImage";
 import { CaptureButton } from "@/components/camera/CaptureButton";
+import { useVocab } from "@/components/app/VocabProvider";
+import { lower, menuDoc, withArticle } from "@/lib/vocab";
 
 type Stage = "idle" | "previewing" | "uploading" | "reading" | "done" | "error";
 
 export function ScanInvoiceClient({ orgId }: { orgId: string }) {
+  const v = useVocab();
   const router = useRouter();
   const [stage, setStage] = useState<Stage>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -132,7 +135,7 @@ export function ScanInvoiceClient({ orgId }: { orgId: string }) {
           <p className="text-sm font-medium text-red-600">{errorMessage}</p>
           {importUrl && (
             <Link href={importUrl} className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white">
-              {importUrl.includes("kind=recipe") ? "Import it as a recipe" : "Import it as a menu"}
+              {importUrl.includes("kind=recipe") ? `Import it as ${withArticle(lower(v.recipe))}` : `Import it as ${withArticle(menuDoc(v))}`}
             </Link>
           )}
           <button

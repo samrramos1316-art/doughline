@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function NewRecipeForm() {
+// `labels`: the industry's words (lib/industries); left out, the food wording.
+export function NewRecipeForm({ labels = { recipe: "recipe", yield: "Batch makes", yieldExample: "cookies" } }: { labels?: { recipe: string; yield: string; yieldExample: string } }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -50,7 +51,7 @@ export function NewRecipeForm() {
 
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
-          <label htmlFor="recipe-batch-yield-qty" className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Batch makes</label>
+          <label htmlFor="recipe-batch-yield-qty" className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">{labels.yield}</label>
           <input
             id="recipe-batch-yield-qty"
             name="batch_yield_qty"
@@ -67,7 +68,7 @@ export function NewRecipeForm() {
             id="recipe-batch-yield-unit"
             name="batch_yield_unit"
             required
-            placeholder="e.g. cookies"
+            placeholder={`e.g. ${labels.yieldExample}`}
             className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200"
           />
         </div>
@@ -78,7 +79,7 @@ export function NewRecipeForm() {
         disabled={pending}
         className="rounded-md bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
       >
-        {pending ? "Creating…" : "Create recipe"}
+        {pending ? "Creating…" : `Create ${labels.recipe}`}
       </button>
     </form>
   );

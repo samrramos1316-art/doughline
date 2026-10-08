@@ -70,7 +70,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
-          <p className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Cost per serving (live)</p>
+          <p className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Cost per {v.serving} (live)</p>
           <p className="mt-1 text-2xl font-semibold text-stone-900 tabular-nums">{cost?.cost_per_serving != null ? `$${Number(cost.cost_per_serving).toFixed(4)}` : "—"}</p>
         </div>
         <Kpi
@@ -84,7 +84,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
         <Kpi
           label="Sold as"
           value={soldAs.length}
-          sub={soldAs.length ? soldAs.map((m) => `${m.name} ${m.margin_pct ?? "—"}%`).join(" · ") : "not on the menu yet"}
+          sub={soldAs.length ? soldAs.map((m) => `${m.name} ${m.margin_pct ?? "—"}%`).join(" · ") : `not ${v.onMenu} yet`}
           tone={soldAs.some((m) => m.margin_pct != null && Number(m.margin_pct) < target) ? "critical" : "neutral"}
           href={soldAs.length ? "/margins" : "/menu"}
         />

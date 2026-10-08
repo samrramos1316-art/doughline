@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useVocab } from "@/components/app/VocabProvider";
+import { lower } from "@/lib/vocab";
 import { useRouter } from "next/navigation";
 
 export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string; name: string }[] }) {
+  const v = useVocab();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -53,7 +56,7 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="menu-recipe-id" className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Recipe</label>
+        <label htmlFor="menu-recipe-id" className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">{v.recipe}</label>
         <select id="menu-recipe-id" name="recipe_id" className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200">
           <option value="">—</option>
           {recipeOptions.map((r) => (
@@ -81,7 +84,7 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
         disabled={pending}
         className="rounded-md bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
       >
-        {pending ? "Adding…" : "Add menu item"}
+        {pending ? "Adding…" : `Add ${lower(v.menuItem)}`}
       </button>
     </form>
   );

@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   const industry = await getIndustry();
   // Market Watch only for an industry with a series actually ingested (lib/industries).
   const [o, trends] = await Promise.all([
-    getOverview(supabase, orgId),
+    getOverview(supabase, orgId, industry.vocab),
     industry.hasMarketData ? getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS }) : Promise.resolve([]),
   ]);
   const v = industry.vocab;
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
       {/* Headline figures */}
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Kpi
-          label="Avg menu margin"
+          label={`Avg ${lower(v.menu)} margin`}
           value={kpis.avgMargin == null ? "—" : `${kpis.avgMargin.toFixed(1)}%`}
           tone={marginTone(kpis.avgMargin, org.target)}
           sub={<><Delta value={kpis.marginChange30d} suffix="pp" goodWhenUp /> vs 30 days ago</>}

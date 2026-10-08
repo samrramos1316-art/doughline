@@ -6,8 +6,9 @@ function money(n: number) {
 }
 
 // §8 deterministic options, one block per affected menu item, then the
-// optional Claude narrative weighing them.
-export function SuggestionsPanel({ suggestions }: { suggestions: AlertSuggestions }) {
+// optional Claude narrative weighing them. `recipeWord`: the industry's word
+// for a recipe, mid-sentence (lib/industries); "recipe" for food.
+export function SuggestionsPanel({ suggestions, recipeWord = "recipe" }: { suggestions: AlertSuggestions; recipeWord?: string }) {
   const { alert, items, target_margin_pct } = suggestions;
   const ingredient = alert.ingredient_name.toLowerCase();
 
@@ -43,12 +44,12 @@ export function SuggestionsPanel({ suggestions }: { suggestions: AlertSuggestion
                     (i.reduce_portion.feasible ? (
                       <li>
                         Or use <strong>{i.reduce_portion.reduce_by_display} less {ingredient}</strong> per batch (
-                        {i.reduce_portion.reduce_pct}% of the recipe&apos;s {i.ingredient_qty_per_batch} {alert.base_unit}) at
+                        {i.reduce_portion.reduce_pct}% of the {recipeWord}&apos;s {i.ingredient_qty_per_batch} {alert.base_unit}) at
                         the same price.
                       </li>
                     ) : (
                       <li className="text-stone-500">
-                        Cutting {ingredient} alone can&apos;t get there — {i.reduce_portion.reason}.
+                        Cutting {ingredient} alone can&apos;t get there — {i.reduce_portion.reason.replace("in the recipe", `in the ${recipeWord}`)}.
                       </li>
                     ))}
                 </ul>

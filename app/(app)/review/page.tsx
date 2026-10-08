@@ -6,6 +6,7 @@ import { loadReviewQueue } from "@/lib/matching/queue";
 import { getReviewBacklog, UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { SwipeDeck } from "@/components/swipe/SwipeDeck";
 import { getIndustry } from "@/lib/supabase/vocab";
+import { lower, withArticle } from "@/lib/vocab";
 import { formSuggestions } from "@/lib/industries";
 import { PageHeader, Panel, Kpi } from "@/components/ui/dash";
 
@@ -16,10 +17,11 @@ export default async function ReviewQueuePage() {
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
 
-  const [{ lineItems, ingredients }, backlog, { data: byInvoice }] = await Promise.all([
+  const [{ lineItems, ingredients }, backlog, { data: byInvoice }, industry] = await Promise.all([
     loadReviewQueue(supabase),
     getReviewBacklog(supabase, orgId),
     supabase.from("invoice_line_items").select("invoice_id, invoices(invoice_number, invoice_date, vendors(name))").in("match_status", [...UNRESOLVED_STATUSES]),
+    getIndustry(),
   ]);
   const groups = new Map<string, { label: string; date: string | null; n: number }>();
   for (const l of byInvoice ?? []) {
@@ -36,7 +38,7 @@ export default async function ReviewQueuePage() {
       />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="rounded-lg border border-stone-200 bg-white px-4 py-6 xl:col-span-8">
-          <SwipeDeck lineItems={lineItems} ingredients={ingredients} doneHref="/invoices" doneLabel="Go to invoices" suggest={formSuggestions(await getIndustry())} />
+          <SwipeDeck lineItems={lineItems} ingredients={ingredients} doneHref="/invoices" doneLabel="Go to invoices" suggest={formSuggestions(industry)} />
         </div>
         <div className="flex flex-col gap-4 xl:col-span-4">
           <div className="grid grid-cols-2 gap-3">
@@ -66,8 +68,8 @@ export default async function ReviewQueuePage() {
             <ul className="space-y-1.5 text-[13px] text-stone-600">
               <li><b className="text-stone-800">Confirm</b> — the suggestion is right; this supplier&apos;s wording is remembered.</li>
               <li><b className="text-stone-800">Not this</b> — show the next suggestion.</li>
-              <li><b className="text-stone-800">Create new</b> — add it to your ingredients.</li>
-              <li><b className="text-stone-800">Not an ingredient</b> — gloves, cleaning supplies, fees; remembered for next time.</li>
+              <li><b className="text-stone-800">Create new</b> — add it to your {lower(industry.vocab.ingredients)}.</li>
+              <li><b className="text-stone-800">Not {withArticle(lower(industry.vocab.ingredient))}</b> — gloves, cleaning supplies, fees; remembered for next time.</li>
             </ul>
           </Panel>
         </div>

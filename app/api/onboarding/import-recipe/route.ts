@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Couldn't read this recipe" }, { status: 502 });
   }
   // Not a recipe (a menu, an invoice…): say what it is so the screen can route it.
-  if (recipe.document_type !== "recipe") return NextResponse.json(wrongKindBody("recipe", recipe.document_type, file.path), { status: 422 });
+  if (recipe.document_type !== "recipe") return NextResponse.json(wrongKindBody("recipe", recipe.document_type, file.path, (await getIndustry()).vocab), { status: 422 });
   if (!recipe.ingredient_lines.length) return NextResponse.json({ recipe, lines: [] });
 
   const { data: ingredients } = await supabase.from("ingredients").select("id, name, base_unit");

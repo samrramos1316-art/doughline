@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { compressImage } from "@/lib/media/compressImage";
+import { useVocab } from "@/components/app/VocabProvider";
+import { lower, menuDoc, withArticle } from "@/lib/vocab";
 
 const MAX_FILES = 25; // matches BULK_IMPORT_MAX on the server
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
@@ -57,6 +59,7 @@ const STATUS_CLASS: Record<ItemStatus, string> = {
 // starts, so closing the tab mid-queue loses nothing: the page offers to
 // finish reading them next time.
 export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: WaitingInvoice[] }) {
+  const v = useVocab();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -254,7 +257,7 @@ export function BulkImportClient({ orgId, waiting }: { orgId: string; waiting: W
                 )}
                 {it.status === "not_invoice" && it.importUrl && (
                   <Link href={it.importUrl} className="font-medium text-zinc-900 underline">
-                    {it.importUrl.includes("kind=recipe") ? "Import it as a recipe" : "Import it as a menu"}
+                    {it.importUrl.includes("kind=recipe") ? `Import it as ${withArticle(lower(v.recipe))}` : `Import it as ${withArticle(menuDoc(v))}`}
                   </Link>
                 )}
                 {it.invoiceId && it.status === "needs_review" && (

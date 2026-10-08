@@ -56,7 +56,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
     return (
       <>
-        <PageHeader title={v.ingredients} subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
+        <PageHeader title={v.ingredients} subtitle="What you pay, per base unit, and how it's moving" tabs={tabs} actions={<ButtonLink href="/margins">Margins by {lower(v.menuItem)}</ButtonLink>} />
         {tab === "movers" ? (
           <Panel title={`Every ${lower(v.ingredient)} — biggest moves first`} flush>
             {rows.length === 0 ? (
@@ -66,7 +66,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
                 <table className="w-full">
                   <thead>
                     <tr>
-                      <th className={th}>Ingredient</th>
+                      <th className={th}>{v.ingredient}</th>
                       <th className={th}>Category</th>
                       <th className={thNum}>Price now</th>
                       <th className={thNum}>30 days</th>
@@ -104,7 +104,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
                   <thead>
                     <tr>
                       <th className={th}>Date</th>
-                      <th className={th}>Ingredient</th>
+                      <th className={th}>{v.ingredient}</th>
                       <th className={thNum}>Price</th>
                       <th className={th}>From</th>
                     </tr>
@@ -137,7 +137,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <PageHeader title={v.ingredients} subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
+      <PageHeader title={v.ingredients} subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">Margins by {lower(v.menuItem)}</ButtonLink>} />
       <Panel title="Price list">
         <IngredientsGrid ingredients={list} suggest={formSuggestions(industry)} waste={showWaste ? { defaultPct: industry.defaults.default_waste_pct } : undefined} />
       </Panel>
