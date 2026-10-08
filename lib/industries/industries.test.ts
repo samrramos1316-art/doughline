@@ -27,9 +27,9 @@ test("registry: every profile is complete and consistent", () => {
   }
 });
 
-test("registry: food is live, the new trades are hidden, with the spec's defaults", () => {
+test("registry: food is live, the trades are beta, with the spec's defaults", () => {
   for (const id of ["bakery", "food_truck", "caterer"] as const) assert.equal(INDUSTRIES[id].status, "live");
-  for (const id of ["jewelry", "florist", "metalworking"] as const) assert.equal(INDUSTRIES[id].status, "hidden");
+  for (const id of ["jewelry", "florist", "metalworking"] as const) assert.equal(INDUSTRIES[id].status, "beta");
   assert.deepEqual(
     Object.fromEntries(Object.values(INDUSTRIES).map((p) => [p.id, [p.defaults.default_waste_pct, p.defaults.show_labor_by_default]])),
     { bakery: [0, false], food_truck: [0, false], caterer: [0, false], other: [0, false], jewelry: [5, true], florist: [10, true], metalworking: [8, true] },
@@ -45,11 +45,15 @@ test("market: only food has ingesting series; they are the ones lib/market/serie
   }
 });
 
-test("gate: default env offers only the food industries", () => {
-  assert.deepEqual(enabledIndustries(undefined), ["bakery", "food_truck", "caterer"]);
-  assert.deepEqual(enabledIndustries(""), ["bakery", "food_truck", "caterer"]);
-  assert.deepEqual(industryOptions(null, "").map((o) => o.id), ["bakery", "food_truck", "caterer"]);
-  assert.equal(isIndustryEnabled("jewelry", ""), false);
+test("gate: by default every industry is offered, the trades as beta", () => {
+  const all = ["bakery", "food_truck", "caterer", "jewelry", "florist", "metalworking"];
+  assert.deepEqual(enabledIndustries(undefined), all);
+  assert.deepEqual(enabledIndustries(""), all);
+  assert.deepEqual(industryOptions(null, "").map((o) => o.id), all);
+  assert.deepEqual(industryOptions(null, "").filter((o) => o.beta).map((o) => o.id), ["jewelry", "florist", "metalworking"]);
+  assert.ok(industryOptions(null, "").every((o) => o.description.length > 10));
+  assert.equal(isIndustryEnabled("jewelry", ""), true);
+  assert.equal(isIndustryEnabled("jewelry", "bakery,caterer"), false); // ENABLED_INDUSTRIES can still narrow it
   assert.equal(isIndustryEnabled("other", ""), true);
   assert.equal(isIndustryEnabled(null, ""), true);
 });
@@ -60,10 +64,11 @@ test("gate: an env change turns the trades on", () => {
   assert.deepEqual(enabledIndustries(" Jewelry , bogus,other "), ["jewelry"]); // unknown and "other" ignored
 });
 
-test("gate: an org already set to a hidden industry keeps it and still loads", () => {
-  const opts = industryOptions("jewelry", "");
-  assert.deepEqual(opts.find((o) => o.id === "jewelry"), { id: "jewelry", name: "Jewelry maker", beta: false, offered: false });
-  assert.ok(!industryOptions("bakery", "").some((o) => o.id === "jewelry"));
+test("gate: an org already set to a switched-off industry keeps it and still loads", () => {
+  const FOOD = "bakery,food_truck,caterer";
+  const opts = industryOptions("jewelry", FOOD);
+  assert.deepEqual(opts.find((o) => o.id === "jewelry"), { id: "jewelry", name: "Jewelry maker", description: INDUSTRIES.jewelry.description, beta: true, offered: false });
+  assert.ok(!industryOptions("bakery", FOOD).some((o) => o.id === "jewelry"));
   const p = resolveIndustry("jewelry");
   assert.equal(p.vocab.recipe, "Build sheet");
   assert.equal(p.defaults.default_waste_pct, 5);
@@ -121,8 +126,8 @@ test("snapshot: a food org's labels are exactly today's", () => {
   };
   for (const t of ["bakery", "food_truck", "caterer", "other", null, "anything else"]) assert.deepEqual(vocabFor(t), today);
   assert.deepEqual(
-    industryOptions(null, "").map((o) => o.name),
-    ["Home bakery", "Food truck", "Caterer"], // the signup <option> text since launch
+    industryOptions(null, "").map((o) => o.name).slice(0, 3),
+    ["Home bakery", "Food truck", "Caterer"], // the signup choices since launch, still first
   );
   for (const id of ["bakery", "food_truck", "caterer", "other"]) assert.equal(formSuggestions(resolveIndustry(id)), undefined);
 });

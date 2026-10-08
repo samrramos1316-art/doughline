@@ -6,7 +6,10 @@
 // stops offering it to others.
 import { INDUSTRIES, INDUSTRY_IDS, normalizeIndustryId, type IndustryId, type IndustryProfile } from "./index.ts";
 
-export const DEFAULT_ENABLED_INDUSTRIES: IndustryId[] = ["bakery", "food_truck", "caterer"];
+// Every industry is offered unless ENABLED_INDUSTRIES narrows it (owner's
+// call, 2026-10-07: let people pick any type at signup; the trades are
+// marked beta).
+export const DEFAULT_ENABLED_INDUSTRIES: IndustryId[] = ["bakery", "food_truck", "caterer", "jewelry", "florist", "metalworking"];
 
 export function enabledIndustries(env: string | undefined = process.env.ENABLED_INDUSTRIES): IndustryId[] {
   if (env == null || !env.trim()) return DEFAULT_ENABLED_INDUSTRIES;
@@ -22,7 +25,7 @@ export function isIndustryEnabled(id: string | null | undefined, env?: string): 
   return enabledIndustries(env).includes(id as IndustryId);
 }
 
-export type IndustryOption = { id: IndustryId; name: string; beta: boolean; offered: boolean };
+export type IndustryOption = { id: IndustryId; name: string; description: string; beta: boolean; offered: boolean };
 
 // The picker's choices, in registry order. `current` (the org's own value)
 // is always included so Settings never silently changes it, even when that
@@ -32,5 +35,5 @@ export function industryOptions(current?: string | null, env?: string): Industry
   const cur = normalizeIndustryId(current);
   return (Object.values(INDUSTRIES) as IndustryProfile[])
     .filter((p) => p.id !== "other" && (enabled.includes(p.id) || p.id === cur))
-    .map((p) => ({ id: p.id, name: p.name, beta: p.status === "beta", offered: enabled.includes(p.id) }));
+    .map((p) => ({ id: p.id, name: p.name, description: p.description, beta: p.status === "beta", offered: enabled.includes(p.id) }));
 }

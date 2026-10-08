@@ -3,17 +3,17 @@
 // ENABLED_INDUSTRIES gate — against a real server and the real database.
 //
 // Needs a production build (`npx next build`); starts `next start` itself.
-//   node scripts/test-industries-e2e.mjs            # trades enabled
-//   node scripts/test-industries-e2e.mjs --default  # ENABLED_INDUSTRIES unset
+//   node scripts/test-industries-e2e.mjs         # ENABLED_INDUSTRIES unset: every industry offered
+//   node scripts/test-industries-e2e.mjs --food  # ENABLED_INDUSTRIES narrowed to the food types
 import { spawn, execSync } from "node:child_process";
 import { chromium } from "playwright-core";
 import { getAdminClient, assert } from "./lib/supabaseTestEnv.mjs";
 import { waitForServer } from "./lib/devServer.mjs";
 
-const DEFAULT_ENV = process.argv.includes("--default");
-const PORT = DEFAULT_ENV ? 3221 : 3220;
+const FOOD_ONLY = process.argv.includes("--food");
+const PORT = FOOD_ONLY ? 3221 : 3220;
 const BASE = `http://localhost:${PORT}`;
-const ALL = "bakery,food_truck,caterer,jewelry,florist,metalworking";
+const FOOD = "bakery,food_truck,caterer";
 const admin = getAdminClient();
 const suffix = Date.now();
 const password = "Test-Password-123!";
@@ -31,7 +31,7 @@ async function makeUser(type) {
   return { email, orgId: profile.org_id };
 }
 
-const env = { ...process.env, ENABLED_INDUSTRIES: DEFAULT_ENV ? "" : ALL };
+const env = { ...process.env, ENABLED_INDUSTRIES: FOOD_ONLY ? FOOD : "" };
 const server = spawn("npx", ["next", "start", "--port", String(PORT)], { shell: true, stdio: "ignore", env });
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 try {
@@ -102,6 +102,7 @@ try {
   // Change the material's waste once; the build sheet follows (8/0.9×1.20 + 6 + 18 = $34.6667).
   await admin.from("ingredients").update({ waste_pct: 10 }).eq("id", ings[0].id);
   await j.reload();
+  await j.getByRole("button", { name: /^Save build sheet$/i }).waitFor(); // past the loading outline
   perPiece = await perPieceText();
   assert(perPiece.includes("$34.6667"), `changing the sterling's waste to 10% re-costs the build sheet: ${perPiece}`);
 
@@ -110,6 +111,7 @@ try {
   await j.getByRole("button", { name: /^Save build sheet$/i }).click();
   await j.waitForLoadState("networkidle");
   await j.reload();
+  await j.getByRole("button", { name: /^Save build sheet$/i }).waitFor(); // past the loading outline
   perPiece = await perPieceText();
   assert(perPiece.includes("$33.6000"), `a line's own 0% overrides the material's 10%: ${perPiece}`);
   await admin.from("ingredients").update({ waste_pct: 5 }).eq("id", ings[0].id);
@@ -157,10 +159,10 @@ try {
 
   await j.goto(`${BASE}/settings`);
   const options = await j.locator("#business_type option").allInnerTexts();
-  if (DEFAULT_ENV) {
-    assert(options.some((o) => o.includes("Jewelry maker (no longer offered)")) && !options.some((o) => o.startsWith("Florist")), `default env: picker keeps the org's own hidden industry only: ${options.join(" | ")}`);
+  if (FOOD_ONLY) {
+    assert(options.some((o) => /^Jewelry maker.*\(no longer offered\)$/.test(o)) && !options.some((o) => o.startsWith("Florist")), `food-only env: picker keeps the org's own switched-off industry only: ${options.join(" | ")}`);
   } else {
-    assert(["Jewelry maker", "Florist", "Metal fabrication"].every((n) => options.includes(n)), `all enabled: picker offers the trades: ${options.join(" | ")}`);
+    assert(["Jewelry maker", "Florist", "Metal fabrication"].every((n) => options.some((o) => o.startsWith(n))), `default: picker offers the trades: ${options.join(" | ")}`);
     await j.locator("#business_type").selectOption("florist");
     await j.getByRole("button", { name: "Save settings" }).click();
     await j.getByText("Saved.").waitFor();
@@ -197,16 +199,20 @@ try {
   // ---- signup ---------------------------------------------------------------
   const s = await browser.newPage();
   await s.goto(`${BASE}/signup?industry=jewelry`);
-  const signupOptions = await s.locator("#businessType option").allInnerTexts();
-  const firstLabel = await s.locator("form label").first().innerText();
-  assert(firstLabel.includes("What kind of business?"), "the industry picker is the first signup step");
-  if (DEFAULT_ENV) {
-    assert(!signupOptions.includes("Jewelry maker") && (await s.locator("#businessType").inputValue()) === "", "default env: signup doesn't offer or preselect jewelry");
+  const cards = (await s.getByTestId("industry-cards").locator("label").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+  const picked = async () => s.locator('input[name="businessType"]:checked').getAttribute("value").catch(() => null);
+  assert((await s.locator("form legend").first().innerText()).includes("What kind of business?"), "the industry picker is the first signup step");
+  assert(["Home bakery", "Food truck", "Caterer"].every((n, i) => cards[i]?.startsWith(n)) && cards.at(-1).startsWith("Something else"), `food choices first, "Something else" last: ${cards.join(" | ")}`);
+  if (FOOD_ONLY) {
+    assert(!cards.some((c) => c.startsWith("Jewelry")) && (await picked()) === "", `food-only env: signup doesn't offer or preselect jewelry ("Something else" stays picked): ${cards.join(" | ")}`);
   } else {
-    assert(signupOptions.includes("Jewelry maker") && (await s.locator("#businessType").inputValue()) === "jewelry", "enabled: ?industry=jewelry preselects it");
+    assert(["Jewelry maker beta", "Florist beta", "Metal fabrication beta"].every((n) => cards.some((c) => c.toLowerCase().startsWith(n.toLowerCase()))), `default: signup cards offer every type, trades as beta: ${cards.join(" | ")}`);
+    assert((await picked()) === "jewelry", "?industry=jewelry preselects the jewelry card");
+    await s.getByTestId("industry-cards").locator("label", { hasText: "Florist" }).click();
+    assert((await picked()) === "florist", "clicking a card picks it");
   }
 
-  console.log(`\nAll industry checks passed (${DEFAULT_ENV ? "default ENABLED_INDUSTRIES" : "all industries enabled"}).`);
+  console.log(`\nAll industry checks passed (${FOOD_ONLY ? "ENABLED_INDUSTRIES = food only" : "default: every industry offered"}).`);
 } finally {
   await browser.close();
   try {

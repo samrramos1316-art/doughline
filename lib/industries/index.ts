@@ -128,7 +128,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     name: "Jewelry maker",
     description: "Pieces built from precious metal, stones and findings.",
     family: "trade",
-    status: "hidden",
+    status: "beta",
     vocab: {
       recipe: "Build sheet",
       recipes: "Build sheets",
@@ -174,7 +174,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     name: "Florist",
     description: "Arrangements and event packages from cut flowers and supplies.",
     family: "trade",
-    status: "hidden",
+    status: "beta",
     vocab: {
       recipe: "Arrangement",
       recipes: "Arrangements",
@@ -213,7 +213,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     name: "Metal fabrication",
     description: "Jobs and quotes built from bar, sheet and tube stock.",
     family: "trade",
-    status: "hidden",
+    status: "beta",
     vocab: {
       recipe: "Job",
       recipes: "Jobs",
