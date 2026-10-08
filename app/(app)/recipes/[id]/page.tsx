@@ -6,7 +6,7 @@ import { CostBreakdown } from "@/components/recipes/CostBreakdown";
 import { effectiveWastePct, laborRate, lineCost } from "@/lib/costing/recipeCost";
 import { getVocab, getIndustry } from "@/lib/supabase/vocab";
 import { lower } from "@/lib/vocab";
-import { Panel, Kpi, PageHeader, HBar, Empty, money, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { Panel, Kpi, PageHeader, HBar, Empty, ButtonLink, money, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
 export default async function RecipeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -67,6 +67,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
             <Link href="/recipes" className="underline">{v.recipes}</Link> · {lower(v.yield)} {recipe.batch_yield_qty} {recipe.batch_yield_unit}
           </>
         }
+        actions={industry.features.quote ? <ButtonLink href={`/quote?from=${id}`}>Quote a custom version</ButtonLink> : undefined}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">

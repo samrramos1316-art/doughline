@@ -118,6 +118,32 @@ try {
   await j.goto(`${BASE}/margins`);
   assert((await j.getByText("64.1%").count()) > 0, "the ring's margin (64.1%) includes waste and labor");
 
+  // ---- the custom-order quote calculator (jewelry core) -------------------
+  assert((await navLinks(j)).includes("Quote"), "jeweler nav has Quote");
+  await j.goto(`${BASE}/recipes/${recipe.id}`);
+  await j.getByRole("link", { name: "Quote a custom version" }).click();
+  await j.waitForURL(/\/quote\?from=/);
+  const result = j.getByTestId("quote-result");
+  await result.waitFor();
+  // Same piece as the build sheet: $34.1053 to make; at the 65% target → $97.45.
+  assert((await result.innerText()).includes("$97.45"), `quote suggests $97.45 at a 65% margin: ${(await result.innerText()).replace(/\s+/g, " ")}`);
+  assert((await j.locator("main").innerText()).includes("$34.1053"), "quote costs the piece exactly like its build sheet");
+  await j.getByLabel("Your price ($, optional)").fill("95");
+  assert((await j.getByTestId("quote-own-margin").innerText()).includes("64.1% margin, under your 65% target"), "your own price shows its margin against the target");
+  // A heavier custom version: 12 g of sterling instead of 8 → 12/0.95×1.20 + 6 + 18 = $39.1579; ÷ 0.35 → $111.88.
+  await j.getByLabel("Your price ($, optional)").fill("");
+  await j.locator('input[data-cell="0:1"]').fill("12");
+  assert((await result.innerText()).includes("$111.88"), `editing the metal weight re-prices the quote: ${(await result.innerText()).replace(/\s+/g, " ")}`);
+  await j.locator('input[value="Stacking ring (custom)"]').fill("Heavy stacking ring");
+  await j.getByRole("button", { name: /Keep as a build sheet and product/i }).click();
+  await j.waitForURL(/\/recipes\/[0-9a-f-]{36}$/);
+  await j.getByRole("button", { name: /^Save build sheet$/i }).waitFor(); // past the loading outline
+  const { data: kept } = await admin.from("menu_items").select("selling_price, recipes(name, labor_minutes, recipe_ingredients(quantity, waste_pct))").eq("org_id", jeweler.orgId).eq("name", "Heavy stacking ring").single();
+  assert(Number(kept.selling_price) === 111.88 && kept.recipes.name === "Heavy stacking ring" && Number(kept.recipes.labor_minutes) === 45, `kept as a build sheet and a $111.88 product: ${JSON.stringify(kept)}`);
+  assert(kept.recipes.recipe_ingredients.some((l) => Number(l.quantity) === 12 && l.waste_pct === null), "kept lines follow the material's loss %");
+  const perPieceKept = (await j.locator("main").innerText()).replace(/\s+/g, " ").match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0] ?? "";
+  assert(perPieceKept.includes("$39.1579"), `the kept build sheet costs what the quote said: ${perPieceKept}`);
+
   await j.goto(`${BASE}/ingredients`);
   await j.getByRole("heading", { name: "Materials" }).waitFor();
   const unitOptions = await j.locator("datalist option").evaluateAll((os) => os.map((o) => o.value));
@@ -152,6 +178,7 @@ try {
   const b = await login(baker.email);
   nav = await navLinks(b);
   assert(["Overview", "Menu", "Margins", "Recipes", "Ingredients", "Invoices", "Match lines", "Price alerts", "Market watch", "Settings"].every((n) => nav.includes(n)), `food nav unchanged: ${nav.join(", ")}`);
+  assert(!nav.includes("Quote"), "food nav has no Quote");
   assert((await b.getByText(/Market watch ·/).count()) === 1, "food dashboard keeps Market Watch");
   await b.goto(`${BASE}/ingredients`);
   const foodUnits = await b.locator("datalist option").evaluateAll((os) => os.map((o) => o.value));
@@ -160,6 +187,12 @@ try {
   const csv = await (await b.request.get(`${BASE}/api/ingredients/export`)).text();
   const csvHeader = csv.split(/\r?\n/)[0];
   assert(csvHeader === "id,name,category,base_unit,current_unit_cost,commodity_code", `food CSV export is the same file as before: ${csvHeader}`);
+
+  // Like /admin, the page calls notFound() after the app's loading outline
+  // has streamed, so the status stays 200; what matters is what they see.
+  await b.goto(`${BASE}/quote`);
+  await b.getByText("This page could not be found").waitFor();
+  assert((await b.getByTestId("quote-result").count()) === 0, "food orgs get the not-found page for /quote, no calculator");
 
   // ---- signup ---------------------------------------------------------------
   const s = await browser.newPage();

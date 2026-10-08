@@ -144,3 +144,10 @@ test("extraction prompts: hints for trades, none for food", () => {
   assert.match(withIndustryHints(base, extractionHints("metalworking", "invoice")), /CWT/);
   assert.match(withIndustryHints(base, extractionHints("metalworking", "recipe")), /cut list/);
 });
+
+test("the quote calculator is jewelry's alone; food has no new screens", () => {
+  for (const id of INDUSTRY_IDS) assert.equal(INDUSTRIES[id].features.quote, id === "jewelry", id);
+  assert.equal(resolveIndustry("bakery").features.quote, false);
+  assert.equal(resolveIndustry(null).features.quote, false);
+  assert.ok(INDUSTRIES.jewelry.categories.includes("outsourced_work"));
+});

@@ -54,6 +54,9 @@ export type IndustryProfile = {
     default_overhead_pct: number;
     show_labor_by_default: boolean; // the recipe page's Labor & overhead section starts open
   };
+  // Screens only some industries get. quote: the custom-order quote
+  // calculator (/quote), for one-off pieces priced from materials + labor.
+  features: { quote: boolean };
   market: {
     categoryDefaults: Record<string, string>; // category → commodity_code
     series: MarketSeries[];
@@ -105,6 +108,7 @@ const food = (id: IndustryId, name: string, description: string): IndustryProfil
   units: FOOD_UNITS,
   categories: FOOD_CATEGORIES,
   defaults: { default_waste_pct: 0, default_overhead_pct: 0, show_labor_by_default: false },
+  features: { quote: false },
   market: { categoryDefaults: CATEGORY_DEFAULTS, series: FOOD_SERIES },
   extraction: NO_HINTS,
 });
@@ -141,8 +145,10 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     },
     // Stones are counted (each) or weighed in carats; chain is bought by length.
     units: ["g", "dwt", "troy oz", "carat", "each", "in", "cm"],
-    categories: ["precious_metal", "stone", "finding", "chain", "packaging", "tools_consumables"],
+    // outsourced_work: casting, plating, stone setting bought in per piece.
+    categories: ["precious_metal", "stone", "finding", "chain", "outsourced_work", "packaging", "tools_consumables"],
     defaults: { default_waste_pct: 5, default_overhead_pct: 0, show_labor_by_default: true },
+    features: { quote: true },
     market: {
       categoryDefaults: { precious_metal: "gold_spot" },
       series: [
@@ -186,6 +192,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     units: ["stem", "bunch", "each", "ft", "in"],
     categories: ["cut_flower", "greens", "vase_container", "foam_supplies", "ribbon_packaging"],
     defaults: { default_waste_pct: 10, default_overhead_pct: 0, show_labor_by_default: true },
+    features: { quote: false },
     market: {
       categoryDefaults: { cut_flower: "floral_wholesale" },
       series: [{ code: "floral_wholesale", label: "Wholesale cut flowers (placeholder)", ingesting: false }],
@@ -224,6 +231,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     units: ["kg", "lb", "ft", "in", "m", "sheet", "each"],
     categories: ["bar_stock", "sheet_plate", "tube_pipe", "fasteners", "consumables", "finishing_coating", "outsourced_service"],
     defaults: { default_waste_pct: 8, default_overhead_pct: 0, show_labor_by_default: true },
+    features: { quote: false },
     market: {
       categoryDefaults: { sheet_plate: "steel_hrc", bar_stock: "steel_hrc" },
       series: [

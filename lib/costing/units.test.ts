@@ -71,3 +71,9 @@ test("stems, bunches and sheets", () => {
   // A case of 25 bunches, flower costed per bunch.
   assert.deepEqual(toBaseUnitCost(line(50, "CS", 25, "bunch"), "bunch"), { ok: true, cost: 2, basis: "$50 per CS of 25 bunch = 25 bunch" });
 });
+
+test("more invoice spellings of troy weights", () => {
+  for (const u of ["toz", "tr oz", "ozt.", "OZT"]) assert.equal(canonicalUnit(u), "troy oz", u);
+  for (const u of ["dwts", "DWT.", "Pennyweights"]) assert.equal(canonicalUnit(u), "dwt", u);
+  assert.equal(canonicalUnit("oz."), null); // food spellings unchanged
+});

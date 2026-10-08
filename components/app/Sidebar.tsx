@@ -9,7 +9,8 @@ import { CameraIcon } from "@/components/ui/dash";
 
 export type NavCounts = { review: number; alerts: number; failed: number; reviewBlocked: boolean };
 // Industry wording for the three links that have it (lib/vocab.ts).
-export type NavLabels = { menu: string; recipes: string; ingredients: string; market?: boolean };
+// market / quote: whether those pages exist for this industry (lib/industries).
+export type NavLabels = { menu: string; recipes: string; ingredients: string; market?: boolean; quote?: boolean };
 
 type Item = { href: string; label: string; icon: keyof typeof ICONS; badge?: (c: NavCounts) => { n: number; tone: "red" | "amber" } | null };
 // Grouped the way the money moves: what you sell, what you make it from,
@@ -21,6 +22,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     items: [
       { href: "/menu", label: "Menu", icon: "tag" },
       { href: "/margins", label: "Margins", icon: "pct" },
+      { href: "/quote", label: "Quote", icon: "calc" },
     ],
   },
   {
@@ -49,6 +51,7 @@ const groupsFor = (admin: boolean, labels?: NavLabels) =>
     ...g,
     items: g.items
       .filter((it) => it.href !== "/market" || labels?.market !== false)
+      .filter((it) => it.href !== "/quote" || labels?.quote === true)
       .map((it) => (labels && LABEL_KEYS[it.href] ? { ...it, label: labels[LABEL_KEYS[it.href]] as string } : it)),
   }));
 
@@ -56,6 +59,7 @@ const ICONS = {
   grid: "M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z",
   tag: "M3 10V3h7l7 7-7 7-7-7zM6.5 6.5h.01",
   pct: "M5 15 15 5M6.5 5.5a1 1 0 1 0 0 .01M13.5 14.5a1 1 0 1 0 0 .01",
+  calc: "M5 2h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM7 5h6v3H7zM7 11h.01M10 11h.01M13 11h.01M7 14h.01M10 14h.01M13 14h.01",
   book: "M4 3h9a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2zM4 15a2 2 0 0 1 2-2h9",
   box: "M3 6l7-3 7 3v8l-7 3-7-3zM3 6l7 3 7-3M10 9v8",
   doc: "M5 2h7l4 4v12H5zM12 2v4h4M8 10h5M8 13h5",
