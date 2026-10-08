@@ -4,6 +4,7 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { createIngredientFromLineItemSchema } from "@/lib/validators/lineItem";
 import { confirmLineItem, UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
+import { getIndustry } from "@/lib/supabase/vocab";
 
 // Voyage retries 429s on its free tier, so the embedding can take most of a
 // minute. It runs after the response (below); this keeps it from being cut off.
@@ -58,7 +59,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!ingredient) {
     const { data, error } = await supabase
       .from("ingredients")
-      .insert({ ...parsed.data, org_id: orgId })
+      // New materials start at the industry's waste % (0 for food; migration 027).
+      .insert({ ...parsed.data, org_id: orgId, waste_pct: (await getIndustry()).defaults.default_waste_pct })
       .select(INGREDIENT_COLUMNS)
       .single();
     if (error?.code === "23505") {

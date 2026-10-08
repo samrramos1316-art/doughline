@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { suggestForItem, type ItemSuggestion } from "./math";
-import { effectiveUnitCost } from "@/lib/costing/recipeCost";
+import { effectiveUnitCost, effectiveWastePct } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 
@@ -62,7 +62,7 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
       supabase.from("recipes").select("id, name, batch_yield_qty, overhead_pct").in("id", recipeIds),
       supabase
         .from("recipe_ingredients")
-        .select("recipe_id, quantity, waste_pct")
+        .select("recipe_id, quantity, waste_pct, ingredients(waste_pct)")
         .eq("ingredient_id", alert.ingredient_id)
         .in("recipe_id", recipeIds),
     ]);
@@ -82,7 +82,7 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
     // A recipe can list the same ingredient on more than one line.
     const lines = (recipeIngs ?? [])
       .filter((ri) => ri.recipe_id === recipe.id)
-      .map((ri) => ({ quantity: Number(ri.quantity), wastePct: Number(ri.waste_pct) }));
+      .map((ri) => ({ quantity: Number(ri.quantity), wastePct: effectiveWastePct(ri.waste_pct, ri.ingredients?.waste_pct) }));
     const qty = lines.reduce((sum, l) => sum + l.quantity, 0);
 
     const s = suggestForItem({

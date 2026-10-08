@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { batchCost, effectiveUnitCost, laborCost, lineCost, marginPctOf, perServing } from "./recipeCost.ts";
+import { batchCost, effectiveUnitCost, effectiveWastePct, laborCost, lineCost, marginPctOf, perServing } from "./recipeCost.ts";
 
 // The cookie batch from scripts/test-costing-views.mjs: 1000 g flour at
 // $0.002, 500 g sugar at $0.0015, 250 g butter at $0.008 → $4.75, 24 cookies.
@@ -63,4 +63,16 @@ test("effective unit cost includes waste and overhead", () => {
   close(effectiveUnitCost(2, [{ quantity: 1, wastePct: 20 }], 10), 2 * 1.25 * 1.1);
   // Two lines, one wasteful: weighted by quantity.
   close(effectiveUnitCost(1, [{ quantity: 3 }, { quantity: 1, wastePct: 50 }]), (3 + 2) / 4);
+});
+
+test("a line's waste: its own % if set, else its material's", () => {
+  assert.equal(effectiveWastePct(null, 3), 3); // follows the material
+  assert.equal(effectiveWastePct(undefined, "3.50"), 3.5); // numeric columns arrive as strings
+  assert.equal(effectiveWastePct(0, 3), 0); // an explicit 0 overrides
+  assert.equal(effectiveWastePct(12, 3), 12);
+  assert.equal(effectiveWastePct(null, null), 0);
+  // 3% loss on gold, set once on the material: 10 g used costs 10/0.97 g.
+  close(lineCost(10, 60, effectiveWastePct(null, 3)), (10 / 0.97) * 60);
+  // A food line with nothing set anywhere is still exactly quantity × cost.
+  assert.equal(lineCost(1000, 0.002, effectiveWastePct(null, 0)), 1000 * 0.002);
 });

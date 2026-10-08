@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RecipeBuilder } from "@/components/recipes/RecipeBuilder";
 import { CostBreakdown } from "@/components/recipes/CostBreakdown";
-import { laborRate, lineCost } from "@/lib/costing/recipeCost";
+import { effectiveWastePct, laborRate, lineCost } from "@/lib/costing/recipeCost";
 import { getVocab, getIndustry } from "@/lib/supabase/vocab";
 import { lower } from "@/lib/vocab";
 import { Panel, Kpi, PageHeader, HBar, Empty, money, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
@@ -14,8 +14,8 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
 
   const [{ data: recipe }, { data: recipeIngredients }, { data: allIngredients }, { data: cost }, { data: menu }, { data: org }, { data: menuItems }, v] = await Promise.all([
     supabase.from("recipes").select("*").eq("id", id).maybeSingle(),
-    supabase.from("recipe_ingredients").select("ingredient_id, quantity, unit, waste_pct, ingredients(name, base_unit, current_unit_cost)").eq("recipe_id", id),
-    supabase.from("ingredients").select("id, name, base_unit").order("name"),
+    supabase.from("recipe_ingredients").select("ingredient_id, quantity, unit, waste_pct, ingredients(name, base_unit, current_unit_cost, waste_pct)").eq("recipe_id", id),
+    supabase.from("ingredients").select("id, name, base_unit, waste_pct").order("name"),
     supabase.from("recipe_costs").select("*").eq("recipe_id", id).maybeSingle(),
     supabase.from("menu_item_margins").select("menu_item_id, name, selling_price, margin_pct"),
     supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour").maybeSingle(),
@@ -26,21 +26,21 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
   const soldAs = (menu ?? []).filter((m) => (menuItems ?? []).some((mi) => mi.id === m.menu_item_id));
 
   const industry = await getIndustry();
-  const defaultWaste = industry.defaults.default_waste_pct;
-  // With an industry default waste, a blank cell means "the default", so a
-  // saved 0 shows as 0 rather than blank.
+  // A blank cell follows the material's waste % (migration 027); a line's
+  // own %, 0 included, shows as typed.
   const initialRows = (recipeIngredients ?? []).map((ri) => ({
     ingredient_id: ri.ingredient_id,
     quantity: String(ri.quantity),
     unit: ri.unit,
-    waste_pct: Number(ri.waste_pct) > 0 || defaultWaste > 0 ? String(Number(ri.waste_pct)) : "",
+    waste_pct: ri.waste_pct == null ? "" : String(Number(ri.waste_pct)),
   }));
-  // Line cost includes waste (÷ (1 − waste %)), as the recipe_costs view does.
+  // Line cost includes waste (÷ (1 − waste %)), the line's own or else the
+  // material's, as the recipe_costs view does.
   const breakdown = (recipeIngredients ?? [])
     .map((ri) => {
       const c = ri.ingredients?.current_unit_cost == null ? null : Number(ri.ingredients.current_unit_cost);
       const qty = Number(ri.quantity);
-      const waste = Number(ri.waste_pct);
+      const waste = effectiveWastePct(ri.waste_pct, ri.ingredients?.waste_pct);
       return { name: ri.ingredients?.name ?? "?", qty, unit: ri.unit, waste, unitCost: c, line: c == null ? null : lineCost(qty, c, waste), wasteExtra: c == null ? 0 : lineCost(qty, c, waste) - qty * c };
     })
     .sort((a, b) => (b.line ?? 0) - (a.line ?? 0));
@@ -98,7 +98,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
             initialLabor={{ labor_minutes: laborOverhead.laborMinutes, labor_rate_per_hour: laborOverhead.laborRatePerHour, overhead_pct: laborOverhead.overheadPct }}
             defaultLaborRate={defaultLaborRate}
             labels={{ ingredient: v.ingredient, ingredients: v.ingredients, recipe: lower(v.recipe) }}
-            defaultWastePct={defaultWaste}
+            defaultWastePct={industry.defaults.default_waste_pct}
             showLaborByDefault={industry.defaults.show_labor_by_default}
           />
         </Panel>

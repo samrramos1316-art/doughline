@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { isoDaysAgo } from "@/lib/dates/localDate";
-import { batchCost, laborCost, lineCost, marginPctOf, overheadMultiplier, perServing, wasteMultiplier, type LaborOverhead } from "@/lib/costing/recipeCost";
+import { batchCost, effectiveWastePct, laborCost, lineCost, marginPctOf, overheadMultiplier, perServing, wasteMultiplier, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 
@@ -86,7 +86,7 @@ export async function getMargins(supabase: Client, orgId: string) {
     supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch").eq("is_active", true).order("name"),
     supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit, labor_minutes, labor_rate_per_hour, overhead_pct"),
-    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct"),
+    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct, ingredients(waste_pct)"),
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost").order("name"),
     supabase.from("ingredient_price_history").select("ingredient_id, unit_cost, effective_date, created_at, vendors(name)").order("effective_date").order("created_at"),
     supabase
@@ -100,7 +100,7 @@ export async function getMargins(supabase: Client, orgId: string) {
   const ingById = new Map((ingredients.data ?? []).map((i) => [i.id, i]));
   const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number; wastePct: number }[]>();
   for (const l of recipeIngredients.data ?? []) {
-    linesByRecipe.set(l.recipe_id, [...(linesByRecipe.get(l.recipe_id) ?? []), { ingredient_id: l.ingredient_id, quantity: Number(l.quantity), wastePct: Number(l.waste_pct) }]);
+    linesByRecipe.set(l.recipe_id, [...(linesByRecipe.get(l.recipe_id) ?? []), { ingredient_id: l.ingredient_id, quantity: Number(l.quantity), wastePct: effectiveWastePct(l.waste_pct, l.ingredients?.waste_pct) }]);
   }
   const defaultRate = Number(org.data?.default_labor_rate_per_hour ?? 0);
 

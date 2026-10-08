@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { createIngredientSchema } from "@/lib/validators/ingredient";
 import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
+import { getIndustry } from "@/lib/supabase/vocab";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 
 // Claude and Voyage calls (Voyage retries 429s on its free tier) can take
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
-  const { current_unit_cost, ...rest } = parsed.data;
+  const { current_unit_cost, waste_pct, ...rest } = parsed.data;
 
   // §4: embedding generated server-side on insert, so the ingredient is
   // vector-matchable (§5.2 step 5b) from the first invoice scanned after it.
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
       ...rest,
       org_id: orgId,
       embedding,
+      waste_pct: waste_pct ?? (await getIndustry()).defaults.default_waste_pct,
       current_unit_cost: current_unit_cost ?? null,
       current_unit_cost_updated_at: current_unit_cost != null ? new Date().toISOString() : null,
     })

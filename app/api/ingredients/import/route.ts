@@ -5,11 +5,12 @@ import { parseCsv } from "@/lib/csv";
 import { localDateFrom } from "@/lib/dates/localDate";
 import { bulkUpsertIngredients, type IngredientRowInput } from "@/lib/ingredients/bulkUpsert";
 import { retryUnappliedPrices } from "@/lib/costing/retryPrices";
+import { getIndustry } from "@/lib/supabase/vocab";
 
 // One Voyage call for every new/renamed ingredient, retried on 429s.
 export const maxDuration = 300;
 
-const COLUMNS = ["id", "name", "category", "base_unit", "current_unit_cost", "commodity_code"] as const;
+const COLUMNS = ["id", "name", "category", "base_unit", "current_unit_cost", "commodity_code", "waste_pct"] as const;
 
 // §9.2: bulk upsert of the ingredient list. Takes either a CSV file body
 // (text/csv — a spreadsheet exported from GET /api/ingredients/export, or
@@ -45,11 +46,12 @@ export async function POST(request: Request) {
       base_unit: get(r, "base_unit") ?? "",
       current_unit_cost: get(r, "current_unit_cost"),
       commodity_code: get(r, "commodity_code"),
+      waste_pct: get(r, "waste_pct"),
     }));
   }
   if (rows.length > 2000) return NextResponse.json({ error: "At most 2000 rows per import" }, { status: 400 });
 
-  const result = await bulkUpsertIngredients(supabase, orgId, rows, localDateFrom(request));
+  const result = await bulkUpsertIngredients(supabase, orgId, rows, localDateFrom(request), (await getIndustry()).defaults.default_waste_pct);
   if ("errors" in result) {
     return NextResponse.json({ error: "Nothing was saved — fix these rows first", row_errors: result.errors }, { status: 400 });
   }

@@ -13,6 +13,7 @@ export type GridColumn = {
   required?: boolean;
   validate?: (value: string, row: GridValues) => string | null;
   placeholder?: string;
+  rowPlaceholder?: (row: GridRow) => string | undefined; // per row, over `placeholder`
   minWidth?: number; // px; the grid scrolls sideways past the sum
   align?: "left" | "right";
   readOnly?: (row: GridRow) => boolean;
@@ -221,7 +222,7 @@ export function EditableGrid({
                           inputMode={c.type === "number" ? "decimal" : undefined}
                           list={c.suggestions ? `grid-${c.key}-list` : undefined}
                           value={value}
-                          placeholder={c.placeholder}
+                          placeholder={c.rowPlaceholder?.(row) ?? c.placeholder}
                           onChange={(e) => setCell(r, c.key, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, r, ci, false)}
                         />

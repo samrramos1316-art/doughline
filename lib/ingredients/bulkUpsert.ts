@@ -13,6 +13,7 @@ export type IngredientRowInput = {
   base_unit: string;
   current_unit_cost?: number | string | null;
   commodity_code?: string | null;
+  waste_pct?: number | string | null; // blank: new rows get the default, existing rows keep theirs
 };
 
 export type RowError = { row: number; field?: string; message: string };
@@ -31,10 +32,11 @@ export async function bulkUpsertIngredients(
   orgId: string,
   input: IngredientRowInput[],
   effectiveDate: string, // the business's local date (lib/dates/localDate.ts)
+  defaultWastePct = 0, // new rows with no waste % (the industry's default; migration 027)
 ): Promise<{ errors: RowError[] } | { outcomes: RowOutcome[]; embeddingError: string | null }> {
   const { data: existing, error: loadErr } = await supabase
     .from("ingredients")
-    .select("id, name, category, base_unit, current_unit_cost, commodity_code");
+    .select("id, name, category, base_unit, current_unit_cost, commodity_code, waste_pct");
   if (loadErr) throw new Error(loadErr.message);
   const byId = new Map(existing.map((e) => [e.id, e]));
   const byName = new Map(existing.map((e) => [norm(e.name), e]));
@@ -52,6 +54,11 @@ export async function bulkUpsertIngredients(
     if (cost != null && (!Number.isFinite(cost) || cost < 0)) {
       errors.push({ row, field: "current_unit_cost", message: `"${costText}" isn't a cost` });
     }
+    const wasteText = r.waste_pct == null ? "" : String(r.waste_pct).trim().replace(/%$/, "");
+    const waste = wasteText === "" ? null : Number(wasteText);
+    if (waste != null && !(Number.isFinite(waste) && waste >= 0 && waste < 100)) {
+      errors.push({ row, field: "waste_pct", message: `"${wasteText}" isn't a waste % (0 to under 100)` });
+    }
     if (name) {
       const prior = seen.get(norm(name));
       if (prior) errors.push({ row, field: "name", message: `"${name}" also appears on row ${prior}` });
@@ -66,6 +73,7 @@ export async function bulkUpsertIngredients(
       name,
       base_unit,
       cost,
+      waste,
       category: r.category?.trim() || null,
       commodity_code: r.commodity_code?.trim() || null,
     };
@@ -102,6 +110,7 @@ export async function bulkUpsertIngredients(
           commodity_code: r.commodity_code,
           current_unit_cost: r.cost,
           current_unit_cost_updated_at: r.cost != null ? now : null,
+          waste_pct: r.waste ?? defaultWastePct,
           embedding: vectorFor.get(r.row) ?? null,
         })),
       )
@@ -134,6 +143,10 @@ export async function bulkUpsertIngredients(
     if ((t.commodity_code ?? null) !== r.commodity_code) {
       update.commodity_code = r.commodity_code;
       changes.push(`commodity ${t.commodity_code ?? "—"} → ${r.commodity_code ?? "—"}`);
+    }
+    if (r.waste != null && Number(t.waste_pct) !== r.waste) {
+      update.waste_pct = r.waste;
+      changes.push(`waste ${Number(t.waste_pct)}% → ${r.waste}%`);
     }
     if (r.cost != null && Number(t.current_unit_cost) !== r.cost) {
       update.current_unit_cost = r.cost;

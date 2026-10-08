@@ -7,6 +7,7 @@ import {
   blankRow,
   gridErrors,
   isBlankRow,
+  parseNumber,
   type GridColumn,
   type GridRow,
 } from "@/components/grid/EditableGrid";
@@ -18,6 +19,7 @@ export type IngredientRecord = {
   category: string | null;
   base_unit: string;
   current_unit_cost: number | null;
+  waste_pct?: number | null;
 };
 
 type Message = { kind: "error" | "ok"; text: string; details?: string[] } | null;
@@ -31,12 +33,28 @@ const columnsFor = (categories: string[], units: string[]): GridColumn[] => [
   { key: "current_unit_cost", label: "Cost / unit", type: "number", align: "right", minWidth: 110 },
 ];
 const FOOD_COLUMNS = columnsFor(CATEGORIES, BASE_UNITS);
+// Waste/loss % per material (migration 027): every recipe line using it
+// follows it unless the line has its own. Blank on a new row = the
+// industry's default; blank on an existing row leaves it as it was.
+const wasteColumn = (defaultPct: number): GridColumn => ({
+  key: "waste_pct",
+  label: "Waste %",
+  type: "number",
+  align: "right",
+  minWidth: 90,
+  placeholder: String(defaultPct),
+  validate: (v) => {
+    const n = parseNumber(v);
+    return n != null && !(n >= 0 && n < 100) ? "Waste must be 0 to under 100%" : null;
+  },
+});
 
 const valuesOf = (i: IngredientRecord) => ({
   name: i.name,
   category: i.category ?? "",
   base_unit: i.base_unit,
   current_unit_cost: i.current_unit_cost == null ? "" : String(i.current_unit_cost),
+  waste_pct: String(Number(i.waste_pct ?? 0)),
 });
 
 // §9.2: the ingredient master list as a spreadsheet — edit cells in place,
@@ -44,12 +62,13 @@ const valuesOf = (i: IngredientRecord) => ({
 // upsert as CSV import (one embedding call for everything new or renamed).
 // A remount after save (keyed on the stored list) restarts from the database.
 // `suggest`: the industry's units and categories (lib/industries); left out,
-// the food lists above.
+// the food lists above. `waste`: show the Waste % column, with this default
+// for new rows; left out (food, until a material has waste), no column.
 export type Suggestions = { units: string[]; categories: string[] };
-export function IngredientsGrid({ ingredients, suggest }: { ingredients: IngredientRecord[]; suggest?: Suggestions }) {
+export function IngredientsGrid({ ingredients, suggest, waste }: { ingredients: IngredientRecord[]; suggest?: Suggestions; waste?: { defaultPct: number } }) {
   const [message, setMessage] = useState<Message>(null);
-  const version = ingredients.map((i) => `${i.id}:${i.name}:${i.current_unit_cost}:${i.base_unit}:${i.category}`).join("|");
-  return <IngredientsGridForm key={version} ingredients={ingredients} message={message} setMessage={setMessage} suggest={suggest} />;
+  const version = ingredients.map((i) => `${i.id}:${i.name}:${i.current_unit_cost}:${i.base_unit}:${i.category}:${i.waste_pct}`).join("|");
+  return <IngredientsGridForm key={version} ingredients={ingredients} message={message} setMessage={setMessage} suggest={suggest} waste={waste} />;
 }
 
 function IngredientsGridForm({
@@ -57,13 +76,19 @@ function IngredientsGridForm({
   message,
   setMessage,
   suggest,
+  waste,
 }: {
   ingredients: IngredientRecord[];
   message: Message;
   setMessage: (m: Message) => void;
   suggest?: Suggestions;
+  waste?: { defaultPct: number };
 }) {
-  const COLUMNS = useMemo(() => (suggest ? columnsFor(suggest.categories, suggest.units) : FOOD_COLUMNS), [suggest]);
+  const wasteDefault = waste?.defaultPct;
+  const COLUMNS = useMemo(() => {
+    const base = suggest ? columnsFor(suggest.categories, suggest.units) : FOOD_COLUMNS;
+    return wasteDefault == null ? base : [...base, wasteColumn(wasteDefault)];
+  }, [suggest, wasteDefault]);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const byId = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);

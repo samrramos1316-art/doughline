@@ -285,6 +285,30 @@ try {
     `price alert impact uses waste, labor and overhead: ${impact.previous_margin_pct}% → ${impact.new_margin_pct}% (hand-computed ${pctOf(total)}% → ${pctOf(totalAfter)}%)`,
   );
 
+  // 8. Waste per material (migration 027). A line with no waste of its own
+  //    (null) follows its ingredient's waste %; a line's own % wins.
+  const { data: sugarLine } = await admin.from("recipe_ingredients").select("waste_pct").eq("recipe_id", recipeId).eq("ingredient_id", sugarId).single();
+  assert(sugarLine.waste_pct === null, `a line saved without waste follows its material (waste_pct ${sugarLine.waste_pct})`);
+  await admin.from("ingredients").update({ waste_pct: 20 }).eq("id", sugarId); // sugar line: null → 20%
+  await admin.from("ingredients").update({ waste_pct: 50 }).eq("id", flourId); // flour line keeps its own 10%
+  const materials8 = (1000 / 0.9) * 0.006 + (500 / 0.8) * 0.0015 + 250 * 0.008;
+  const total8 = (materials8 + 9) * 1.1;
+  v = await viewRow();
+  assert(
+    near(v.materials_cost, materials8) && near(v.batch_total_cost, total8),
+    `material waste: sugar follows its 20%, flour keeps its line's 10% over the material's 50%: materials ${v.materials_cost} = ${materials8.toFixed(4)}`,
+  );
+  const { effectiveWastePct } = await import("../lib/costing/recipeCost.ts");
+  const app8 = batchCost(
+    [
+      { quantity: 1000, unitCost: 0.006, wastePct: effectiveWastePct(10, 50) },
+      { quantity: 500, unitCost: 0.0015, wastePct: effectiveWastePct(null, 20) },
+      { quantity: 250, unitCost: 0.008, wastePct: effectiveWastePct(null, 0) },
+    ],
+    { laborMinutes: 30, laborRatePerHour: 18, defaultLaborRatePerHour: 12, overheadPct: 10 },
+  );
+  assert(near(v.batch_total_cost, app8.total), `lib/costing/recipeCost.ts agrees with the view on material waste (${app8.total.toFixed(6)})`);
+
   console.log("\nAll costing view checks passed.");
 } finally {
   console.log("\nCleaning up test fixtures...");

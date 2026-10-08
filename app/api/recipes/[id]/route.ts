@@ -45,8 +45,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 400 });
 
     if (ingredients.length > 0) {
-      // waste_pct on every row: a bulk insert sends null for a key some rows lack (NOT NULL).
-      const rows = ingredients.map((i) => ({ ...i, waste_pct: i.waste_pct ?? 0, org_id: orgId, recipe_id: id }));
+      // waste_pct on every row, null = the material's waste % (migration 027).
+      const rows = ingredients.map((i) => ({ ...i, waste_pct: i.waste_pct ?? null, org_id: orgId, recipe_id: id }));
       const { error: insertError } = await supabase.from("recipe_ingredients").insert(rows);
       if (insertError) return NextResponse.json({ error: insertError.message }, { status: 400 });
     }

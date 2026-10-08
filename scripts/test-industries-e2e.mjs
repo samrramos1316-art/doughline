@@ -41,9 +41,10 @@ try {
 
   // A build sheet: 8 g sterling ($1.20/g) with 5% waste, a $6 stone, 45 min
   // at $24/h; sold as a $95 ring → cost 8/0.95×1.20 + 6 + 18 = $34.1053.
+  // The 5% is set once on the sterling (migration 027); the lines follow it.
   const { data: ings, error: ingErr } = await admin.from("ingredients").insert([
-    { org_id: jeweler.orgId, name: "Sterling casting grain", base_unit: "g", category: "precious_metal", current_unit_cost: 1.2 },
-    { org_id: jeweler.orgId, name: "White sapphire 3mm", base_unit: "each", category: "stone", current_unit_cost: 6 },
+    { org_id: jeweler.orgId, name: "Sterling casting grain", base_unit: "g", category: "precious_metal", current_unit_cost: 1.2, waste_pct: 5 },
+    { org_id: jeweler.orgId, name: "White sapphire 3mm", base_unit: "each", category: "stone", current_unit_cost: 6, waste_pct: 0 },
   ]).select("id, name");
   if (ingErr) throw new Error("insert ingredients failed: " + ingErr.message);
   const { data: recipe, error: recipeErr } = await admin.from("recipes").insert({
@@ -51,8 +52,8 @@ try {
   }).select("id").single();
   if (recipeErr) throw new Error("insert recipe failed: " + recipeErr.message);
   const { error: riErr } = await admin.from("recipe_ingredients").insert([
-    { org_id: jeweler.orgId, recipe_id: recipe.id, ingredient_id: ings[0].id, quantity: 8, unit: "g", waste_pct: 5 },
-    { org_id: jeweler.orgId, recipe_id: recipe.id, ingredient_id: ings[1].id, quantity: 1, unit: "each", waste_pct: 0 },
+    { org_id: jeweler.orgId, recipe_id: recipe.id, ingredient_id: ings[0].id, quantity: 8, unit: "g" },
+    { org_id: jeweler.orgId, recipe_id: recipe.id, ingredient_id: ings[1].id, quantity: 1, unit: "each" },
   ]);
   if (riErr) throw new Error("insert recipe lines failed: " + riErr.message);
   await admin.from("menu_items").insert({ org_id: jeweler.orgId, recipe_id: recipe.id, name: "Stacking ring", selling_price: 95 });
@@ -81,11 +82,38 @@ try {
   assert(headings.some((h) => /products margins/i.test(h)) && !headings.some((h) => /menu margins/i.test(h)), `dashboard card wording comes from the profile: ${headings.join(" | ")}`);
 
   await j.goto(`${BASE}/recipes/${recipe.id}`);
+  await j.getByRole("button", { name: /^Save build sheet$/i }).waitFor(); // past the loading outline
   assert((await j.getByRole("columnheader", { name: "Waste %" }).count()) > 0, "build sheet shows the Waste % column");
   assert(await j.locator("details").first().evaluate((d) => d.open), "Labor & overhead starts open (show_labor_by_default)");
-  assert((await j.getByText("A blank Waste % uses your usual 5%").count()) === 1, "new lines default to the jewelry waste (5%)");
-  const perPiece = (await j.locator("main").innerText()).replace(/\s+/g, " ").match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0] ?? "(no batch cost panel)";
-  assert(perPiece.includes("$34.1053"), `build sheet cost with waste and labor: ${perPiece}`);
+  assert((await j.getByText(/A blank Waste % uses the material's own waste %/).count()) === 1, "build sheet explains blank waste = the material's");
+  const wastePlaceholders = await j.locator('input[data-cell$=":3"]').evaluateAll((els) => els.map((e) => e.placeholder));
+  assert(wastePlaceholders[0] === "5" && wastePlaceholders[1] === "0", `blank waste cells show each material's own %: ${wastePlaceholders.join(", ")}`);
+  const perPieceText = async () => (await j.locator("main").innerText()).replace(/\s+/g, " ").match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0] ?? "(no batch cost panel)";
+  let perPiece = await perPieceText();
+  assert(perPiece.includes("$34.1053"), `build sheet cost uses the material's 5% waste and labor: ${perPiece}`);
+  assert((await j.getByText("+5% waste").count()) === 1, "the cost table shows the sterling's 5% waste");
+
+  // Saving with blank waste keeps the lines following the material.
+  await j.getByRole("button", { name: /^Save build sheet$/i }).click();
+  await j.waitForLoadState("networkidle");
+  const { data: savedLines } = await admin.from("recipe_ingredients").select("waste_pct").eq("recipe_id", recipe.id);
+  assert(savedLines.length === 2 && savedLines.every((l) => l.waste_pct === null), `saved with blank waste: lines still follow their material (${savedLines.map((l) => l.waste_pct).join(", ")})`);
+
+  // Change the material's waste once; the build sheet follows (8/0.9×1.20 + 6 + 18 = $34.6667).
+  await admin.from("ingredients").update({ waste_pct: 10 }).eq("id", ings[0].id);
+  await j.reload();
+  perPiece = await perPieceText();
+  assert(perPiece.includes("$34.6667"), `changing the sterling's waste to 10% re-costs the build sheet: ${perPiece}`);
+
+  // A line's own % overrides the material's: type 0 on the sterling line.
+  await j.locator('input[data-cell="0:3"]').fill("0");
+  await j.getByRole("button", { name: /^Save build sheet$/i }).click();
+  await j.waitForLoadState("networkidle");
+  await j.reload();
+  perPiece = await perPieceText();
+  assert(perPiece.includes("$33.6000"), `a line's own 0% overrides the material's 10%: ${perPiece}`);
+  await admin.from("ingredients").update({ waste_pct: 5 }).eq("id", ings[0].id);
+  await admin.from("recipe_ingredients").update({ waste_pct: null }).eq("recipe_id", recipe.id);
 
   await j.goto(`${BASE}/margins`);
   assert((await j.getByText("64.1%").count()) > 0, "the ring's margin (64.1%) includes waste and labor");
@@ -94,6 +122,9 @@ try {
   await j.getByRole("heading", { name: "Materials" }).waitFor();
   const unitOptions = await j.locator("datalist option").evaluateAll((os) => os.map((o) => o.value));
   assert(unitOptions.includes("dwt") && unitOptions.includes("troy oz") && unitOptions.includes("precious_metal"), "materials grid suggests jewelry units and categories");
+  assert((await j.getByRole("columnheader", { name: "Waste %" }).count()) === 1, "materials grid has a Waste % column");
+  const ringRow = j.locator("tr", { has: j.locator('input[value="Sterling casting grain"]') });
+  assert((await ringRow.locator('input[data-cell$=":4"]').inputValue()) === "5", "the sterling's waste % shows in the materials grid");
 
   await j.goto(`${BASE}/market`);
   assert((await j.getByText("Not available yet").count()) === 1, "/market says there's no data for jewelry rather than showing food prices");
@@ -125,6 +156,10 @@ try {
   await b.goto(`${BASE}/ingredients`);
   const foodUnits = await b.locator("datalist option").evaluateAll((os) => os.map((o) => o.value));
   assert(foodUnits.includes("gal") && !foodUnits.includes("dwt"), "food ingredient grid keeps its own unit list");
+  assert((await b.getByRole("columnheader", { name: "Waste %" }).count()) === 0, "food ingredient grid has no Waste % column");
+  const csv = await (await b.request.get(`${BASE}/api/ingredients/export`)).text();
+  const csvHeader = csv.split(/\r?\n/)[0];
+  assert(csvHeader === "id,name,category,base_unit,current_unit_cost,commodity_code", `food CSV export is the same file as before: ${csvHeader}`);
 
   // ---- signup ---------------------------------------------------------------
   const s = await browser.newPage();

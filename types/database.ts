@@ -159,6 +159,7 @@ export type Database = {
           name: string
           org_id: string
           updated_at: string
+          waste_pct: number
         }
         Insert: {
           base_unit: string
@@ -172,6 +173,7 @@ export type Database = {
           name: string
           org_id: string
           updated_at?: string
+          waste_pct?: number
         }
         Update: {
           base_unit?: string
@@ -185,6 +187,7 @@ export type Database = {
           name?: string
           org_id?: string
           updated_at?: string
+          waste_pct?: number
         }
         Relationships: [
           {
@@ -677,7 +680,7 @@ export type Database = {
           quantity: number
           recipe_id: string
           unit: string
-          waste_pct: number
+          waste_pct: number | null
         }
         Insert: {
           created_at?: string
@@ -687,7 +690,7 @@ export type Database = {
           quantity: number
           recipe_id: string
           unit: string
-          waste_pct?: number
+          waste_pct?: number | null
         }
         Update: {
           created_at?: string
@@ -697,7 +700,7 @@ export type Database = {
           quantity?: number
           recipe_id?: string
           unit?: string
-          waste_pct?: number
+          waste_pct?: number | null
         }
         Relationships: [
           {

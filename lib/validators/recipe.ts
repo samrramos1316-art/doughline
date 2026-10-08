@@ -1,13 +1,14 @@
 import { z } from "zod";
 
 // Waste, labor and overhead (migration 025) are optional everywhere: left
-// out, the database defaults them to 0 (and the labor rate to null = the
-// org's default rate), so a food recipe costs what it always did.
+// out, labor and overhead default to 0 (and the labor rate to null = the
+// org's default rate), and a line's waste to null = its material's waste %
+// (migration 027), so a food recipe costs what it always did.
 export const recipeIngredientSchema = z.object({
   ingredient_id: z.string().uuid(),
   quantity: z.coerce.number().positive(),
   unit: z.string().min(1),
-  waste_pct: z.coerce.number().min(0, "Waste can't be negative").lt(100, "Waste must be under 100%").optional(),
+  waste_pct: z.coerce.number().min(0, "Waste can't be negative").lt(100, "Waste must be under 100%").nullable().optional(),
 });
 
 const laborOverhead = {

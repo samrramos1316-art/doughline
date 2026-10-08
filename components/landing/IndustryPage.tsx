@@ -90,7 +90,7 @@ export function IndustryPage({ id, audience }: { id: IndustryId; audience: strin
             <h2 id="fit-title" className="font-display text-xl font-semibold text-white">Set up the way you work</h2>
             <ul className="mt-4 space-y-3 text-[15px] leading-relaxed">
               <li><b className="text-white">{v.ingredients}</b>, priced from your invoices, by {p.units.join(", ")}.</li>
-              <li><b className="text-white">{v.recipes}</b> list what goes into each piece, with a waste % per line (new lines start at {p.defaults.default_waste_pct}%) and labor time.</li>
+              <li><b className="text-white">{v.recipes}</b> list what goes into each piece, with labor time. Each {lower(v.ingredient)} carries its own waste % (new ones start at {p.defaults.default_waste_pct}%), and any line can override it.</li>
               <li><b className="text-white">{v.menuItems}</b> carry your selling price, so every margin stays current.</li>
               <li>Suggested categories: {p.categories.map(label).join(", ")}.</li>
             </ul>

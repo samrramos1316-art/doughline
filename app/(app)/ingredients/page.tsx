@@ -11,7 +11,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
   const { tab } = await searchParams;
   const supabase = await createClient();
   const [{ data: ingredients }, v] = await Promise.all([
-    supabase.from("ingredients").select("id, name, category, base_unit, current_unit_cost").order("name"),
+    supabase.from("ingredients").select("id, name, category, base_unit, current_unit_cost, waste_pct").order("name"),
     getVocab(),
   ]);
   const list = ingredients ?? [];
@@ -130,11 +130,16 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
     );
   }
 
+  // The Waste % column (migration 027) only once it's in use: an industry
+  // default, or a material that has one. Food lists look as they did.
+  const industry = await getIndustry();
+  const showWaste = industry.defaults.default_waste_pct > 0 || list.some((i) => Number(i.waste_pct) > 0);
+
   return (
     <>
       <PageHeader title={v.ingredients} subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">Margins by menu item</ButtonLink>} />
       <Panel title="Price list">
-        <IngredientsGrid ingredients={list} suggest={formSuggestions(await getIndustry())} />
+        <IngredientsGrid ingredients={list} suggest={formSuggestions(industry)} waste={showWaste ? { defaultPct: industry.defaults.default_waste_pct } : undefined} />
       </Panel>
     </>
   );

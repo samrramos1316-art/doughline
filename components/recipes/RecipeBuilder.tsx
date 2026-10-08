@@ -12,7 +12,7 @@ import {
   type GridRow,
 } from "@/components/grid/EditableGrid";
 
-type IngredientOption = { id: string; name: string; base_unit: string };
+type IngredientOption = { id: string; name: string; base_unit: string; waste_pct?: number };
 type Row = { ingredient_id: string; quantity: string; unit: string; waste_pct: string };
 export type LaborOverheadValues = { labor_minutes: number; labor_rate_per_hour: number | null; overhead_pct: number };
 
@@ -25,8 +25,10 @@ const blankIfZero = (n: number | null | undefined) => (n == null || n === 0 ? ""
 // (recipe_costs view) multiplies quantity by cost-per-base-unit.
 //
 // Waste % and labor & overhead (migration 025) stay out of the way until
-// they're used: the waste column appears once any line has waste or the
-// owner asks for it, and labor sits in a closed section.
+// they're used: the waste column appears once any line or material has
+// waste or the owner asks for it, and labor sits in a closed section. A
+// blank waste cell follows the material's waste % (migration 027), shown as
+// the placeholder; a number overrides it for this line.
 export function RecipeBuilder({
   recipeId,
   ingredientOptions,
@@ -43,14 +45,18 @@ export function RecipeBuilder({
   initialLabor: LaborOverheadValues;
   defaultLaborRate: number;
   labels?: { ingredient: string; ingredients: string; recipe: string };
-  // From the industry profile (lib/industries): a new line left blank gets
-  // this waste %, and the labor section starts open. 0 / false for food.
+  // From the industry profile (lib/industries): with a default waste % the
+  // waste column starts visible, and the labor section starts open. 0 /
+  // false for food.
   defaultWastePct?: number;
   showLaborByDefault?: boolean;
 }) {
   const router = useRouter();
   const unitOf = useMemo(() => new Map(ingredientOptions.map((o) => [o.id, o.base_unit])), [ingredientOptions]);
-  const [showWaste, setShowWaste] = useState(() => defaultWastePct > 0 || initialRows.some((r) => Number(r.waste_pct) > 0));
+  const wasteOf = useMemo(() => new Map(ingredientOptions.map((o) => [o.id, Number(o.waste_pct ?? 0)])), [ingredientOptions]);
+  const [showWaste, setShowWaste] = useState(
+    () => defaultWastePct > 0 || initialRows.some((r) => r.waste_pct.trim() !== "" || (wasteOf.get(r.ingredient_id) ?? 0) > 0),
+  );
   const hasLabor = showLaborByDefault || initialLabor.labor_minutes > 0 || initialLabor.overhead_pct > 0 || initialLabor.labor_rate_per_hour != null;
   const [labor, setLabor] = useState({
     labor_minutes: blankIfZero(initialLabor.labor_minutes),
@@ -86,13 +92,13 @@ export function RecipeBuilder({
               type: "number",
               align: "right",
               minWidth: 90,
-              placeholder: String(defaultWastePct),
+              rowPlaceholder: (r: GridRow) => (r.values.ingredient_id ? String(wasteOf.get(r.values.ingredient_id) ?? 0) : undefined),
               validate: (v: string) => ((parseNumber(v) ?? 0) >= 100 ? "Waste must be under 100%" : null),
             } satisfies GridColumn,
           ]
         : []),
     ],
-    [ingredientOptions, showWaste, labels.ingredient, defaultWastePct],
+    [ingredientOptions, showWaste, labels.ingredient, wasteOf],
   );
 
   const [rows, setRows] = useState<GridRow[]>(() => [
@@ -144,7 +150,7 @@ export function RecipeBuilder({
           ingredient_id: r.values.ingredient_id,
           quantity: parseNumber(r.values.quantity),
           unit: unitOf.get(r.values.ingredient_id),
-          waste_pct: parseNumber(r.values.waste_pct ?? "") ?? defaultWastePct, // blank = the default
+          waste_pct: parseNumber(r.values.waste_pct ?? ""), // blank = the material's waste %
         })),
       labor_minutes: parseNumber(labor.labor_minutes) ?? 0,
       labor_rate_per_hour: parseNumber(labor.labor_rate_per_hour), // blank = the business's default rate
@@ -200,8 +206,10 @@ export function RecipeBuilder({
         canDeleteRow={() => true}
         onDeleteRow={(r) => setRows(rows.filter((x) => x.key !== r.key))}
       />
-      {defaultWastePct > 0 && (
-        <p className="-mt-1 text-xs text-stone-500">A blank Waste % uses your usual {defaultWastePct}%; type 0 for none.</p>
+      {showWaste && (
+        <p className="-mt-1 text-xs text-stone-500">
+          A blank Waste % uses the {labels.ingredient.toLowerCase()}&apos;s own waste % (set on the {labels.ingredients} page); type a number to override it for this line.
+        </p>
       )}
       {!showWaste && (
         <button type="button" onClick={() => setShowWaste(true)} className="self-start text-xs font-medium text-amber-700 hover:underline">

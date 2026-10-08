@@ -6,6 +6,7 @@
 //
 // Per recipe batch:
 //   materials = Σ quantity / (1 − waste_pct/100) × unit cost
+//               (waste_pct = the line's own %, else the material's; 027)
 //   labor     = labor_minutes × (recipe rate ?? org default rate) / 60
 //   total     = (materials + labor) × (1 + overhead_pct/100)
 
@@ -25,6 +26,12 @@ export type LaborOverhead = {
 export type BatchCost = { materials: number; labor: number; overhead: number; total: number };
 
 const num = (n: number | null | undefined) => (n == null || !Number.isFinite(Number(n)) ? 0 : Number(n));
+
+// A line's waste: its own % when set, else its material's (migration 027 —
+// recipe_ingredients.waste_pct null = ingredients.waste_pct).
+export function effectiveWastePct(lineWastePct: number | string | null | undefined, materialWastePct: number | string | null | undefined): number {
+  return lineWastePct != null ? num(Number(lineWastePct)) : num(Number(materialWastePct ?? 0));
+}
 
 // How much has to be bought for `quantity` to end up in the batch: 10% waste
 // means 1 kg used costs 1/0.9 kg bought.

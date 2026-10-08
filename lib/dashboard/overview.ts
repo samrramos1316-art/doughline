@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { isoDaysAgo } from "@/lib/dates/localDate";
-import { batchCost, lineCost, laborCost, overheadMultiplier, perServing, marginPctOf, type LaborOverhead } from "@/lib/costing/recipeCost";
+import { batchCost, effectiveWastePct, lineCost, laborCost, overheadMultiplier, perServing, marginPctOf, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 const round = (n: number, dp = 2) => Math.round(n * 10 ** dp) / 10 ** dp;
@@ -38,7 +38,7 @@ export async function getOverview(supabase: Client, orgId: string) {
     supabase.from("organizations").select("name, target_margin_pct, max_unreviewed_line_items, price_alert_threshold_pct, default_labor_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch, is_active").order("name"),
     supabase.from("recipes").select("id, name, batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct"),
-    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct"),
+    supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct, ingredients(waste_pct)"),
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost"),
     supabase.from("ingredient_price_history").select("ingredient_id, unit_cost, effective_date, created_at").order("effective_date").order("created_at"),
     supabase
@@ -60,7 +60,7 @@ export async function getOverview(supabase: Client, orgId: string) {
   const recipeById = new Map((recipes.data ?? []).map((r) => [r.id, r]));
   const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number; wastePct: number }[]>();
   for (const ri of recipeIngredients.data ?? []) {
-    linesByRecipe.set(ri.recipe_id, [...(linesByRecipe.get(ri.recipe_id) ?? []), { ingredient_id: ri.ingredient_id, quantity: Number(ri.quantity), wastePct: Number(ri.waste_pct) }]);
+    linesByRecipe.set(ri.recipe_id, [...(linesByRecipe.get(ri.recipe_id) ?? []), { ingredient_id: ri.ingredient_id, quantity: Number(ri.quantity), wastePct: effectiveWastePct(ri.waste_pct, ri.ingredients?.waste_pct) }]);
   }
   const defaultRate = Number(org.data.default_labor_rate_per_hour);
   const laborOverheadOf = (recipe: { labor_minutes: number; labor_rate_per_hour: number | null; overhead_pct: number } | undefined): LaborOverhead =>

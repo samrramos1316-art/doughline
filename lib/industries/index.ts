@@ -46,7 +46,7 @@ export type IndustryProfile = {
   units: string[]; // allowed/suggested units, all known to lib/costing/units.ts
   categories: string[]; // suggested ingredient categories (stored as written)
   defaults: {
-    default_waste_pct: number; // prefilled on new recipe lines
+    default_waste_pct: number; // new materials start with this waste % (migration 027)
     default_overhead_pct: number;
     show_labor_by_default: boolean; // the recipe page's Labor & overhead section starts open
   };

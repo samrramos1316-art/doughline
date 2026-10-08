@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { batchCost, marginPctOf } from "./recipeCost";
+import { batchCost, effectiveWastePct, marginPctOf } from "./recipeCost";
 
 export type MarginHistoryPoint = {
   date: string;
@@ -34,7 +34,7 @@ export async function getMenuItemMarginHistory(
 
   const { data: recipeIngredients } = await supabase
     .from("recipe_ingredients")
-    .select("ingredient_id, quantity, waste_pct")
+    .select("ingredient_id, quantity, waste_pct, ingredients(waste_pct)")
     .eq("recipe_id", menuItem.recipe_id);
   if (!recipeIngredients || recipeIngredients.length === 0) return [];
 
@@ -68,7 +68,7 @@ export async function getMenuItemMarginHistory(
         (p) => p.ingredient_id === ri.ingredient_id && p.effective_date <= date,
       );
       const latest = pricesOnOrBefore[pricesOnOrBefore.length - 1];
-      return latest ? [{ quantity: Number(ri.quantity), unitCost: Number(latest.unit_cost), wastePct: Number(ri.waste_pct) }] : [];
+      return latest ? [{ quantity: Number(ri.quantity), unitCost: Number(latest.unit_cost), wastePct: effectiveWastePct(ri.waste_pct, ri.ingredients?.waste_pct) }] : [];
     });
 
     const costPerServing = (batchCost(lines, laborOverhead)?.total ?? 0) / servingsPerBatch;
