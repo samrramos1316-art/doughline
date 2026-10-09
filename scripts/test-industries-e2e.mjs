@@ -38,6 +38,7 @@ try {
   await waitForServer(BASE, 60_000);
   const jeweler = await makeUser("jewelry");
   const baker = await makeUser("bakery");
+  const florist = await makeUser("florist");
 
   // A build sheet: 8 g sterling ($1.20/g) with 5% waste, a $6 stone, 45 min
   // at $24/h; sold as a $95 ring → cost 8/0.95×1.20 + 6 + 18 = $34.1053.
@@ -175,6 +176,71 @@ try {
     const { count } = await admin.from("recipe_ingredients").select("id", { count: "exact", head: true }).eq("recipe_id", recipe.id);
     assert(count === 2, "switching industry leaves existing data alone");
   }
+
+  // ---- the florist: stems by the bunch, spoilage, event quotes -------------
+  // Roses arrive as "1 BN $14.50" with no pack size printed: unconvertible
+  // until the rose says it comes 10 to a bunch (migration 028).
+  const { data: fl, error: flErr } = await admin.from("ingredients").insert([
+    { org_id: florist.orgId, name: "Red rose", base_unit: "stem", category: "cut_flower", current_unit_cost: null, waste_pct: 10 },
+    { org_id: florist.orgId, name: "Eucalyptus", base_unit: "stem", category: "greens", current_unit_cost: 0.5, waste_pct: 10 },
+    { org_id: florist.orgId, name: "Glass vase", base_unit: "each", category: "vase_container", current_unit_cost: 4, waste_pct: 0 },
+  ]).select("id, name");
+  if (flErr) throw new Error("insert florist materials failed: " + flErr.message);
+  const [rose, euc, vase] = fl;
+  const { data: arr, error: arrErr } = await admin.from("recipes").insert([
+    { org_id: florist.orgId, name: "Centerpiece", batch_yield_qty: 1, batch_yield_unit: "arrangement", labor_minutes: 15, labor_rate_per_hour: 20 },
+    { org_id: florist.orgId, name: "Bridal bouquet", batch_yield_qty: 1, batch_yield_unit: "bouquet", labor_minutes: 45, labor_rate_per_hour: 20 },
+  ]).select("id, name");
+  if (arrErr) throw new Error("insert arrangements failed: " + arrErr.message);
+  const [centerpiece, bouquet] = arr;
+  await admin.from("recipe_ingredients").insert([
+    { org_id: florist.orgId, recipe_id: centerpiece.id, ingredient_id: rose.id, quantity: 6, unit: "stem" },
+    { org_id: florist.orgId, recipe_id: centerpiece.id, ingredient_id: euc.id, quantity: 3, unit: "stem" },
+    { org_id: florist.orgId, recipe_id: centerpiece.id, ingredient_id: vase.id, quantity: 1, unit: "each" },
+    { org_id: florist.orgId, recipe_id: bouquet.id, ingredient_id: rose.id, quantity: 24, unit: "stem" },
+    { org_id: florist.orgId, recipe_id: bouquet.id, ingredient_id: euc.id, quantity: 6, unit: "stem" },
+  ]);
+  const { data: flInv } = await admin.from("invoices").insert({ org_id: florist.orgId, file_storage_path: `test/florist-${suffix}.jpg` }).select("id").single();
+  await admin.from("invoice_line_items").insert({
+    org_id: florist.orgId, invoice_id: flInv.id, raw_text: "ROSE RED 50CM 1 BN", parsed_item_name: "Red rose", parsed_unit: "BN", parsed_unit_cost: 14.5,
+    matched_ingredient_id: rose.id, match_status: "confirmed", price_note: "Can't convert \"BN\" to stem — price not applied",
+  });
+
+  const f = await login(florist.email);
+  nav = await navLinks(f);
+  assert(["Packages", "Arrangements", "Stems & supplies", "Quote"].every((n) => nav.includes(n)), `florist nav: ${nav.join(", ")}`);
+  await f.goto(`${BASE}/ingredients`);
+  await f.getByRole("heading", { name: "Stems & supplies" }).waitFor();
+  assert((await f.getByRole("columnheader", { name: "Per bunch" }).count()) === 1 && (await f.getByRole("columnheader", { name: "Per box" }).count()) === 1, "florist materials grid has Per bunch and Per box");
+  const roseRow = f.locator("tr", { has: f.locator('input[value="Red rose"]') });
+  await roseRow.locator('input[data-cell$=":5"]').fill("10"); // name, category, unit, cost, waste, per bunch
+  await f.getByRole("button", { name: /^Save 1 change$/ }).click();
+  await f.getByText(/Saved —/).waitFor();
+  const { data: roseNow } = await admin.from("ingredients").select("current_unit_cost, pack_sizes").eq("id", rose.id).single();
+  assert(Number(roseNow.current_unit_cost) === 1.45 && roseNow.pack_sizes.bunch === 10, `"1 BN $14.50" becomes $1.45 a stem once the rose is 10 to a bunch: ${JSON.stringify(roseNow)}`);
+
+  // Centerpiece: 6 roses + 3 eucalyptus at 10% spoilage, a $4 vase, 15 min at $20
+  //   = 6/0.9×1.45 + 3/0.9×0.50 + 4 + 5 = $20.3333
+  // Bridal bouquet: 24/0.9×1.45 + 6/0.9×0.50 + 15 = $57.0000
+  await f.goto(`${BASE}/recipes/${centerpiece.id}`);
+  await f.getByRole("button", { name: /^Save arrangement$/i }).waitFor();
+  const cpCost = (await f.locator("main").innerText()).replace(/\s+/g, " ").match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0] ?? "(none)";
+  assert(cpCost.includes("$20.3333"), `centerpiece costed per stem with 10% spoilage and labor: ${cpCost}`);
+
+  // 10 centerpieces + 1 bouquet + $60 delivery + 60 min setup at $20
+  //   = 203.3333 + 57 + 60 + 20 = $340.33; ÷ 0.35 → $972.39 at the 65% target.
+  await f.goto(`${BASE}/quote?name=Rivera%20wedding&items=${centerpiece.id}:10,${bouquet.id}:1&delivery=60&setup_minutes=60&rate=20`);
+  await f.getByRole("heading", { name: "Event quote" }).waitFor();
+  const res = f.getByTestId("quote-result");
+  assert((await f.getByTestId("event-total-cost").innerText()) === "$340.33", `event total cost: ${await f.getByTestId("event-total-cost").innerText()}`);
+  assert((await res.innerText()).includes("$972.39"), `event suggested price at 65%: ${(await res.innerText()).replace(/\s+/g, " ")}`);
+  await f.getByLabel("Your price ($, optional)").fill("900");
+  assert((await f.getByTestId("quote-own-margin").innerText()).includes("62.19% margin, under your 65% target"), `own event price margin: ${await f.getByTestId("quote-own-margin").innerText()}`);
+  await f.getByRole("button", { name: "Copy link to this quote" }).click();
+  const copied = new URL(f.url());
+  assert(copied.searchParams.get("items") === `${centerpiece.id}:10,${bouquet.id}:1` && copied.searchParams.get("price") === "900", `the copied link carries the quote: ${f.url()}`);
+  await f.goto(`${BASE}/recipes/${centerpiece.id}`);
+  assert((await f.getByRole("link", { name: "Quote a custom version" }).count()) === 0, "no jewelry piece-quote link on a florist's arrangement");
 
   // ---- the baker: today's app ---------------------------------------------
   const b = await login(baker.email);

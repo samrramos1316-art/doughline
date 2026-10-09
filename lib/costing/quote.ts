@@ -40,3 +40,49 @@ export function quote(x: QuoteInput): Quote {
     marginAtPrice: x.price != null && x.price > 0 ? marginPctOf(x.price, costPerPiece) : null,
   };
 }
+
+// An event or wedding quote (docs: florist "event quote bundle"): several
+// arrangements, each at its live cost per piece (its own materials,
+// spoilage, labor and overhead), times how many, plus what the event adds —
+// delivery, setup time, anything else — priced at a target margin.
+export type EventItem = { name: string; quantity: number; costEach: number | null };
+
+export type EventQuoteInput = {
+  items: EventItem[];
+  delivery?: number | null; // $ for the event
+  setupMinutes?: number | null; // on-site setup / breakdown time
+  laborRatePerHour?: number | null;
+  otherCosts?: number | null; // $: rentals, permits, anything not in an arrangement
+  targetMarginPct: number;
+  price?: number | null; // the owner's own total, if they set one
+};
+
+export type EventQuote = {
+  arrangements: number | null; // Σ quantity × cost each; null while any is unknown
+  unpriced: string[]; // arrangements without a cost yet
+  setupLabor: number;
+  extras: number; // delivery + other costs
+  totalCost: number | null;
+  suggestedPrice: number | null; // for the whole event, at the target margin
+  marginAtPrice: number | null;
+};
+
+const money0 = (n: number | null | undefined) => (n != null && Number.isFinite(n) && n > 0 ? n : 0);
+
+export function eventQuote(x: EventQuoteInput): EventQuote {
+  const items = x.items.filter((i) => i.quantity > 0);
+  const unpriced = items.filter((i) => i.costEach == null).map((i) => i.name);
+  const arrangements = items.length && !unpriced.length ? items.reduce((s, i) => s + i.quantity * i.costEach!, 0) : null;
+  const setupLabor = (money0(x.setupMinutes) * money0(x.laborRatePerHour)) / 60;
+  const extras = money0(x.delivery) + money0(x.otherCosts);
+  const totalCost = arrangements == null ? null : arrangements + setupLabor + extras;
+  return {
+    arrangements,
+    unpriced,
+    setupLabor,
+    extras,
+    totalCost,
+    suggestedPrice: priceForMargin(totalCost, x.targetMarginPct),
+    marginAtPrice: x.price != null && x.price > 0 ? marginPctOf(x.price, totalCost) : null,
+  };
+}

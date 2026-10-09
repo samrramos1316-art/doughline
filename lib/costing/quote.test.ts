@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { priceForMargin, quote } from "./quote.ts";
+import { eventQuote, priceForMargin, quote } from "./quote.ts";
 
 test("price for a margin: cost ÷ (1 − margin), rounded up to the cent", () => {
   assert.equal(priceForMargin(40, 60), 100);
@@ -47,4 +47,36 @@ test("no price yet: nothing is suggested, and it says how many are missing", () 
   assert.equal(q.batch, null);
   assert.equal(q.unpriced, 1);
   assert.equal(q.suggestedPrice, null);
+});
+
+test("a wedding: bouquets and centerpieces, delivery and setup, at a target margin", () => {
+  const q = eventQuote({
+    items: [
+      { name: "Bridal bouquet", quantity: 1, costEach: 62.5 },
+      { name: "Bridesmaid bouquet", quantity: 4, costEach: 21.25 },
+      { name: "Centerpiece", quantity: 12, costEach: 18 },
+    ],
+    delivery: 75,
+    setupMinutes: 90,
+    laborRatePerHour: 20, // $30 of setup
+    otherCosts: 40,
+    targetMarginPct: 60,
+    price: 900,
+  });
+  assert.equal(q.arrangements, 62.5 + 85 + 216); // 363.5
+  assert.equal(q.setupLabor, 30);
+  assert.equal(q.extras, 115);
+  assert.equal(q.totalCost, 508.5);
+  assert.equal(q.suggestedPrice, 1271.25); // 508.5 ÷ 0.4
+  assert.equal(q.marginAtPrice, 43.5); // (900 − 508.5) ÷ 900
+});
+
+test("event quote: an arrangement without a cost holds the total back, and says which", () => {
+  const q = eventQuote({ items: [{ name: "Arch", quantity: 1, costEach: null }, { name: "Boutonniere", quantity: 6, costEach: 4 }], targetMarginPct: 60 });
+  assert.deepEqual(q.unpriced, ["Arch"]);
+  assert.equal(q.totalCost, null);
+  assert.equal(q.suggestedPrice, null);
+  // Rows with no quantity don't count, priced or not.
+  assert.equal(eventQuote({ items: [{ name: "Arch", quantity: 0, costEach: null }, { name: "Boutonniere", quantity: 6, costEach: 4 }], targetMarginPct: 50 }).suggestedPrice, 48);
+  assert.equal(eventQuote({ items: [], targetMarginPct: 50 }).totalCost, null);
 });

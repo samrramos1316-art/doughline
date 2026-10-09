@@ -21,6 +21,7 @@ export type IngredientRecord = {
   base_unit: string;
   current_unit_cost: number | null;
   waste_pct?: number | null;
+  pack_sizes?: unknown; // migration 028; florists see it as Per bunch / Per box
 };
 
 type Message = { kind: "error" | "ok"; text: string; details?: string[] } | null;
@@ -50,12 +51,33 @@ const wasteColumn = (defaultPct: number): GridColumn => ({
   },
 });
 
+// How many of the base unit come in a bunch / a box (migration 028), for
+// prices on invoices that don't print the pack size. 0 clears it.
+const packColumn = (unit: "bunch" | "box"): GridColumn => ({
+  key: `per_${unit}`,
+  label: `Per ${unit}`,
+  type: "number",
+  align: "right",
+  minWidth: 90,
+  placeholder: "—",
+  validate: (v) => {
+    const n = parseNumber(v);
+    return n != null && !(n >= 0) ? `How many to a ${unit}` : null;
+  },
+});
+const packOf = (i: IngredientRecord, unit: "bunch" | "box") => {
+  const n = Number((i.pack_sizes as Record<string, unknown> | null | undefined)?.[unit]);
+  return Number.isFinite(n) && n > 0 ? String(n) : "";
+};
+
 const valuesOf = (i: IngredientRecord) => ({
   name: i.name,
   category: i.category ?? "",
   base_unit: i.base_unit,
   current_unit_cost: i.current_unit_cost == null ? "" : String(i.current_unit_cost),
   waste_pct: String(Number(i.waste_pct ?? 0)),
+  per_bunch: packOf(i, "bunch"),
+  per_box: packOf(i, "box"),
 });
 
 // §9.2: the ingredient master list as a spreadsheet — edit cells in place,
@@ -66,10 +88,10 @@ const valuesOf = (i: IngredientRecord) => ({
 // the food lists above. `waste`: show the Waste % column, with this default
 // for new rows; left out (food, until a material has waste), no column.
 export type Suggestions = { units: string[]; categories: string[] };
-export function IngredientsGrid({ ingredients, suggest, waste }: { ingredients: IngredientRecord[]; suggest?: Suggestions; waste?: { defaultPct: number } }) {
+export function IngredientsGrid({ ingredients, suggest, waste, packs = false }: { ingredients: IngredientRecord[]; suggest?: Suggestions; waste?: { defaultPct: number }; packs?: boolean }) {
   const [message, setMessage] = useState<Message>(null);
-  const version = ingredients.map((i) => `${i.id}:${i.name}:${i.current_unit_cost}:${i.base_unit}:${i.category}:${i.waste_pct}`).join("|");
-  return <IngredientsGridForm key={version} ingredients={ingredients} message={message} setMessage={setMessage} suggest={suggest} waste={waste} />;
+  const version = ingredients.map((i) => `${i.id}:${i.name}:${i.current_unit_cost}:${i.base_unit}:${i.category}:${i.waste_pct}:${JSON.stringify(i.pack_sizes ?? {})}`).join("|");
+  return <IngredientsGridForm key={version} ingredients={ingredients} message={message} setMessage={setMessage} suggest={suggest} waste={waste} packs={packs} />;
 }
 
 function IngredientsGridForm({
@@ -78,19 +100,21 @@ function IngredientsGridForm({
   setMessage,
   suggest,
   waste,
+  packs,
 }: {
   ingredients: IngredientRecord[];
   message: Message;
   setMessage: (m: Message) => void;
   suggest?: Suggestions;
   waste?: { defaultPct: number };
+  packs: boolean;
 }) {
   const v = useVocab();
   const wasteDefault = waste?.defaultPct;
   const COLUMNS = useMemo(() => {
     const base = suggest ? columnsFor(suggest.categories, suggest.units) : FOOD_COLUMNS;
-    return wasteDefault == null ? base : [...base, wasteColumn(wasteDefault)];
-  }, [suggest, wasteDefault]);
+    return [...base, ...(wasteDefault == null ? [] : [wasteColumn(wasteDefault)]), ...(packs ? [packColumn("bunch"), packColumn("box")] : [])];
+  }, [suggest, wasteDefault, packs]);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const byId = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);

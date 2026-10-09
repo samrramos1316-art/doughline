@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     getIndustry(),
   ]);
   const vocab = industry.vocab;
-  const labels = { menu: vocab.menu, recipes: vocab.recipes, ingredients: vocab.ingredients, market: industry.hasMarketData, quote: industry.features.quote };
+  const labels = { menu: vocab.menu, recipes: vocab.recipes, ingredients: vocab.ingredients, market: industry.hasMarketData, quote: industry.features.quote !== false };
   const counts: NavCounts = {
     review: backlog?.unresolved ?? 0,
     reviewBlocked: backlog?.blocked ?? false,

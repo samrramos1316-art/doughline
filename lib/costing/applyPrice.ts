@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { toBaseUnitCost } from "./units";
+import { cleanPackSizes, toBaseUnitCost } from "./units";
 
 type Client = SupabaseClient<Database>;
 
@@ -33,7 +33,7 @@ export async function applyLinePrice(supabase: Client, lineItemId: string): Prom
   const { data: line, error } = await supabase
     .from("invoice_line_items")
     .select(
-      "id, parsed_unit_cost, parsed_unit, parsed_pack_quantity, parsed_pack_unit, price_applied_at, ingredients(base_unit)",
+      "id, parsed_unit_cost, parsed_unit, parsed_pack_quantity, parsed_pack_unit, price_applied_at, ingredients(base_unit, pack_sizes)",
     )
     .eq("id", lineItemId)
     .single();
@@ -49,6 +49,7 @@ export async function applyLinePrice(supabase: Client, lineItemId: string): Prom
       pack_unit: line.parsed_pack_unit,
     },
     line.ingredients.base_unit,
+    cleanPackSizes(line.ingredients.pack_sizes),
   );
   if (!converted.ok) {
     await supabase.from("invoice_line_items").update({ price_note: converted.note }).eq("id", lineItemId);

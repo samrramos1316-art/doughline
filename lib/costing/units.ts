@@ -50,7 +50,7 @@ const ALIASES: Record<string, string> = {
   dz: "dozen", doz: "dozen",
   "troy ounce": "troy oz", "troy ounces": "troy oz", ozt: "troy oz", "oz t": "troy oz", "t oz": "troy oz", "oz troy": "troy oz", toz: "troy oz", "tr oz": "troy oz", "ozt.": "troy oz",
   pennyweight: "dwt", pennyweights: "dwt", dwts: "dwt", "dwt.": "dwt", carats: "carat",
-  stems: "stem", bunches: "bunch", bn: "bunch", sheets: "sheet",
+  stems: "stem", st: "stem", stm: "stem", stms: "stem", bunches: "bunch", bn: "bunch", bch: "bunch", bnch: "bunch", sheets: "sheet",
   inch: "in", inches: "in", foot: "ft", feet: "ft",
   meter: "m", meters: "m", metre: "m", metres: "m",
   centimeter: "cm", centimeters: "cm", centimetre: "cm", centimetres: "cm",
@@ -109,6 +109,30 @@ export function conversionFactor(from: string | null | undefined, to: string | n
   return ff / tf;
 }
 
+// ingredients.pack_sizes (migration 028): how many of the material's base
+// unit come in one bunch, box, … — keyed by the unit as invoices name it.
+export type PackSizes = Record<string, number>;
+
+export function packSizeFor(sizes: PackSizes | null | undefined, unit: string | null | undefined): number | null {
+  const key = unitKey(unit);
+  if (!sizes || !key) return null;
+  const n = Number(sizes[key]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// A stored pack_sizes value, cleaned: unit keys as invoices would name them,
+// positive sizes only. Anything else is dropped.
+export function cleanPackSizes(raw: unknown): PackSizes {
+  const out: PackSizes = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [unit, n] of Object.entries(raw as Record<string, unknown>)) {
+    const key = unitKey(unit);
+    const size = Number(n);
+    if (key && Number.isFinite(size) && size > 0) out[key] = size;
+  }
+  return out;
+}
+
 export type BaseUnitCost = { ok: true; cost: number; basis: string } | { ok: false; note: string };
 
 // An invoice price is per *invoice unit* (a 50# bag, a 36/1# case); recipes
@@ -118,7 +142,9 @@ export type BaseUnitCost = { ok: true; cost: number; basis: string } | { ok: fal
 //      Pack wins over a count unit: "EA" on an invoice usually means one
 //      invoice unit (one 15-dozen case), not one egg.
 //   3. else a bare count unit (DZ, EA) with no pack → divide by its factor
-//   4. else it can't be done safely — the caller records why and leaves the cost alone.
+//   4. else the material's own size for that unit (migration 028: a bunch
+//      of these roses is 10 stems, a box 25), in its base unit
+//   5. else it can't be done safely — the caller records why and leaves the cost alone.
 export function toBaseUnitCost(
   line: {
     unit_cost: number | null;
@@ -127,6 +153,7 @@ export function toBaseUnitCost(
     pack_unit: string | null;
   },
   baseUnit: string,
+  packSizes?: PackSizes | null,
 ): BaseUnitCost {
   if (line.unit_cost == null) return { ok: false, note: "No unit cost on the invoice line" };
 
@@ -152,6 +179,11 @@ export function toBaseUnitCost(
   }
 
   if (direct) return byDirect(direct);
+
+  const size = packSizeFor(packSizes, line.unit);
+  if (size) {
+    return { ok: true, cost: round4(unitCost / size), basis: `$${unitCost} per ${line.unit} of ${size} ${baseUnit}` };
+  }
 
   const what = line.pack_quantity && line.pack_unit ? `${line.pack_quantity} ${line.pack_unit}` : `"${line.unit ?? "?"}"`;
   return { ok: false, note: `Can't convert ${what} to ${baseUnit} — price not applied` };

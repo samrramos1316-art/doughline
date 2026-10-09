@@ -11,7 +11,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
   const { tab } = await searchParams;
   const supabase = await createClient();
   const [{ data: ingredients }, v] = await Promise.all([
-    supabase.from("ingredients").select("id, name, category, base_unit, current_unit_cost, waste_pct").order("name"),
+    supabase.from("ingredients").select("id, name, category, base_unit, current_unit_cost, waste_pct, pack_sizes").order("name"),
     getVocab(),
   ]);
   const list = ingredients ?? [];
@@ -139,7 +139,7 @@ export default async function IngredientsPage({ searchParams }: { searchParams: 
     <>
       <PageHeader title={v.ingredients} subtitle="Edit in place or paste rows from a spreadsheet. Prices are per base unit; invoices keep them current." tabs={tabs} actions={<ButtonLink href="/margins">Margins by {lower(v.menuItem)}</ButtonLink>} />
       <Panel title="Price list">
-        <IngredientsGrid ingredients={list} suggest={formSuggestions(industry)} waste={showWaste ? { defaultPct: industry.defaults.default_waste_pct } : undefined} />
+        <IngredientsGrid ingredients={list} suggest={formSuggestions(industry)} waste={showWaste ? { defaultPct: industry.defaults.default_waste_pct } : undefined} packs={industry.features.packSizes} />
       </Panel>
     </>
   );

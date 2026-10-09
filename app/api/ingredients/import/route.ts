@@ -10,7 +10,7 @@ import { getIndustry } from "@/lib/supabase/vocab";
 // One Voyage call for every new/renamed ingredient, retried on 429s.
 export const maxDuration = 300;
 
-const COLUMNS = ["id", "name", "category", "base_unit", "current_unit_cost", "commodity_code", "waste_pct"] as const;
+const COLUMNS = ["id", "name", "category", "base_unit", "current_unit_cost", "commodity_code", "waste_pct", "per_bunch", "per_box"] as const;
 
 // §9.2: bulk upsert of the ingredient list. Takes either a CSV file body
 // (text/csv — a spreadsheet exported from GET /api/ingredients/export, or
@@ -47,6 +47,8 @@ export async function POST(request: Request) {
       current_unit_cost: get(r, "current_unit_cost"),
       commodity_code: get(r, "commodity_code"),
       waste_pct: get(r, "waste_pct"),
+      per_bunch: get(r, "per_bunch"),
+      per_box: get(r, "per_box"),
     }));
   }
   if (rows.length > 2000) return NextResponse.json({ error: "At most 2000 rows per import" }, { status: 400 });
@@ -55,8 +57,9 @@ export async function POST(request: Request) {
   if ("errors" in result) {
     return NextResponse.json({ error: "Nothing was saved — fix these rows first", row_errors: result.errors }, { status: 400 });
   }
-  // Rows whose base unit changed may now convert their stuck invoice prices.
-  const unitChanged = result.outcomes.filter((o) => o.changes.some((c) => c.startsWith("base unit"))).map((o) => o.id);
+  // Rows whose base unit or bunch/box size changed may now convert their
+  // stuck invoice prices.
+  const unitChanged = result.outcomes.filter((o) => o.changes.some((c) => c.startsWith("base unit") || c.startsWith("per bunch") || c.startsWith("per box"))).map((o) => o.id);
   const prices = await retryUnappliedPrices(supabase, unitChanged);
   const count = (a: string) => result.outcomes.filter((o) => o.action === a).length;
   return NextResponse.json({

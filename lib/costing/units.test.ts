@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canonicalUnit, conversionFactor, isContainerUnit, sameUnit, toBaseUnitCost } from "./units.ts";
+import { canonicalUnit, cleanPackSizes, conversionFactor, isContainerUnit, packSizeFor, sameUnit, toBaseUnitCost } from "./units.ts";
 
 const close = (a: number | null, b: number) => assert.ok(a != null && Math.abs(a - b) < 1e-9, `${a} ≈ ${b}`);
 const line = (unit_cost: number, unit: string | null, pack_quantity: number | null = null, pack_unit: string | null = null) => ({ unit_cost, unit, pack_quantity, pack_unit });
@@ -76,4 +76,31 @@ test("more invoice spellings of troy weights", () => {
   for (const u of ["toz", "tr oz", "ozt.", "OZT"]) assert.equal(canonicalUnit(u), "troy oz", u);
   for (const u of ["dwts", "DWT.", "Pennyweights"]) assert.equal(canonicalUnit(u), "dwt", u);
   assert.equal(canonicalUnit("oz."), null); // food spellings unchanged
+});
+
+test("bunches and boxes: the material's own pack size, only where nothing else converts", () => {
+  const roses = { bunch: 10, box: 25 };
+  // "1 BN $12.50" with no pack printed, costed per stem → $1.25 a stem.
+  const bn = toBaseUnitCost({ unit_cost: 12.5, unit: "BN", pack_quantity: null, pack_unit: null }, "stem", roses);
+  assert.deepEqual(bn, { ok: true, cost: 1.25, basis: "$12.5 per BN of 10 stem" });
+  assert.equal((toBaseUnitCost({ unit_cost: 30, unit: "Boxes", pack_quantity: null, pack_unit: null }, "stem", roses) as { cost: number }).cost, 1.2);
+  // A printed pack wins over the stored size.
+  assert.equal((toBaseUnitCost({ unit_cost: 12, unit: "bunch", pack_quantity: 12, pack_unit: "st" }, "stem", roses) as { cost: number }).cost, 1);
+  // Without a stored size it still can't be done (as before 028).
+  assert.equal(toBaseUnitCost({ unit_cost: 12.5, unit: "bunch", pack_quantity: null, pack_unit: null }, "stem").ok, false);
+  assert.equal(toBaseUnitCost({ unit_cost: 12.5, unit: "bunch", pack_quantity: null, pack_unit: null }, "stem", {}).ok, false);
+  // Food lines that converted before convert exactly the same with sizes around.
+  const lb = { unit_cost: 40, unit: "LB", pack_quantity: null, pack_unit: null };
+  assert.deepEqual(toBaseUnitCost(lb, "g", { box: 3 }), toBaseUnitCost(lb, "g"));
+  const cs = { unit_cost: 36, unit: "CS", pack_quantity: 36, pack_unit: "lb" };
+  assert.deepEqual(toBaseUnitCost(cs, "lb", { cs: 99 }), toBaseUnitCost(cs, "lb"));
+});
+
+test("pack sizes are cleaned on the way in", () => {
+  assert.deepEqual(cleanPackSizes({ Bunches: "10", box: 25, case: 0, bag: -1, sleeve: "x" }), { bunch: 10, box: 25 });
+  assert.deepEqual(cleanPackSizes(null), {});
+  assert.deepEqual(cleanPackSizes([1, 2]), {});
+  assert.equal(packSizeFor({ bunch: 10 }, "BUNCHES"), 10);
+  assert.equal(canonicalUnit("st"), "stem");
+  assert.equal(canonicalUnit("bch"), "bunch");
 });

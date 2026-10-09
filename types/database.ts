@@ -158,6 +158,7 @@ export type Database = {
           id: string
           name: string
           org_id: string
+          pack_sizes: Json
           updated_at: string
           waste_pct: number
         }
@@ -172,6 +173,7 @@ export type Database = {
           id?: string
           name: string
           org_id: string
+          pack_sizes?: Json
           updated_at?: string
           waste_pct?: number
         }
@@ -186,6 +188,7 @@ export type Database = {
           id?: string
           name?: string
           org_id?: string
+          pack_sizes?: Json
           updated_at?: string
           waste_pct?: number
         }

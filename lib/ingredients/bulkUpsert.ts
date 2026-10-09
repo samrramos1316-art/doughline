@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
+import { cleanPackSizes, type PackSizes } from "@/lib/costing/units";
 
 type Client = SupabaseClient<Database>;
 
@@ -14,6 +15,10 @@ export type IngredientRowInput = {
   current_unit_cost?: number | string | null;
   commodity_code?: string | null;
   waste_pct?: number | string | null; // blank: new rows get the default, existing rows keep theirs
+  // How many of the base unit in a bunch / a box (migration 028). Blank keeps
+  // what's stored; 0 removes it.
+  per_bunch?: number | string | null;
+  per_box?: number | string | null;
 };
 
 export type RowError = { row: number; field?: string; message: string };
@@ -36,7 +41,7 @@ export async function bulkUpsertIngredients(
 ): Promise<{ errors: RowError[] } | { outcomes: RowOutcome[]; embeddingError: string | null }> {
   const { data: existing, error: loadErr } = await supabase
     .from("ingredients")
-    .select("id, name, category, base_unit, current_unit_cost, commodity_code, waste_pct");
+    .select("id, name, category, base_unit, current_unit_cost, commodity_code, waste_pct, pack_sizes");
   if (loadErr) throw new Error(loadErr.message);
   const byId = new Map(existing.map((e) => [e.id, e]));
   const byName = new Map(existing.map((e) => [norm(e.name), e]));
@@ -59,6 +64,14 @@ export async function bulkUpsertIngredients(
     if (waste != null && !(Number.isFinite(waste) && waste >= 0 && waste < 100)) {
       errors.push({ row, field: "waste_pct", message: `"${wasteText}" isn't a waste % (0 to under 100)` });
     }
+    const packs: Partial<Record<"bunch" | "box", number>> = {};
+    for (const [unit, raw] of [["bunch", r.per_bunch], ["box", r.per_box]] as const) {
+      const text = raw == null ? "" : String(raw).trim();
+      if (text === "") continue;
+      const n = Number(text);
+      if (!Number.isFinite(n) || n < 0) errors.push({ row, field: `per_${unit}`, message: `"${text}" isn't a number per ${unit}` });
+      else packs[unit] = n;
+    }
     if (name) {
       const prior = seen.get(norm(name));
       if (prior) errors.push({ row, field: "name", message: `"${name}" also appears on row ${prior}` });
@@ -74,6 +87,7 @@ export async function bulkUpsertIngredients(
       base_unit,
       cost,
       waste,
+      packs,
       category: r.category?.trim() || null,
       commodity_code: r.commodity_code?.trim() || null,
     };
@@ -111,6 +125,7 @@ export async function bulkUpsertIngredients(
           current_unit_cost: r.cost,
           current_unit_cost_updated_at: r.cost != null ? now : null,
           waste_pct: r.waste ?? defaultWastePct,
+          pack_sizes: withPacks({}, r.packs),
           embedding: vectorFor.get(r.row) ?? null,
         })),
       )
@@ -144,6 +159,12 @@ export async function bulkUpsertIngredients(
       update.commodity_code = r.commodity_code;
       changes.push(`commodity ${t.commodity_code ?? "—"} → ${r.commodity_code ?? "—"}`);
     }
+    const packsBefore = cleanPackSizes(t.pack_sizes);
+    const packsAfter = withPacks(packsBefore, r.packs);
+    for (const unit of ["bunch", "box"] as const) {
+      if (packsBefore[unit] !== packsAfter[unit]) changes.push(`per ${unit} ${packsBefore[unit] ?? "—"} → ${packsAfter[unit] ?? "—"}`);
+    }
+    if (JSON.stringify(packsBefore) !== JSON.stringify(packsAfter)) update.pack_sizes = packsAfter;
     if (r.waste != null && Number(t.waste_pct) !== r.waste) {
       update.waste_pct = r.waste;
       changes.push(`waste ${Number(t.waste_pct)}% → ${r.waste}%`);
@@ -169,6 +190,17 @@ export async function bulkUpsertIngredients(
 
   outcomes.sort((a, b) => a.row - b.row);
   return { outcomes, embeddingError };
+}
+
+// Stored pack sizes with this row's bunch/box sizes applied: a number sets
+// it, 0 removes it, left out keeps what was there.
+function withPacks(stored: PackSizes, packs: Partial<Record<"bunch" | "box", number>>): PackSizes {
+  const out = { ...stored };
+  for (const [unit, n] of Object.entries(packs)) {
+    if (n > 0) out[unit] = n;
+    else delete out[unit];
+  }
+  return out;
 }
 
 function norm(s: string) {

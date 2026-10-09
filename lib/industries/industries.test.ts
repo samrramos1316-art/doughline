@@ -18,7 +18,7 @@ test("registry: every profile is complete and consistent", () => {
     assert.equal(Object.keys(p.vocab).length, VOCAB_KEYS.length, `${p.id}: no stray vocab keys`);
     assert.ok(p.units.length && p.categories.length, `${p.id}: units and categories`);
     for (const u of p.units) assert.ok(canonicalUnit(u) != null || isContainerUnit(u), `${p.id}: unit "${u}" is known to lib/costing/units.ts`);
-    for (const u of p.units) if (u !== "case") assert.ok(canonicalUnit(u) === u, `${p.id}: unit "${u}" is written canonically`);
+    for (const u of p.units) if (u !== "case" && u !== "box") assert.ok(canonicalUnit(u) === u, `${p.id}: unit "${u}" is written canonically`);
     const d = p.defaults;
     assert.ok(d.default_waste_pct >= 0 && d.default_waste_pct < 100 && d.default_overhead_pct >= 0, `${p.id}: defaults in range`);
     assert.equal(typeof d.show_labor_by_default, "boolean");
@@ -150,8 +150,11 @@ test("extraction prompts: hints for trades, none for food", () => {
   assert.match(withIndustryHints(base, extractionHints("metalworking", "recipe")), /cut list/);
 });
 
-test("the quote calculator is jewelry's alone; food has no new screens", () => {
-  for (const id of INDUSTRY_IDS) assert.equal(INDUSTRIES[id].features.quote, id === "jewelry", id);
+test("quotes: a custom piece for jewelry, an event for florists; food has no new screens", () => {
+  for (const id of INDUSTRY_IDS) {
+    assert.equal(INDUSTRIES[id].features.quote, id === "jewelry" ? "piece" : id === "florist" ? "event" : false, id);
+    assert.equal(INDUSTRIES[id].features.packSizes, id === "florist", id);
+  }
   assert.equal(resolveIndustry("bakery").features.quote, false);
   assert.equal(resolveIndustry(null).features.quote, false);
   assert.ok(INDUSTRIES.jewelry.categories.includes("outsourced_work"));
