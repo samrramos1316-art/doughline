@@ -38,6 +38,7 @@ export function RecipeBuilder({
   labels = { ingredient: "Ingredient", ingredients: "Ingredients", recipe: "recipe" },
   defaultWastePct = 0,
   showLaborByDefault = false,
+  machine,
 }: {
   recipeId: string;
   ingredientOptions: IngredientOption[];
@@ -50,6 +51,10 @@ export function RecipeBuilder({
   // false for food.
   defaultWastePct?: number;
   showLaborByDefault?: boolean;
+  // Machine time (migration 029): given for industries that cost it (or a
+  // recipe that already has some); left out, no machine fields and nothing
+  // about machine time is sent.
+  machine?: { minutes: number; ratePerHour: number | null; defaultRate: number };
 }) {
   const router = useRouter();
   const unitOf = useMemo(() => new Map(ingredientOptions.map((o) => [o.id, o.base_unit])), [ingredientOptions]);
@@ -57,11 +62,13 @@ export function RecipeBuilder({
   const [showWaste, setShowWaste] = useState(
     () => defaultWastePct > 0 || initialRows.some((r) => r.waste_pct.trim() !== "" || (wasteOf.get(r.ingredient_id) ?? 0) > 0),
   );
-  const hasLabor = showLaborByDefault || initialLabor.labor_minutes > 0 || initialLabor.overhead_pct > 0 || initialLabor.labor_rate_per_hour != null;
+  const hasLabor = showLaborByDefault || initialLabor.labor_minutes > 0 || initialLabor.overhead_pct > 0 || initialLabor.labor_rate_per_hour != null || (machine?.minutes ?? 0) > 0;
   const [labor, setLabor] = useState({
     labor_minutes: blankIfZero(initialLabor.labor_minutes),
     labor_rate_per_hour: initialLabor.labor_rate_per_hour == null ? "" : String(initialLabor.labor_rate_per_hour),
     overhead_pct: blankIfZero(initialLabor.overhead_pct),
+    machine_minutes: blankIfZero(machine?.minutes ?? 0),
+    machine_rate_per_hour: machine?.ratePerHour == null ? "" : String(machine.ratePerHour),
   });
 
   const columns: GridColumn[] = useMemo(
@@ -126,6 +133,10 @@ export function RecipeBuilder({
     if (minutes != null && !(minutes >= 0)) return "Labor minutes must be a number, 0 or more.";
     if (rate != null && !(rate >= 0)) return "Hourly rate must be a number, 0 or more.";
     if (overhead != null && !(overhead >= 0 && overhead < 1000)) return "Overhead must be a percentage, 0 or more.";
+    const mMinutes = parseNumber(labor.machine_minutes);
+    const mRate = parseNumber(labor.machine_rate_per_hour);
+    if (mMinutes != null && !(mMinutes >= 0)) return "Machine minutes must be a number, 0 or more.";
+    if (mRate != null && !(mRate >= 0)) return "Machine rate must be a number, 0 or more.";
     return null;
   }
 
@@ -155,6 +166,12 @@ export function RecipeBuilder({
       labor_minutes: parseNumber(labor.labor_minutes) ?? 0,
       labor_rate_per_hour: parseNumber(labor.labor_rate_per_hour), // blank = the business's default rate
       overhead_pct: parseNumber(labor.overhead_pct) ?? 0,
+      ...(machine
+        ? {
+            machine_minutes: parseNumber(labor.machine_minutes) ?? 0,
+            machine_rate_per_hour: parseNumber(labor.machine_rate_per_hour), // blank = the business's default machine rate
+          }
+        : {}),
     };
     const res = await fetch(`/api/recipes/${recipeId}`, {
       method: "PATCH",
@@ -217,7 +234,7 @@ export function RecipeBuilder({
         </button>
       )}
       <details open={hasLabor} className="rounded-lg border border-stone-200 bg-stone-50/60">
-        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-800">Labor &amp; overhead <span className="font-normal text-stone-500">(optional)</span></summary>
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-800">Labor{machine ? ", machine time" : ""} &amp; overhead <span className="font-normal text-stone-500">(optional)</span></summary>
         <div className="grid gap-3 border-t border-stone-200 p-3 sm:grid-cols-3">
           {field("labor_minutes", "Labor minutes per batch", "Hands-on time to make one batch.")}
           {field(
@@ -226,7 +243,15 @@ export function RecipeBuilder({
             defaultLaborRate > 0 ? `Blank uses your default, $${defaultLaborRate.toFixed(2)}/h (Settings).` : "Blank uses your default rate from Settings.",
             defaultLaborRate > 0 ? defaultLaborRate.toFixed(2) : "",
           )}
-          {field("overhead_pct", "Overhead %", "Added on top of materials and labor (rent, power, packaging).")}
+          {field("overhead_pct", "Overhead %", machine ? "Added on top of materials, labor and machine time (rent, power, consumables)." : "Added on top of materials and labor (rent, power, packaging).")}
+          {machine && field("machine_minutes", "Machine minutes per batch", "Run time on the laser, brake, saw or CNC.")}
+          {machine &&
+            field(
+              "machine_rate_per_hour",
+              "Machine rate ($/h)",
+              machine.defaultRate > 0 ? `Blank uses your default, $${machine.defaultRate.toFixed(2)}/h (Settings).` : "What an hour of this machine costs you. Blank uses your default from Settings.",
+              machine.defaultRate > 0 ? machine.defaultRate.toFixed(2) : "",
+            )}
         </div>
       </details>
       <div className="flex flex-wrap items-center gap-3">

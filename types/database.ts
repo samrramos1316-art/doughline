@@ -535,6 +535,7 @@ export type Database = {
           business_type: string | null
           created_at: string
           default_labor_rate_per_hour: number
+          default_machine_rate_per_hour: number
           id: string
           industry_settings: Json
           max_unreviewed_line_items: number
@@ -549,6 +550,7 @@ export type Database = {
           business_type?: string | null
           created_at?: string
           default_labor_rate_per_hour?: number
+          default_machine_rate_per_hour?: number
           id?: string
           industry_settings?: Json
           max_unreviewed_line_items?: number
@@ -563,6 +565,7 @@ export type Database = {
           business_type?: string | null
           created_at?: string
           default_labor_rate_per_hour?: number
+          default_machine_rate_per_hour?: number
           id?: string
           industry_settings?: Json
           max_unreviewed_line_items?: number
@@ -744,6 +747,8 @@ export type Database = {
           id: string
           labor_minutes: number
           labor_rate_per_hour: number | null
+          machine_minutes: number
+          machine_rate_per_hour: number | null
           name: string
           notes: string | null
           org_id: string
@@ -757,6 +762,8 @@ export type Database = {
           id?: string
           labor_minutes?: number
           labor_rate_per_hour?: number | null
+          machine_minutes?: number
+          machine_rate_per_hour?: number | null
           name: string
           notes?: string | null
           org_id: string
@@ -770,6 +777,8 @@ export type Database = {
           id?: string
           labor_minutes?: number
           labor_rate_per_hour?: number | null
+          machine_minutes?: number
+          machine_rate_per_hour?: number | null
           name?: string
           notes?: string | null
           org_id?: string
@@ -889,6 +898,7 @@ export type Database = {
         Row: {
           cost_per_serving: number | null
           labor_cost: number | null
+          machine_cost: number | null
           margin_amount: number | null
           margin_pct: number | null
           materials_cost: number | null
@@ -915,6 +925,7 @@ export type Database = {
           batch_yield_unit: string | null
           cost_per_serving: number | null
           labor_cost: number | null
+          machine_cost: number | null
           materials_cost: number | null
           name: string | null
           org_id: string | null

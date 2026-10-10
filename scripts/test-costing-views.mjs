@@ -309,6 +309,49 @@ try {
   );
   assert(near(v.batch_total_cost, app8.total), `lib/costing/recipeCost.ts agrees with the view on material waste (${app8.total.toFixed(6)})`);
 
+  // 9. Machine time (migration 029): its own minutes and rate, apart from
+  //    labor, inside the overhead. 24 min at the org's default $75/h = $30;
+  //    then the recipe's own rate $90/h = $36.
+  await admin.from("organizations").update({ default_machine_rate_per_hour: 75 }).eq("id", orgId);
+  v = await viewRow();
+  assert(near(v.batch_total_cost, total8) && Number(v.machine_cost) === 0, `an org machine rate alone changes nothing: ${v.batch_total_cost}, machine_cost ${v.machine_cost}`);
+  await admin.from("recipes").update({ machine_minutes: 24 }).eq("id", recipeId);
+  v = await viewRow();
+  assert(near(v.machine_cost, 30) && near(v.batch_total_cost, (materials8 + 9 + 30) * 1.1), `machine time at the org default: machine_cost ${v.machine_cost}, total ${v.batch_total_cost}`);
+  await admin.from("recipes").update({ machine_rate_per_hour: 90 }).eq("id", recipeId);
+  const total9 = (materials8 + 9 + 36) * 1.1;
+  v = await viewRow();
+  assert(near(v.machine_cost, 36) && near(v.batch_total_cost, total9) && near(v.labor_cost, 9), `the recipe's own machine rate, labor untouched: machine ${v.machine_cost}, labor ${v.labor_cost}, total ${v.batch_total_cost}`);
+  const { laborOverheadOf } = await import("../lib/costing/recipeCost.ts");
+  const { data: recipeRow } = await admin.from("recipes").select("labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour").eq("id", recipeId).single();
+  const { data: orgRow } = await admin.from("organizations").select("default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single();
+  const app9 = batchCost(
+    [
+      { quantity: 1000, unitCost: 0.006, wastePct: 10 },
+      { quantity: 500, unitCost: 0.0015, wastePct: 20 },
+      { quantity: 250, unitCost: 0.008 },
+    ],
+    laborOverheadOf(recipeRow, orgRow),
+  );
+  assert(near(v.batch_total_cost, app9.total) && near(app9.machine, 36), `lib/costing/recipeCost.ts agrees with the view on machine time (${app9.total.toFixed(6)})`);
+  const { data: sixPack9 } = await admin.from("menu_item_margins").select("cost_per_serving, machine_cost").eq("menu_item_id", sixPackId).single();
+  assert(near(sixPack9.cost_per_serving, total9 / 4) && near(sixPack9.machine_cost, 9), `menu_item_margins carries machine time per serving: ${JSON.stringify(sixPack9)}`);
+
+  // The price cascade records before/after with machine time in.
+  const { data: line9 } = await admin
+    .from("invoice_line_items")
+    .insert({ org_id: orgId, invoice_id: inv.id, raw_text: "BUTTER", matched_ingredient_id: butterId, match_status: "confirmed" })
+    .select("id")
+    .single();
+  const { data: applied9, error: apply9Err } = await admin.rpc("apply_line_item_price", { p_line_item_id: line9.id, p_base_unit_cost: 0.012 });
+  if (apply9Err) throw new Error("apply_line_item_price failed: " + apply9Err.message);
+  const { data: impact9 } = await admin.from("menu_item_margin_impacts").select("previous_margin_pct, new_margin_pct").eq("price_alert_id", applied9.price_alert_id).eq("menu_item_id", sixPackId).single();
+  const total9After = ((1000 / 0.9) * 0.006 + (500 / 0.8) * 0.0015 + 250 * 0.012 + 9 + 36) * 1.1;
+  assert(
+    Math.abs(Number(impact9.previous_margin_pct) - pctOf(total9)) < 0.01 && Math.abs(Number(impact9.new_margin_pct) - pctOf(total9After)) < 0.01,
+    `price alert impact includes machine time: ${impact9.previous_margin_pct}% → ${impact9.new_margin_pct}% (hand-computed ${pctOf(total9)}% → ${pctOf(total9After)}%)`,
+  );
+
   console.log("\nAll costing view checks passed.");
 } finally {
   console.log("\nCleaning up test fixtures...");

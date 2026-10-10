@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { isoDaysAgo } from "@/lib/dates/localDate";
-import { batchCost, effectiveWastePct, laborCost, lineCost, marginPctOf, overheadMultiplier, perServing, wasteMultiplier, type LaborOverhead } from "@/lib/costing/recipeCost";
+import { batchCost, effectiveWastePct, laborCost, laborOverheadOf, lineCost, machineCost, marginPctOf, overheadMultiplier, perServing, wasteMultiplier, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 
@@ -33,6 +33,7 @@ export type ItemMargin = {
   cost: number | null; // null until every ingredient has a price
   knownCost: number; // what the priced ingredients add up to so far (plus labor and overhead)
   labor: number; // per serving; 0 when the recipe has no labor time or rate
+  machine: number; // per serving; machine time (migration 029), 0 when none
   overhead: number | null; // per serving; null while the cost is unknown
   profit: number | null;
   marginPct: number | null;
@@ -83,9 +84,9 @@ export async function getMargins(supabase: Client, orgId: string) {
   const since30 = isoDaysAgo(30);
   const since90 = isoDaysAgo(90);
   const [org, menuItems, recipes, recipeIngredients, ingredients, history, lines] = await Promise.all([
-    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour").eq("id", orgId).single(),
+    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch").eq("is_active", true).order("name"),
-    supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit, labor_minutes, labor_rate_per_hour, overhead_pct"),
+    supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour"),
     supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct, ingredients(waste_pct)"),
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost").order("name"),
     supabase.from("ingredient_price_history").select("ingredient_id, unit_cost, effective_date, created_at, vendors(name)").order("effective_date").order("created_at"),
@@ -102,7 +103,6 @@ export async function getMargins(supabase: Client, orgId: string) {
   for (const l of recipeIngredients.data ?? []) {
     linesByRecipe.set(l.recipe_id, [...(linesByRecipe.get(l.recipe_id) ?? []), { ingredient_id: l.ingredient_id, quantity: Number(l.quantity), wastePct: effectiveWastePct(l.waste_pct, l.ingredients?.waste_pct) }]);
   }
-  const defaultRate = Number(org.data?.default_labor_rate_per_hour ?? 0);
 
   const items: ItemMargin[] = (menuItems.data ?? []).map((m) => {
     const recipe = m.recipe_id ? recipeById.get(m.recipe_id) : undefined;
@@ -110,14 +110,7 @@ export async function getMargins(supabase: Client, orgId: string) {
     const servings = servingsRaw == null || Number(servingsRaw) <= 0 ? null : Number(servingsRaw);
     const price = Number(m.selling_price);
     const lines = (recipe && linesByRecipe.get(recipe.id)) || [];
-    const lo: LaborOverhead = recipe
-      ? {
-          laborMinutes: Number(recipe.labor_minutes),
-          laborRatePerHour: recipe.labor_rate_per_hour == null ? null : Number(recipe.labor_rate_per_hour),
-          defaultLaborRatePerHour: defaultRate,
-          overheadPct: Number(recipe.overhead_pct),
-        }
-      : {};
+    const lo: LaborOverhead = recipe ? laborOverheadOf(recipe, org.data) : {};
     const unitCostOf = (id: string) => {
       const c = ingById.get(id)?.current_unit_cost;
       return c == null ? null : Number(c);
@@ -154,8 +147,9 @@ export async function getMargins(supabase: Client, orgId: string) {
     const batch = servings ? batchCost(lines.map((l) => ({ quantity: l.quantity, unitCost: unitCostOf(l.ingredient_id), wastePct: l.wastePct })), lo) : null;
     const cost = perServing(batch?.total ?? null, servings);
     const labor = servings ? laborCost(lo) / servings : 0;
+    const machine = servings ? machineCost(lo) / servings : 0;
     const knownMaterials = parts.reduce((s, p) => s + (p.cost ?? 0), 0);
-    const knownCost = cost ?? (knownMaterials + labor) * overheadMultiplier(lo.overheadPct);
+    const knownCost = cost ?? (knownMaterials + labor + machine) * overheadMultiplier(lo.overheadPct);
     for (const p of parts) p.shareOfCost = cost && p.cost != null ? p.cost / cost : null;
     parts.sort((a, b) => (b.cost ?? -1) - (a.cost ?? -1));
     return {
@@ -170,6 +164,7 @@ export async function getMargins(supabase: Client, orgId: string) {
       cost,
       knownCost,
       labor,
+      machine,
       overhead: batch && servings ? batch.overhead / servings : null,
       profit: cost == null ? null : price - cost,
       marginPct: marginPctOf(price, cost),

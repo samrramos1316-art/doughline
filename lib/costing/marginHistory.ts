@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { batchCost, effectiveWastePct, marginPctOf } from "./recipeCost";
+import { batchCost, effectiveWastePct, laborOverheadOf, marginPctOf } from "./recipeCost";
 
 export type MarginHistoryPoint = {
   date: string;
@@ -27,7 +27,7 @@ export async function getMenuItemMarginHistory(
 
   const { data: recipe } = await supabase
     .from("recipes")
-    .select("batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct, organizations(default_labor_rate_per_hour)")
+    .select("batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour, organizations(default_labor_rate_per_hour, default_machine_rate_per_hour)")
     .eq("id", menuItem.recipe_id)
     .single();
   if (!recipe) return [];
@@ -53,13 +53,8 @@ export async function getMenuItemMarginHistory(
   // item's own servings_per_batch override, else the recipe's yield.
   const servingsPerBatch = Number(menuItem.servings_per_batch ?? recipe.batch_yield_qty);
 
-  // Waste, labor and overhead as the recipe has them now (lib/costing/recipeCost.ts).
-  const laborOverhead = {
-    laborMinutes: Number(recipe.labor_minutes),
-    laborRatePerHour: recipe.labor_rate_per_hour == null ? null : Number(recipe.labor_rate_per_hour),
-    defaultLaborRatePerHour: Number(recipe.organizations?.default_labor_rate_per_hour ?? 0),
-    overheadPct: Number(recipe.overhead_pct),
-  };
+  // Waste, labor, machine time and overhead as the recipe has them now (lib/costing/recipeCost.ts).
+  const laborOverhead = laborOverheadOf(recipe, recipe.organizations);
 
   return changeDates.map((date) => {
     // An ingredient with no price yet on this date is left out, as before.

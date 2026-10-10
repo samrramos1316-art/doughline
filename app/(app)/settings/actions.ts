@@ -17,6 +17,9 @@ const schema = z.object({
   // Recipes that log labor time and set no rate of their own use this
   // (migration 025). Blank = 0 = labor isn't costed.
   default_labor_rate_per_hour: z.coerce.number().min(0, "Labor rate can't be negative").max(999999).optional(),
+  // Jobs that log machine time with no rate of their own (migration 029).
+  // Only on the form for industries that use it; left out = unchanged.
+  default_machine_rate_per_hour: z.coerce.number().min(0, "Machine rate can't be negative").max(999999).optional(),
   // "" = Other / prefer not to say. Left out (an older form) = unchanged.
   business_type: z.union([z.literal(""), z.enum(INDUSTRY_IDS)]).optional(),
 });

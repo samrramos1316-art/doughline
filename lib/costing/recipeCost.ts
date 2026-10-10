@@ -8,7 +8,8 @@
 //   materials = Σ quantity / (1 − waste_pct/100) × unit cost
 //               (waste_pct = the line's own %, else the material's; 027)
 //   labor     = labor_minutes × (recipe rate ?? org default rate) / 60
-//   total     = (materials + labor) × (1 + overhead_pct/100)
+//   machine   = machine_minutes × (recipe machine rate ?? org default) / 60 (029)
+//   total     = (materials + labor + machine) × (1 + overhead_pct/100)
 
 export type CostLine = {
   quantity: number; // in the ingredient's base unit
@@ -20,10 +21,46 @@ export type LaborOverhead = {
   laborMinutes?: number | null; // per batch
   laborRatePerHour?: number | null; // the recipe's own rate; null = the org default
   defaultLaborRatePerHour?: number | null; // organizations.default_labor_rate_per_hour
-  overheadPct?: number | null; // on top of materials + labor
+  overheadPct?: number | null; // on top of materials + labor (+ machine)
+  // Machine time (migration 029): separate from hands-on labor.
+  machineMinutes?: number | null; // per batch
+  machineRatePerHour?: number | null; // the recipe's own; null = the org default
+  defaultMachineRatePerHour?: number | null; // organizations.default_machine_rate_per_hour
 };
 
-export type BatchCost = { materials: number; labor: number; overhead: number; total: number };
+export type BatchCost = { materials: number; labor: number; machine: number; overhead: number; total: number };
+
+// A recipe row + its org's defaults → the formula's inputs. Numeric columns
+// arrive as strings or numbers; missing ones are 0 / the default.
+type RecipeRow = {
+  labor_minutes?: number | string | null;
+  labor_rate_per_hour?: number | string | null;
+  overhead_pct?: number | string | null;
+  machine_minutes?: number | string | null;
+  machine_rate_per_hour?: number | string | null;
+};
+type OrgDefaults = { default_labor_rate_per_hour?: number | string | null; default_machine_rate_per_hour?: number | string | null } | null | undefined;
+export type RecipeLaborOverhead = {
+  laborMinutes: number;
+  laborRatePerHour: number | null;
+  defaultLaborRatePerHour: number;
+  overheadPct: number;
+  machineMinutes: number;
+  machineRatePerHour: number | null;
+  defaultMachineRatePerHour: number;
+};
+export function laborOverheadOf(r: RecipeRow | null | undefined, org: OrgDefaults): RecipeLaborOverhead {
+  const n = (v: number | string | null | undefined) => (v == null ? null : Number(v));
+  return {
+    laborMinutes: Number(r?.labor_minutes ?? 0),
+    laborRatePerHour: n(r?.labor_rate_per_hour),
+    defaultLaborRatePerHour: Number(org?.default_labor_rate_per_hour ?? 0),
+    overheadPct: Number(r?.overhead_pct ?? 0),
+    machineMinutes: Number(r?.machine_minutes ?? 0),
+    machineRatePerHour: n(r?.machine_rate_per_hour),
+    defaultMachineRatePerHour: Number(org?.default_machine_rate_per_hour ?? 0),
+  };
+}
 
 const num = (n: number | null | undefined) => (n == null || !Number.isFinite(Number(n)) ? 0 : Number(n));
 
@@ -55,6 +92,14 @@ export function laborCost(x: LaborOverhead): number {
   return (num(x.laborMinutes) * laborRate(x)) / 60;
 }
 
+export function machineRate(x: LaborOverhead): number {
+  return x.machineRatePerHour != null ? num(x.machineRatePerHour) : num(x.defaultMachineRatePerHour);
+}
+
+export function machineCost(x: LaborOverhead): number {
+  return (num(x.machineMinutes) * machineRate(x)) / 60;
+}
+
 // Multiplier for overhead on top of materials + labor (5% → 1.05).
 export function overheadMultiplier(overheadPct: number | null | undefined): number {
   return 1 + num(overheadPct) / 100;
@@ -67,10 +112,11 @@ export function batchCost(lines: CostLine[], x: LaborOverhead = {}): BatchCost |
   if (!lines.length || lines.some((l) => l.unitCost == null)) return null;
   const materials = lines.reduce((s, l) => s + lineCost(l.quantity, l.unitCost!, l.wastePct), 0);
   const labor = laborCost(x);
+  const machine = machineCost(x);
   const overheadPct = num(x.overheadPct);
-  if (labor === 0 && overheadPct === 0) return { materials, labor: 0, overhead: 0, total: materials };
-  const total = (materials + labor) * overheadMultiplier(overheadPct);
-  return { materials, labor, overhead: total - materials - labor, total };
+  if (labor === 0 && machine === 0 && overheadPct === 0) return { materials, labor: 0, machine: 0, overhead: 0, total: materials };
+  const total = (materials + labor + machine) * overheadMultiplier(overheadPct);
+  return { materials, labor, machine, overhead: total - materials - labor - machine, total };
 }
 
 export function perServing(cost: number | null, servings: number | null | undefined): number | null {

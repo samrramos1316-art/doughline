@@ -155,6 +155,7 @@ test("quotes: a custom piece for jewelry, an event for florists; food has no new
     assert.equal(INDUSTRIES[id].features.quote, id === "jewelry" ? "piece" : id === "florist" ? "event" : false, id);
     assert.equal(INDUSTRIES[id].features.packSizes, id === "florist", id);
     assert.equal(INDUSTRIES[id].features.costSheets, id === "jewelry" || id === "florist", id);
+    assert.equal(INDUSTRIES[id].features.machineTime, id === "metalworking", id);
   }
   assert.equal(resolveIndustry("bakery").features.quote, false);
   assert.equal(resolveIndustry(null).features.quote, false);

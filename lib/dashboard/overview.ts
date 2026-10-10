@@ -3,7 +3,7 @@ import type { Database } from "@/types/database";
 import { UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { isoDaysAgo } from "@/lib/dates/localDate";
 import { lower, vocabFor, type Vocab } from "@/lib/vocab";
-import { batchCost, effectiveWastePct, lineCost, laborCost, overheadMultiplier, perServing, marginPctOf, type LaborOverhead } from "@/lib/costing/recipeCost";
+import { batchCost, effectiveWastePct, lineCost, laborCost, laborOverheadOf as laborOverheadFor, machineCost, overheadMultiplier, perServing, marginPctOf, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 const round = (n: number, dp = 2) => Math.round(n * 10 ** dp) / 10 ** dp;
@@ -22,7 +22,7 @@ export type MenuRow = {
 };
 
 export type Mover = { id: string; name: string; unit: string; from: number; to: number; pct: number; menuItems: number };
-export type Driver = { name: string; share: number; perRound: number; kind: "ingredient" | "labor" | "overhead" };
+export type Driver = { name: string; share: number; perRound: number; kind: "ingredient" | "labor" | "machine" | "overhead" };
 export type InboxItem = { kind: "review" | "failed" | "alert" | "stuck"; title: string; detail: string; href: string; tone: "critical" | "warning" | "neutral"; at: string };
 export type RecentInvoice = { id: string; date: string | null; vendor: string; number: string | null; lines: number; total: number | null; status: string };
 
@@ -37,9 +37,9 @@ export async function getOverview(supabase: Client, orgId: string, v: Vocab = vo
   const since30 = isoDaysAgo(30);
 
   const [org, menuItems, recipes, recipeIngredients, ingredients, history, alerts, invoices, unresolved] = await Promise.all([
-    supabase.from("organizations").select("name, target_margin_pct, max_unreviewed_line_items, price_alert_threshold_pct, default_labor_rate_per_hour").eq("id", orgId).single(),
+    supabase.from("organizations").select("name, target_margin_pct, max_unreviewed_line_items, price_alert_threshold_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch, is_active").order("name"),
-    supabase.from("recipes").select("id, name, batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct"),
+    supabase.from("recipes").select("id, name, batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour"),
     supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct, ingredients(waste_pct)"),
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost"),
     supabase.from("ingredient_price_history").select("ingredient_id, unit_cost, effective_date, created_at").order("effective_date").order("created_at"),
@@ -64,16 +64,7 @@ export async function getOverview(supabase: Client, orgId: string, v: Vocab = vo
   for (const ri of recipeIngredients.data ?? []) {
     linesByRecipe.set(ri.recipe_id, [...(linesByRecipe.get(ri.recipe_id) ?? []), { ingredient_id: ri.ingredient_id, quantity: Number(ri.quantity), wastePct: effectiveWastePct(ri.waste_pct, ri.ingredients?.waste_pct) }]);
   }
-  const defaultRate = Number(org.data.default_labor_rate_per_hour);
-  const laborOverheadOf = (recipe: { labor_minutes: number; labor_rate_per_hour: number | null; overhead_pct: number } | undefined): LaborOverhead =>
-    recipe
-      ? {
-          laborMinutes: Number(recipe.labor_minutes),
-          laborRatePerHour: recipe.labor_rate_per_hour == null ? null : Number(recipe.labor_rate_per_hour),
-          defaultLaborRatePerHour: defaultRate,
-          overheadPct: Number(recipe.overhead_pct),
-        }
-      : {};
+  const laborOverheadOf = (recipe: Parameters<typeof laborOverheadFor>[0] | undefined): LaborOverhead => (recipe ? laborOverheadFor(recipe, org.data) : {});
   const histByIng = new Map<string, { date: string; cost: number }[]>();
   for (const h of history.data ?? []) {
     histByIng.set(h.ingredient_id, [...(histByIng.get(h.ingredient_id) ?? []), { date: h.effective_date, cost: Number(h.unit_cost) }]);
@@ -162,6 +153,7 @@ export async function getOverview(supabase: Client, orgId: string, v: Vocab = vo
   // ingredients and labor (no overhead, no labor: ingredients only, as before).
   const perIng = new Map<string, number>();
   let laborPerRound = 0;
+  let machinePerRound = 0;
   let overheadPerRound = 0;
   for (const m of menuItems.data ?? []) {
     if (!m.is_active || !m.recipe_id) continue;
@@ -179,13 +171,16 @@ export async function getOverview(supabase: Client, orgId: string, v: Vocab = vo
       perIng.set(l.ingredient_id, (perIng.get(l.ingredient_id) ?? 0) + line);
     }
     const labor = laborCost(lo) / servings;
+    const machine = machineCost(lo) / servings;
     laborPerRound += labor;
-    overheadPerRound += (materials + labor) * oh;
+    machinePerRound += machine;
+    overheadPerRound += (materials + labor + machine) * oh;
   }
-  const driverTotal = [...perIng.values()].reduce((a, b) => a + b, 0) + laborPerRound + overheadPerRound;
+  const driverTotal = [...perIng.values()].reduce((a, b) => a + b, 0) + laborPerRound + machinePerRound + overheadPerRound;
   const drivers: Driver[] = [
     ...[...perIng.entries()].map(([id, v]) => ({ name: ing.get(id)?.name ?? "?", perRound: v, kind: "ingredient" as const })),
     ...(laborPerRound > 0 ? [{ name: "Labor", perRound: laborPerRound, kind: "labor" as const }] : []),
+    ...(machinePerRound > 0 ? [{ name: "Machine time", perRound: machinePerRound, kind: "machine" as const }] : []),
     ...(overheadPerRound > 0 ? [{ name: "Overhead", perRound: overheadPerRound, kind: "overhead" as const }] : []),
   ]
     .map((d) => ({ ...d, share: driverTotal ? d.perRound / driverTotal : 0 }))

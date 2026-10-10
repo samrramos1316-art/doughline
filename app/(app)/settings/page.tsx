@@ -6,13 +6,14 @@ import { PageHeader, Panel } from "@/components/ui/dash";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 import { industryOptions } from "@/lib/industries/gate";
 import { normalizeIndustryId } from "@/lib/industries";
+import { getIndustry } from "@/lib/supabase/vocab";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
   const [{ data: org }, user] = await Promise.all([
-    supabase.from("organizations").select("name, business_type, target_margin_pct, price_alert_threshold_pct, max_unreviewed_line_items, default_labor_rate_per_hour").eq("id", orgId).single(),
+    supabase.from("organizations").select("name, business_type, target_margin_pct, price_alert_threshold_pct, max_unreviewed_line_items, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
     getSessionUser(),
   ]);
   if (!org) redirect("/login");
@@ -29,6 +30,8 @@ export default async function SettingsPage() {
               price_alert_threshold_pct: Number(org.price_alert_threshold_pct),
               max_unreviewed_line_items: org.max_unreviewed_line_items,
               default_labor_rate_per_hour: Number(org.default_labor_rate_per_hour),
+              // Shown for industries that cost machine time, or once a rate is set.
+              default_machine_rate_per_hour: (await getIndustry()).features.machineTime || Number(org.default_machine_rate_per_hour) > 0 ? Number(org.default_machine_rate_per_hour) : null,
               business_type: normalizeIndustryId(org.business_type) === "other" ? "" : (normalizeIndustryId(org.business_type) ?? ""),
             }}
             industries={industryOptions(org.business_type)}

@@ -6,7 +6,7 @@ import type { IndustryOption } from "@/lib/industries/gate";
 import { useVocab } from "@/components/app/VocabProvider";
 import { lower } from "@/lib/vocab";
 
-type Initial = { name: string; target_margin_pct: number; price_alert_threshold_pct: number; max_unreviewed_line_items: number; default_labor_rate_per_hour: number; business_type: string };
+type Initial = { name: string; target_margin_pct: number; price_alert_threshold_pct: number; max_unreviewed_line_items: number; default_labor_rate_per_hour: number; default_machine_rate_per_hour?: number | null; business_type: string };
 
 const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
 
@@ -52,6 +52,11 @@ export function SettingsForm({ initial, industries }: { initial: Initial; indust
       <Field id="default_labor_rate_per_hour" label="Default labor rate per hour ($)" hint={`Only for ${lower(v.recipes)} where you log labor time. Leave at 0 if you don't cost labor.`}>
         <input id="default_labor_rate_per_hour" name="default_labor_rate_per_hour" type="number" min="0" step="0.01" defaultValue={initial.default_labor_rate_per_hour} className={`${input} max-w-32`} />
       </Field>
+      {initial.default_machine_rate_per_hour != null && (
+        <Field id="default_machine_rate_per_hour" label="Default machine rate per hour ($)" hint={`What an hour of machine time costs you (laser, brake, CNC), for ${lower(v.recipes)} that log machine minutes without their own rate.`}>
+          <input id="default_machine_rate_per_hour" name="default_machine_rate_per_hour" type="number" min="0" step="0.01" defaultValue={initial.default_machine_rate_per_hour} className={`${input} max-w-32`} />
+        </Field>
+      )}
       <div className="flex items-center gap-3 border-t border-stone-100 pt-4">
         <button type="submit" disabled={pending} className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50">
           {pending ? "Saving…" : "Save settings"}

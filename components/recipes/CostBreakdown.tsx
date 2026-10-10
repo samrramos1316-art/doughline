@@ -16,6 +16,8 @@ export function CostBreakdown({
   yieldQty,
   yieldUnit,
   materialsLabel = "Ingredients",
+  machine = 0,
+  machineDetail = null,
 }: {
   materials: number;
   wasteExtra: number; // the part of `materials` that's waste
@@ -28,6 +30,8 @@ export function CostBreakdown({
   yieldQty: number;
   yieldUnit: string;
   materialsLabel?: string;
+  machine?: number; // machine time (migration 029); the row shows only when > 0
+  machineDetail?: string | null;
 }) {
   const parts = [
     {
@@ -37,7 +41,8 @@ export function CostBreakdown({
       color: "#d97706",
     },
     { label: "Labor", value: labor, detail: laborDetail, color: "#0d9488" },
-    { label: "Overhead", value: overhead, detail: overheadPct > 0 ? `${overheadPct}% of ${materialsLabel.toLowerCase()} + labor` : null, color: "#78716c" },
+    ...(machine > 0 ? [{ label: "Machine time", value: machine, detail: machineDetail, color: "#4f46e5" }] : []),
+    { label: "Overhead", value: overhead, detail: overheadPct > 0 ? `${overheadPct}% of ${materialsLabel.toLowerCase()} + labor${machine > 0 ? " + machine time" : ""}` : null, color: "#78716c" },
   ];
   return (
     <div>

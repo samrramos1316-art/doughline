@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RecipeBuilder } from "@/components/recipes/RecipeBuilder";
 import { CostBreakdown } from "@/components/recipes/CostBreakdown";
-import { effectiveWastePct, laborRate, lineCost } from "@/lib/costing/recipeCost";
+import { effectiveWastePct, laborOverheadOf, laborRate, lineCost, machineRate } from "@/lib/costing/recipeCost";
 import { getVocab, getIndustry } from "@/lib/supabase/vocab";
 import { lower } from "@/lib/vocab";
 import { Panel, Kpi, PageHeader, HBar, Empty, ButtonLink, money, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
@@ -18,7 +18,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
     supabase.from("ingredients").select("id, name, base_unit, waste_pct").order("name"),
     supabase.from("recipe_costs").select("*").eq("recipe_id", id).maybeSingle(),
     supabase.from("menu_item_margins").select("menu_item_id, name, selling_price, margin_pct"),
-    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour").maybeSingle(),
+    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
     supabase.from("menu_items").select("id").eq("recipe_id", id),
     getVocab(),
   ]);
@@ -47,16 +47,14 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
   const batch = cost?.batch_total_cost == null ? null : Number(cost.batch_total_cost);
   const target = Number(org?.target_margin_pct ?? 65);
   const defaultLaborRate = Number(org?.default_labor_rate_per_hour ?? 0);
-  const laborOverhead = {
-    laborMinutes: Number(recipe.labor_minutes),
-    laborRatePerHour: recipe.labor_rate_per_hour == null ? null : Number(recipe.labor_rate_per_hour),
-    defaultLaborRatePerHour: defaultLaborRate,
-    overheadPct: Number(recipe.overhead_pct),
-  };
+  const laborOverhead = laborOverheadOf(recipe, org);
   const anyWaste = breakdown.some((b) => b.waste > 0);
-  const usesExtras = anyWaste || laborOverhead.laborMinutes > 0 || laborOverhead.overheadPct > 0;
+  const usesExtras = anyWaste || laborOverhead.laborMinutes > 0 || laborOverhead.overheadPct > 0 || laborOverhead.machineMinutes > 0;
   const materials = cost?.materials_cost == null ? null : Number(cost.materials_cost);
   const labor = Number(cost?.labor_cost ?? 0);
+  const machine = Number(cost?.machine_cost ?? 0);
+  // Machine time fields for industries that cost it, or a recipe that has some (migration 029).
+  const machineFields = industry.features.machineTime || laborOverhead.machineMinutes > 0 || laborOverhead.machineRatePerHour != null;
 
   return (
     <>
@@ -108,17 +106,20 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
             labels={{ ingredient: v.ingredient, ingredients: v.ingredients, recipe: lower(v.recipe) }}
             defaultWastePct={industry.defaults.default_waste_pct}
             showLaborByDefault={industry.defaults.show_labor_by_default}
+            machine={machineFields ? { minutes: laborOverhead.machineMinutes, ratePerHour: laborOverhead.machineRatePerHour, defaultRate: Number(org?.default_machine_rate_per_hour ?? 0) } : undefined}
           />
         </Panel>
         <div className="flex flex-col gap-4 xl:col-span-5">
           {usesExtras && batch != null && materials != null && (
-            <Panel title="Batch cost: materials, labor, overhead">
+            <Panel title={machine > 0 ? "Batch cost: materials, labor, machine time, overhead" : "Batch cost: materials, labor, overhead"}>
               <CostBreakdown
                 materials={materials}
                 wasteExtra={breakdown.reduce((s, b) => s + b.wasteExtra, 0)}
                 labor={labor}
                 laborDetail={laborOverhead.laborMinutes > 0 ? `${laborOverhead.laborMinutes} min × $${laborRate(laborOverhead).toFixed(2)}/h` : null}
-                overhead={batch - materials - labor}
+                overhead={Math.max(0, batch - materials - labor - machine)}
+                machine={machine}
+                machineDetail={laborOverhead.machineMinutes > 0 ? `${laborOverhead.machineMinutes} min × $${machineRate(laborOverhead).toFixed(2)}/h` : null}
                 overheadPct={laborOverhead.overheadPct}
                 total={batch}
                 perServing={cost?.cost_per_serving == null ? null : Number(cost.cost_per_serving)}

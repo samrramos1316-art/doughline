@@ -15,6 +15,9 @@ const laborOverhead = {
   labor_minutes: z.coerce.number().min(0, "Labor minutes can't be negative").max(999999).optional(),
   labor_rate_per_hour: z.coerce.number().min(0, "Hourly rate can't be negative").max(999999).nullable().optional(),
   overhead_pct: z.coerce.number().min(0, "Overhead can't be negative").max(999).optional(),
+  // Machine time (migration 029); null rate = the org's default machine rate.
+  machine_minutes: z.coerce.number().min(0, "Machine minutes can't be negative").max(999999).optional(),
+  machine_rate_per_hour: z.coerce.number().min(0, "Machine rate can't be negative").max(999999).nullable().optional(),
 };
 
 export const createRecipeSchema = z.object({

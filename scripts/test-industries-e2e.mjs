@@ -39,6 +39,7 @@ try {
   const jeweler = await makeUser("jewelry");
   const baker = await makeUser("bakery");
   const florist = await makeUser("florist");
+  const fabricator = await makeUser("metalworking");
 
   // A build sheet: 8 g sterling ($1.20/g) with 5% waste, a $6 stone, 45 min
   // at $24/h; sold as a $95 ring → cost 8/0.95×1.20 + 6 + 18 = $34.1053.
@@ -282,10 +283,56 @@ try {
   assert(alertText.includes("of the arrangement's"), "the suggestion speaks the florist's words");
 
 
+  // ---- the fabricator: machine time on jobs (migration 029) --------------
+  // A bracket job making 10: 20 ft of flat bar at $3.20/ft with 8% scrap,
+  // 60 min of labor at $30/h, 45 min of laser at the shop's $80/h, 10% overhead:
+  //   (20/0.92×3.20 + 30 + 60) × 1.1 = $175.5217 → $17.5522 a bracket.
+  const { data: bar, error: barErr } = await admin.from("ingredients").insert({ org_id: fabricator.orgId, name: "Flat bar 2x1/4", base_unit: "ft", category: "bar_stock", current_unit_cost: 3.2, waste_pct: 8 }).select("id").single();
+  if (barErr) throw new Error("insert bar stock failed: " + barErr.message);
+  const { data: job, error: jobErr } = await admin.from("recipes").insert({ org_id: fabricator.orgId, name: "Mounting bracket", batch_yield_qty: 10, batch_yield_unit: "brackets", labor_minutes: 60, labor_rate_per_hour: 30, overhead_pct: 10 }).select("id").single();
+  if (jobErr) throw new Error("insert job failed: " + jobErr.message);
+  await admin.from("recipe_ingredients").insert({ org_id: fabricator.orgId, recipe_id: job.id, ingredient_id: bar.id, quantity: 20, unit: "ft" });
+  const { data: bracket } = await admin.from("menu_items").insert({ org_id: fabricator.orgId, recipe_id: job.id, name: "Mounting bracket", selling_price: 45 }).select("id").single();
+
+  const fb = await login(fabricator.email);
+  await fb.goto(`${BASE}/settings`);
+  await fb.getByLabel("Default machine rate per hour ($)").fill("80");
+  await fb.getByRole("button", { name: "Save settings" }).click();
+  await fb.getByText("Saved.").waitFor();
+  const { data: fabOrg } = await admin.from("organizations").select("default_machine_rate_per_hour").eq("id", fabricator.orgId).single();
+  assert(Number(fabOrg.default_machine_rate_per_hour) === 80, `the shop's default machine rate is saved: ${fabOrg.default_machine_rate_per_hour}`);
+
+  await fb.goto(`${BASE}/recipes/${job.id}`);
+  await fb.getByRole("button", { name: /^Save job$/i }).waitFor();
+  const jobCost = async () => (await fb.locator("main").innerText()).replace(/\s+/g, " ").match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0] ?? "(none)";
+  assert((await jobCost()).includes("$10.9522"), `before machine time: (69.5652 + 30) × 1.1 ÷ 10 = $10.9522: ${await jobCost()}`);
+  await fb.getByLabel("Machine minutes per batch").fill("45");
+  await fb.getByRole("button", { name: /^Save job$/i }).click();
+  await fb.waitForLoadState("networkidle");
+  await fb.reload();
+  await fb.getByRole("button", { name: /^Save job$/i }).waitFor();
+  assert((await jobCost()).includes("$17.5522"), `45 min of machine time at the shop's $80/h: ${await jobCost()}`);
+  const jobText = (await fb.locator("main").innerText()).replace(/\s+/g, " ");
+  assert(/Machine time\s*45 min × \$80\.00\/h \$60\.00/.test(jobText) && jobText.includes("of materials + labor + machine time"), `the cost breakdown shows machine time apart from labor: ${jobText.match(/Batch cost: .{0,300}/i)?.[0]}`);
+  const { data: jobRow } = await admin.from("recipes").select("machine_minutes, machine_rate_per_hour").eq("id", job.id).single();
+  assert(Number(jobRow.machine_minutes) === 45 && jobRow.machine_rate_per_hour === null, `saved: 45 machine minutes, blank rate = the shop default: ${JSON.stringify(jobRow)}`);
+  const { data: bracketMargin } = await admin.from("menu_item_margins").select("margin_pct, machine_cost").eq("menu_item_id", bracket.id).single();
+  assert(Number(bracketMargin.margin_pct) === 61 && Number(bracketMargin.machine_cost) === 6, `the $45 bracket's margin includes $6 of machine time: ${JSON.stringify(bracketMargin)}`);
+  await fb.goto(`${BASE}/margins`);
+  await fb.getByText("Mounting bracket").first().waitFor();
+  await fb.locator("details", { hasText: "Mounting bracket" }).first().locator("summary").click();
+  const marginsText = (await fb.locator("main").innerText()).replace(/\s+/g, " ");
+  assert(marginsText.includes("Machine time $6.00") && marginsText.includes("61.0%"), `Margins tab: machine time per bracket and the 61.0% margin: ${marginsText.match(/Labor .{0,120}/)?.[0]}`);
+
   // ---- the baker: today's app ---------------------------------------------
   const b = await login(baker.email);
   nav = await navLinks(b);
   assert(["Overview", "Menu", "Margins", "Recipes", "Ingredients", "Invoices", "Match lines", "Price alerts", "Market watch", "Settings"].every((n) => nav.includes(n)), `food nav unchanged: ${nav.join(", ")}`);
+  await b.goto(`${BASE}/settings`);
+  await b.getByRole("button", { name: "Save settings" }).waitFor();
+  assert((await b.getByLabel("Default machine rate per hour ($)").count()) === 0, "food Settings has no machine rate");
+  await b.goto(`${BASE}/dashboard`);
+  await b.locator("main h2").first().waitFor();
   assert(!nav.includes("Quote"), "food nav has no Quote");
   assert((await b.getByText(/Market watch ·/).count()) === 1, "food dashboard keeps Market Watch");
   await b.goto(`${BASE}/ingredients`);

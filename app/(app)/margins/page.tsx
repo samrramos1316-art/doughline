@@ -165,6 +165,13 @@ function ItemCard({ m, target, w: { v } }: { m: ItemMargin; target: number; w: W
                     <td />
                   </tr>
                 )}
+                {m.machine > 0 && (
+                  <tr>
+                    <td className={cellL} colSpan={4}>Machine time</td>
+                    <td className={cellR}>{cents(m.machine)}</td>
+                    <td />
+                  </tr>
+                )}
                 {m.overhead != null && m.overhead > 0 && (
                   <tr>
                     <td className={cellL} colSpan={4}>Overhead</td>
@@ -221,7 +228,7 @@ function TotalCard({ total, items, target, w: { v, food } }: { total: { items: n
           </span>
         </span>
         <Stat label="Sales" value={money(total.sales)} always />
-        <Stat label={!food || items.some((i) => i.labor > 0 || (i.overhead ?? 0) > 0) ? "Cost to make" : "Food cost"} value={money(total.foodCost)} always />
+        <Stat label={!food || items.some((i) => i.labor > 0 || i.machine > 0 || (i.overhead ?? 0) > 0) ? "Cost to make" : "Food cost"} value={money(total.foodCost)} always />
         <Stat label="Profit" value={money(total.profit)} always />
         <Stat label="Total margin" value={pct(total.marginPct)} strong always />
         <span className="col-span-2 self-center md:col-span-1"><MarginBar pct={total.marginPct} target={target} /></span>
