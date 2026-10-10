@@ -80,3 +80,19 @@ test("event quote: an arrangement without a cost holds the total back, and says 
   assert.equal(eventQuote({ items: [{ name: "Arch", quantity: 0, costEach: null }, { name: "Boutonniere", quantity: 6, costEach: 4 }], targetMarginPct: 50 }).suggestedPrice, 48);
   assert.equal(eventQuote({ items: [], targetMarginPct: 50 }).totalCost, null);
 });
+
+test("a fabrication job: scrap, labor and machine time, priced per part", () => {
+  // 50 ft of flat bar at $3.20 with 8% scrap, 30 min labor at $30/h, 90 min of laser
+  // at the shop's $80/h, 10% overhead, 25 parts, 65% target.
+  const q = quote({
+    lines: [{ quantity: 50, unitCost: 3.2, wastePct: 8 }],
+    laborOverhead: { laborMinutes: 60, laborRatePerHour: 30, machineMinutes: 90, defaultMachineRatePerHour: 80, overheadPct: 10 },
+    pieces: 25,
+    targetMarginPct: 65,
+  });
+  const total = ((50 / 0.92) * 3.2 + 30 + 120) * 1.1; // 356.3043…
+  assert.ok(Math.abs(q.batch!.total - total) < 1e-9);
+  assert.ok(Math.abs(q.batch!.machine - 120) < 1e-9);
+  assert.ok(Math.abs(q.costPerPiece! - total / 25) < 1e-9); // 14.2522
+  assert.equal(q.suggestedPrice, 40.73);
+});

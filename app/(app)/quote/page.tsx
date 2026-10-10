@@ -21,16 +21,17 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   if (industry.features.quote === "event") return <EventQuotePage params={params} />;
   const { from } = params;
+  const job = industry.features.quote === "job";
   const supabase = await createClient();
   const v = industry.vocab;
 
   const [{ data: materials }, { data: org }, base] = await Promise.all([
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost, waste_pct").order("name"),
-    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour").maybeSingle(),
+    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
     from
       ? supabase
           .from("recipes")
-          .select("name, batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct, recipe_ingredients(ingredient_id, quantity, waste_pct)")
+          .select("name, batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour, recipe_ingredients(ingredient_id, quantity, waste_pct)")
           .eq("id", from)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -49,14 +50,16 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
         labor_minutes: Number(base.data.labor_minutes) || 0,
         labor_rate_per_hour: base.data.labor_rate_per_hour == null ? null : Number(base.data.labor_rate_per_hour),
         overhead_pct: Number(base.data.overhead_pct) || 0,
+        machine_minutes: Number(base.data.machine_minutes) || 0,
+        machine_rate_per_hour: base.data.machine_rate_per_hour == null ? null : Number(base.data.machine_rate_per_hour),
       }
     : { name: "", pieces: 1, lines: [], labor_minutes: 0, labor_rate_per_hour: null, overhead_pct: industry.defaults.default_overhead_pct };
 
   return (
     <>
       <PageHeader
-        title="Quote a custom piece"
-        subtitle={`${v.ingredients}, loss, labor and overhead in; a price at your target margin out. Nothing is saved until you keep it as a ${lower(v.recipe)}.`}
+        title={job ? "Quote a job" : "Quote a custom piece"}
+        subtitle={`${v.ingredients}, ${job ? "scrap, labor, machine time" : "loss, labor"} and overhead in; a price at your target margin out. Nothing is saved until you keep it as a ${lower(v.recipe)}.`}
       />
       <Panel title={base.data ? `Starting from ${base.data.name}` : "What goes into it"}>
         <QuoteCalculator
@@ -70,6 +73,8 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
           start={start}
           targetMarginPct={Number(org?.target_margin_pct ?? 65)}
           defaultLaborRate={Number(org?.default_labor_rate_per_hour ?? 0)}
+          mode={job ? "job" : "piece"}
+          defaultMachineRate={Number(org?.default_machine_rate_per_hour ?? 0)}
         />
       </Panel>
     </>

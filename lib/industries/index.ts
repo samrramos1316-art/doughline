@@ -55,13 +55,14 @@ export type IndustryProfile = {
     show_labor_by_default: boolean; // the recipe page's Labor & overhead section starts open
   };
   // Screens only some industries get. quote: what /quote prices — "piece"
-  // (a custom-order piece from materials + labor; jewelry) or "event"
+  // (a custom-order piece from materials + labor; jewelry), "job" (the same
+  // with machine time and a parts count; fabrication) or "event"
   // (arrangements × quantities plus delivery and setup; florists).
   // packSizes: materials carry their own bunch/box sizes (migration 028).
   // costSheets: printable cost sheets (/sheet) per build sheet / arrangement
   // and for event quotes. machineTime: jobs log machine minutes at a machine
   // rate, separate from labor (migration 029), and Settings has a default.
-  features: { quote: false | "piece" | "event"; packSizes: boolean; costSheets: boolean; machineTime: boolean };
+  features: { quote: false | "piece" | "job" | "event"; packSizes: boolean; costSheets: boolean; machineTime: boolean };
   market: {
     categoryDefaults: Record<string, string>; // category → commodity_code
     series: MarketSeries[];
@@ -236,7 +237,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     units: ["kg", "lb", "ft", "in", "m", "sheet", "each"],
     categories: ["bar_stock", "sheet_plate", "tube_pipe", "fasteners", "consumables", "finishing_coating", "outsourced_service"],
     defaults: { default_waste_pct: 8, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: false, packSizes: false, costSheets: false, machineTime: true },
+    features: { quote: "job", packSizes: false, costSheets: false, machineTime: true },
     market: {
       categoryDefaults: { sheet_plate: "steel_hrc", bar_stock: "steel_hrc" },
       series: [

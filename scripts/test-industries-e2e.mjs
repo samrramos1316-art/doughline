@@ -125,6 +125,7 @@ try {
   // ---- the custom-order quote calculator (jewelry core) -------------------
   assert((await navLinks(j)).includes("Quote"), "jeweler nav has Quote");
   await j.goto(`${BASE}/recipes/${recipe.id}`);
+  await j.getByRole("button", { name: /^Save build sheet$/i }).waitFor(); // past the loading outline
   assert((await j.getByRole("link", { name: "Cost sheet" }).count()) === 1, "jeweler build sheet links its cost sheet");
   await j.getByRole("link", { name: "Quote a custom version" }).click();
   await j.waitForURL(/\/quote\?from=/);
@@ -323,6 +324,32 @@ try {
   await fb.locator("details", { hasText: "Mounting bracket" }).first().locator("summary").click();
   const marginsText = (await fb.locator("main").innerText()).replace(/\s+/g, " ");
   assert(marginsText.includes("Machine time $6.00") && marginsText.includes("61.0%"), `Margins tab: machine time per bracket and the 61.0% margin: ${marginsText.match(/Labor .{0,120}/)?.[0]}`);
+
+  // ---- fabrication step 2: job quotes --------------------------------------
+  assert((await navLinks(fb)).includes("Quote"), "fabricator nav has Quote");
+  await fb.goto(`${BASE}/recipes/${job.id}`);
+  await fb.getByRole("link", { name: "Quote this job" }).click();
+  await fb.waitForURL(/\/quote\?from=/);
+  await fb.getByRole("heading", { name: "Quote a job" }).waitFor();
+  const jr = fb.getByTestId("quote-result");
+  // From the job as saved: $17.5522 a bracket; ÷ 0.35 → $50.15; × 10 parts = $501.50.
+  assert((await jr.innerText()).includes("$50.15") && (await fb.getByTestId("quote-job-total").innerText()).includes("$501.50"), `job quote per part and job total: ${(await jr.innerText()).replace(/\s+/g, " ")}`);
+  assert((await fb.locator("main").innerText()).replace(/\s+/g, " ").match(/Machine time\s*45 min × \$80\.00\/h \$60\.00/), "the quote's breakdown carries the job's machine time");
+  // A bigger run: 50 ft of bar, 25 parts, 90 min on the laser →
+  //   (50/0.92×3.20 + 30 + 120) × 1.1 = $356.3043 → $14.2522 a part → $40.73; × 25 = $1,018.25.
+  await fb.locator('input[data-cell="0:1"]').fill("50");
+  await fb.getByLabel("Parts").fill("25");
+  await fb.getByLabel("Machine minutes").fill("90");
+  assert((await jr.innerText()).includes("$40.73") && (await fb.getByTestId("quote-job-total").innerText()).includes("$1,018.25"), `re-priced for 25 parts: ${(await jr.innerText()).replace(/\s+/g, " ")}`);
+  await fb.locator('input[value="Mounting bracket (custom)"]').fill("Mounting bracket, 25 off");
+  await fb.getByRole("button", { name: /Keep as a job and quote/i }).click();
+  await fb.waitForURL(/\/recipes\/[0-9a-f-]{36}$/);
+  await fb.getByRole("button", { name: /^Save job$/i }).waitFor();
+  const { data: keptJob } = await admin.from("menu_items").select("selling_price, recipes(batch_yield_qty, batch_yield_unit, machine_minutes, machine_rate_per_hour)").eq("org_id", fabricator.orgId).eq("name", "Mounting bracket, 25 off").single();
+  assert(Number(keptJob.selling_price) === 40.73 && Number(keptJob.recipes.batch_yield_qty) === 25 && keptJob.recipes.batch_yield_unit === "parts" && Number(keptJob.recipes.machine_minutes) === 90 && keptJob.recipes.machine_rate_per_hour === null, `kept as a 25-part job with 90 machine minutes and a $40.73 quote: ${JSON.stringify(keptJob)}`);
+  const keptCost = (await fb.locator("main").innerText()).replace(/\s+/g, " ").match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0] ?? "";
+  assert(keptCost.includes("$14.2522"), `the kept job costs what the quote said: ${keptCost}`);
+
 
   // ---- the baker: today's app ---------------------------------------------
   const b = await login(baker.email);

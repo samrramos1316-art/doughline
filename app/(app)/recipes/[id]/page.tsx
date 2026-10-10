@@ -66,10 +66,11 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
           </>
         }
         actions={
-          industry.features.costSheets || industry.features.quote === "piece" ? (
+          industry.features.costSheets || industry.features.quote === "piece" || industry.features.quote === "job" ? (
             <>
               {industry.features.costSheets && <ButtonLink href={`/sheet/${id}`}>Cost sheet</ButtonLink>}
               {industry.features.quote === "piece" && <ButtonLink href={`/quote?from=${id}`}>Quote a custom version</ButtonLink>}
+              {industry.features.quote === "job" && <ButtonLink href={`/quote?from=${id}`}>Quote this job</ButtonLink>}
             </>
           ) : undefined
         }
