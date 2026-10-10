@@ -6,6 +6,7 @@ import { localDateFrom } from "@/lib/dates/localDate";
 import { bulkUpsertIngredients, type IngredientRowInput } from "@/lib/ingredients/bulkUpsert";
 import { retryUnappliedPrices } from "@/lib/costing/retryPrices";
 import { getIndustry } from "@/lib/supabase/vocab";
+import { newMaterialWastePct } from "@/lib/industries";
 
 // One Voyage call for every new/renamed ingredient, retried on 429s.
 export const maxDuration = 300;
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
   }
   if (rows.length > 2000) return NextResponse.json({ error: "At most 2000 rows per import" }, { status: 400 });
 
-  const result = await bulkUpsertIngredients(supabase, orgId, rows, localDateFrom(request), (await getIndustry()).defaults.default_waste_pct);
+  const industry = await getIndustry();
+  const result = await bulkUpsertIngredients(supabase, orgId, rows, localDateFrom(request), (category) => newMaterialWastePct(industry, category));
   if ("errors" in result) {
     return NextResponse.json({ error: "Nothing was saved — fix these rows first", row_errors: result.errors }, { status: 400 });
   }

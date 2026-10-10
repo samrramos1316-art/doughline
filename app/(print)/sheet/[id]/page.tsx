@@ -5,6 +5,7 @@ import { getIndustry } from "@/lib/supabase/vocab";
 import { effectiveWastePct, laborOverheadOf, laborRate, lineCost, machineRate } from "@/lib/costing/recipeCost";
 import { priceForMargin } from "@/lib/costing/quote";
 import { lower } from "@/lib/vocab";
+import { isServiceCategory } from "@/lib/industries";
 import { Today } from "@/components/print/Today";
 import { SheetBar } from "@/components/print/SheetBar";
 
@@ -32,7 +33,7 @@ export default async function CostSheetPage({ params }: { params: Promise<{ id: 
 
   const [{ data: recipe }, { data: lines }, { data: cost }, { data: org }, { data: items }, { data: margins }] = await Promise.all([
     supabase.from("recipes").select("name, batch_yield_qty, batch_yield_unit, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour, notes").eq("id", id).maybeSingle(),
-    supabase.from("recipe_ingredients").select("quantity, unit, waste_pct, ingredients(name, current_unit_cost, waste_pct)").eq("recipe_id", id),
+    supabase.from("recipe_ingredients").select("quantity, unit, waste_pct, ingredients(name, current_unit_cost, waste_pct, category)").eq("recipe_id", id),
     supabase.from("recipe_costs").select("batch_total_cost, cost_per_serving, materials_cost, labor_cost, machine_cost, unpriced_ingredients").eq("recipe_id", id).maybeSingle(),
     supabase.from("organizations").select("name, target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
     supabase.from("menu_items").select("id, name, selling_price, servings_per_batch, is_active").eq("recipe_id", id).order("name"),
@@ -46,12 +47,13 @@ export default async function CostSheetPage({ params }: { params: Promise<{ id: 
       const c = l.ingredients?.current_unit_cost == null ? null : Number(l.ingredients.current_unit_cost);
       const qty = Number(l.quantity);
       const waste = effectiveWastePct(l.waste_pct, l.ingredients?.waste_pct);
-      return { name: l.ingredients?.name ?? "?", qty, unit: l.unit, waste, unitCost: c, line: c == null ? null : lineCost(qty, c, waste) };
+      return { name: l.ingredients?.name ?? "?", service: isServiceCategory(industry, l.ingredients?.category), qty, unit: l.unit, waste, unitCost: c, line: c == null ? null : lineCost(qty, c, waste) };
     })
     .sort((a, b) => (b.line ?? 0) - (a.line ?? 0));
   const materials = cost?.materials_cost == null ? null : Number(cost.materials_cost);
   const labor = Number(cost?.labor_cost ?? 0);
   const machine = Number(cost?.machine_cost ?? 0);
+  const outsourced = rows.reduce((s, r) => s + (r.service ? (r.line ?? 0) : 0), 0);
   const batch = cost?.batch_total_cost == null ? null : Number(cost.batch_total_cost);
   // Never below 0: float noise in batch − materials − labor would print "$-0.00".
   const overhead = batch != null && materials != null ? Math.max(0, batch - materials - labor - machine) : null;
@@ -80,7 +82,7 @@ export default async function CostSheetPage({ params }: { params: Promise<{ id: 
           <tbody>
             {rows.map((r, i) => (
               <tr key={`${r.name}-${i}`}>
-                <td className={td}>{r.name}</td>
+                <td className={td}>{r.name}{r.service && <span className="ml-1.5 text-[11px] text-stone-500">outsourced</span>}</td>
                 <td className={tdR}>{r.qty} {r.unit}</td>
                 <td className={tdR}>{r.waste > 0 ? `${r.waste}%` : "—"}</td>
                 <td className={tdR}>{r.unitCost == null ? <span className="text-amber-700">no price</span> : `${unit$(r.unitCost)}/${r.unit}`}</td>
@@ -97,7 +99,8 @@ export default async function CostSheetPage({ params }: { params: Promise<{ id: 
       <section className="mt-5 ml-auto max-w-sm" data-testid="cost-sheet-totals">
         <table className="w-full">
           <tbody>
-            <tr><td className={td}>{v.ingredients}{rows.some((r) => r.waste > 0) ? ", with loss" : ""}</td><td className={tdR}>{money(materials)}</td></tr>
+            <tr><td className={td}>{v.ingredients}{rows.some((r) => r.waste > 0) ? ", with loss" : ""}</td><td className={tdR}>{money(materials == null ? null : materials - outsourced)}</td></tr>
+            {outsourced > 0 && <tr><td className={td}>Outsourced work</td><td className={tdR}>{money(outsourced)}</td></tr>}
             <tr><td className={td}>Labor{lo.laborMinutes > 0 ? ` (${lo.laborMinutes} min × ${money(laborRate(lo))}/h)` : ""}</td><td className={tdR}>{money(labor)}</td></tr>
             {machine > 0 && <tr><td className={td}>Machine time ({lo.machineMinutes} min × {money(machineRate(lo))}/h)</td><td className={tdR}>{money(machine)}</td></tr>}
             <tr><td className={td}>Overhead{Number(recipe.overhead_pct) > 0 ? ` (${Number(recipe.overhead_pct)}%)` : ""}</td><td className={tdR}>{money(overhead)}</td></tr>

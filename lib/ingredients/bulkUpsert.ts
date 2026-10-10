@@ -37,7 +37,9 @@ export async function bulkUpsertIngredients(
   orgId: string,
   input: IngredientRowInput[],
   effectiveDate: string, // the business's local date (lib/dates/localDate.ts)
-  defaultWastePct = 0, // new rows with no waste % (the industry's default; migration 027)
+  // A new row's waste % when it gives none: the industry's default, 0 for
+  // bought-in work (lib/industries newMaterialWastePct). 0 for food.
+  defaultWastePct: (category: string | null) => number = () => 0,
 ): Promise<{ errors: RowError[] } | { outcomes: RowOutcome[]; embeddingError: string | null }> {
   const { data: existing, error: loadErr } = await supabase
     .from("ingredients")
@@ -124,7 +126,7 @@ export async function bulkUpsertIngredients(
           commodity_code: r.commodity_code,
           current_unit_cost: r.cost,
           current_unit_cost_updated_at: r.cost != null ? now : null,
-          waste_pct: r.waste ?? defaultWastePct,
+          waste_pct: r.waste ?? defaultWastePct(r.category),
           pack_sizes: withPacks({}, r.packs),
           embedding: vectorFor.get(r.row) ?? null,
         })),

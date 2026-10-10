@@ -10,7 +10,7 @@ import { quote } from "@/lib/costing/quote";
 import { cap, lower } from "@/lib/vocab";
 import { money } from "@/components/ui/dash";
 
-type Material = { id: string; name: string; base_unit: string; unitCost: number | null; wastePct: number };
+type Material = { id: string; name: string; base_unit: string; unitCost: number | null; wastePct: number; service?: boolean };
 export type QuoteStart = {
   name: string;
   pieces: number;
@@ -112,7 +112,7 @@ export function QuoteCalculator({
     const m = byId.get(r.values.ingredient_id);
     const qty = parseNumber(r.values.quantity) ?? 0;
     const waste = effectiveWastePct(parseNumber(r.values.waste_pct ?? ""), m?.wastePct ?? 0);
-    return { name: m?.name ?? "?", quantity: qty, unitCost: m?.unitCost ?? null, wastePct: waste };
+    return { name: m?.name ?? "?", service: m?.service ?? false, quantity: qty, unitCost: m?.unitCost ?? null, wastePct: waste };
   });
   const laborOverhead = {
     laborMinutes: parseNumber(f.labor_minutes) ?? 0,
@@ -222,6 +222,7 @@ export function QuoteCalculator({
             labor={q.batch.labor}
             laborDetail={laborOverhead.laborMinutes > 0 ? `${laborOverhead.laborMinutes} min × $${laborRate(laborOverhead).toFixed(2)}/h` : null}
             machine={q.batch.machine}
+            outsourced={lines.reduce((s, l) => s + (l.service && l.unitCost != null ? lineCost(l.quantity, l.unitCost, l.wastePct) : 0), 0)}
             machineDetail={job && (laborOverhead.machineMinutes ?? 0) > 0 ? `${laborOverhead.machineMinutes} min × $${machineRate(laborOverhead).toFixed(2)}/h` : null}
             overhead={q.batch.overhead}
             overheadPct={laborOverhead.overheadPct}

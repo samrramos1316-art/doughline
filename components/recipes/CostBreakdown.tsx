@@ -18,6 +18,7 @@ export function CostBreakdown({
   materialsLabel = "Ingredients",
   machine = 0,
   machineDetail = null,
+  outsourced = 0,
 }: {
   materials: number;
   wasteExtra: number; // the part of `materials` that's waste
@@ -32,14 +33,18 @@ export function CostBreakdown({
   materialsLabel?: string;
   machine?: number; // machine time (migration 029); the row shows only when > 0
   machineDetail?: string | null;
+  // The part of `materials` that's bought-in work (a service category in
+  // lib/industries): shown as its own row only when > 0.
+  outsourced?: number;
 }) {
   const parts = [
     {
       label: materialsLabel,
-      value: materials,
+      value: materials - outsourced,
       detail: wasteExtra > 0 ? `includes ${money(wasteExtra)} of waste` : null,
       color: "#d97706",
     },
+    ...(outsourced > 0 ? [{ label: "Outsourced work", value: outsourced, detail: null, color: "#be185d" }] : []),
     { label: "Labor", value: labor, detail: laborDetail, color: "#0d9488" },
     ...(machine > 0 ? [{ label: "Machine time", value: machine, detail: machineDetail, color: "#4f46e5" }] : []),
     { label: "Overhead", value: overhead, detail: overheadPct > 0 ? `${overheadPct}% of ${materialsLabel.toLowerCase()} + labor${machine > 0 ? " + machine time" : ""}` : null, color: "#78716c" },

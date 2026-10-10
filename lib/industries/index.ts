@@ -49,6 +49,10 @@ export type IndustryProfile = {
   vocab: Vocab;
   units: string[]; // allowed/suggested units, all known to lib/costing/units.ts
   categories: string[]; // suggested ingredient categories (stored as written)
+  // Categories that are bought-in work, not stock (powder coat, plating, a
+  // laser-cut blank): no scrap/loss by default, and shown as "Outsourced
+  // work" apart from materials in cost breakdowns.
+  serviceCategories: string[];
   defaults: {
     default_waste_pct: number; // new materials start with this waste % (migration 027)
     default_overhead_pct: number;
@@ -113,6 +117,7 @@ const food = (id: IndustryId, name: string, description: string): IndustryProfil
   vocab: FOOD_VOCAB,
   units: FOOD_UNITS,
   categories: FOOD_CATEGORIES,
+  serviceCategories: [],
   defaults: { default_waste_pct: 0, default_overhead_pct: 0, show_labor_by_default: false },
   features: { quote: false, packSizes: false, costSheets: false, machineTime: false },
   market: { categoryDefaults: CATEGORY_DEFAULTS, series: FOOD_SERIES },
@@ -153,6 +158,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     units: ["g", "dwt", "troy oz", "carat", "each", "in", "cm"],
     // outsourced_work: casting, plating, stone setting bought in per piece.
     categories: ["precious_metal", "stone", "finding", "chain", "outsourced_work", "packaging", "tools_consumables"],
+    serviceCategories: ["outsourced_work"],
     defaults: { default_waste_pct: 5, default_overhead_pct: 0, show_labor_by_default: true },
     features: { quote: "piece", packSizes: false, costSheets: true, machineTime: false },
     market: {
@@ -197,6 +203,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     },
     units: ["stem", "bunch", "box", "each", "ft", "in"],
     categories: ["cut_flower", "greens", "vase_container", "foam_supplies", "ribbon_packaging"],
+    serviceCategories: [],
     defaults: { default_waste_pct: 10, default_overhead_pct: 0, show_labor_by_default: true },
     features: { quote: "event", packSizes: true, costSheets: true, machineTime: false },
     market: {
@@ -236,8 +243,9 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     },
     units: ["kg", "lb", "ft", "in", "m", "sheet", "each"],
     categories: ["bar_stock", "sheet_plate", "tube_pipe", "fasteners", "consumables", "finishing_coating", "outsourced_service"],
+    serviceCategories: ["outsourced_service"],
     defaults: { default_waste_pct: 8, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "job", packSizes: false, costSheets: false, machineTime: true },
+    features: { quote: "job", packSizes: false, costSheets: true, machineTime: true },
     market: {
       categoryDefaults: { sheet_plate: "steel_hrc", bar_stock: "steel_hrc" },
       series: [
@@ -309,4 +317,16 @@ export function resolveIndustry(businessType: string | null | undefined, setting
 // get their profile's lists.
 export function formSuggestions(p: Pick<ResolvedIndustry, "family" | "units" | "categories" | "customSuggestions">): { units: string[]; categories: string[] } | undefined {
   return p.family === "food" && !p.customSuggestions ? undefined : { units: p.units, categories: p.categories };
+}
+
+// The waste/loss % a new material starts with (migration 027): the
+// industry's default, except bought-in work (a service category), which
+// has no scrap of its own.
+export function newMaterialWastePct(p: Pick<IndustryProfile, "defaults" | "serviceCategories">, category: string | null | undefined): number {
+  return isServiceCategory(p, category) ? 0 : p.defaults.default_waste_pct;
+}
+
+export function isServiceCategory(p: Pick<IndustryProfile, "serviceCategories">, category: string | null | undefined): boolean {
+  const c = category?.trim().toLowerCase();
+  return !!c && p.serviceCategories.includes(c);
 }

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getIndustry } from "@/lib/supabase/vocab";
 import { lower } from "@/lib/vocab";
+import { isServiceCategory } from "@/lib/industries";
 import { PageHeader, Panel } from "@/components/ui/dash";
 import { QuoteCalculator, type QuoteStart } from "@/components/quote/QuoteCalculator";
 import { EventQuote, type EventStart } from "@/components/quote/EventQuote";
@@ -26,7 +27,7 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
   const v = industry.vocab;
 
   const [{ data: materials }, { data: org }, base] = await Promise.all([
-    supabase.from("ingredients").select("id, name, base_unit, current_unit_cost, waste_pct").order("name"),
+    supabase.from("ingredients").select("id, name, base_unit, current_unit_cost, waste_pct, category").order("name"),
     supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
     from
       ? supabase
@@ -69,6 +70,7 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
             base_unit: m.base_unit,
             unitCost: m.current_unit_cost == null ? null : Number(m.current_unit_cost),
             wastePct: Number(m.waste_pct ?? 0),
+            service: isServiceCategory(industry, m.category),
           }))}
           start={start}
           targetMarginPct={Number(org?.target_margin_pct ?? 65)}

@@ -5,6 +5,7 @@ import { RecipeBuilder } from "@/components/recipes/RecipeBuilder";
 import { CostBreakdown } from "@/components/recipes/CostBreakdown";
 import { effectiveWastePct, laborOverheadOf, laborRate, lineCost, machineRate } from "@/lib/costing/recipeCost";
 import { getVocab, getIndustry } from "@/lib/supabase/vocab";
+import { isServiceCategory } from "@/lib/industries";
 import { lower } from "@/lib/vocab";
 import { Panel, Kpi, PageHeader, HBar, Empty, ButtonLink, money, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
 
@@ -14,7 +15,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
 
   const [{ data: recipe }, { data: recipeIngredients }, { data: allIngredients }, { data: cost }, { data: menu }, { data: org }, { data: menuItems }, v] = await Promise.all([
     supabase.from("recipes").select("*").eq("id", id).maybeSingle(),
-    supabase.from("recipe_ingredients").select("ingredient_id, quantity, unit, waste_pct, ingredients(name, base_unit, current_unit_cost, waste_pct)").eq("recipe_id", id),
+    supabase.from("recipe_ingredients").select("ingredient_id, quantity, unit, waste_pct, ingredients(name, base_unit, current_unit_cost, waste_pct, category)").eq("recipe_id", id),
     supabase.from("ingredients").select("id, name, base_unit, waste_pct").order("name"),
     supabase.from("recipe_costs").select("*").eq("recipe_id", id).maybeSingle(),
     supabase.from("menu_item_margins").select("menu_item_id, name, selling_price, margin_pct"),
@@ -41,7 +42,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
       const c = ri.ingredients?.current_unit_cost == null ? null : Number(ri.ingredients.current_unit_cost);
       const qty = Number(ri.quantity);
       const waste = effectiveWastePct(ri.waste_pct, ri.ingredients?.waste_pct);
-      return { name: ri.ingredients?.name ?? "?", qty, unit: ri.unit, waste, unitCost: c, line: c == null ? null : lineCost(qty, c, waste), wasteExtra: c == null ? 0 : lineCost(qty, c, waste) - qty * c };
+      return { name: ri.ingredients?.name ?? "?", service: isServiceCategory(industry, ri.ingredients?.category), qty, unit: ri.unit, waste, unitCost: c, line: c == null ? null : lineCost(qty, c, waste), wasteExtra: c == null ? 0 : lineCost(qty, c, waste) - qty * c };
     })
     .sort((a, b) => (b.line ?? 0) - (a.line ?? 0));
   const batch = cost?.batch_total_cost == null ? null : Number(cost.batch_total_cost);
@@ -120,6 +121,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
                 laborDetail={laborOverhead.laborMinutes > 0 ? `${laborOverhead.laborMinutes} min × $${laborRate(laborOverhead).toFixed(2)}/h` : null}
                 overhead={Math.max(0, batch - materials - labor - machine)}
                 machine={machine}
+                outsourced={breakdown.reduce((s, b) => s + (b.service ? (b.line ?? 0) : 0), 0)}
                 machineDetail={laborOverhead.machineMinutes > 0 ? `${laborOverhead.machineMinutes} min × $${machineRate(laborOverhead).toFixed(2)}/h` : null}
                 overheadPct={laborOverhead.overheadPct}
                 total={batch}

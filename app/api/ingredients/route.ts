@@ -5,6 +5,7 @@ import { getCurrentOrgId } from "@/lib/supabase/org";
 import { createIngredientSchema } from "@/lib/validators/ingredient";
 import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
 import { getIndustry } from "@/lib/supabase/vocab";
+import { newMaterialWastePct } from "@/lib/industries";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 
 // Claude and Voyage calls (Voyage retries 429s on its free tier) can take
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       ...rest,
       org_id: orgId,
       embedding,
-      waste_pct: waste_pct ?? (await getIndustry()).defaults.default_waste_pct,
+      waste_pct: waste_pct ?? newMaterialWastePct(await getIndustry(), rest.category),
       current_unit_cost: current_unit_cost ?? null,
       current_unit_cost_updated_at: current_unit_cost != null ? new Date().toISOString() : null,
     })

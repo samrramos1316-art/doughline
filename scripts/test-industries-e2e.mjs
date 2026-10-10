@@ -350,6 +350,40 @@ try {
   const keptCost = (await fb.locator("main").innerText()).replace(/\s+/g, " ").match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0] ?? "";
   assert(keptCost.includes("$14.2522"), `the kept job costs what the quote said: ${keptCost}`);
 
+  // ---- fabrication step 3: outsourced work, cost sheets --------------------
+  // Powder coat bought in at $2.50 a part: added in the grid it starts at 0%
+  // scrap (a service category), not the shop's 8%.
+  await fb.goto(`${BASE}/ingredients`);
+  await fb.getByRole("heading", { name: "Materials" }).waitFor();
+  await fb.locator('input[data-cell="1:0"]').fill("Powder coat, black");
+  await fb.locator('input[data-cell="1:1"]').fill("outsourced_service");
+  await fb.locator('input[data-cell="1:2"]').fill("each");
+  await fb.locator('input[data-cell="1:3"]').fill("2.50");
+  await fb.getByRole("button", { name: /^Save 1 change$/ }).click();
+  await fb.getByText(/Saved —/).waitFor();
+  const { data: coat } = await admin.from("ingredients").select("id, waste_pct").eq("org_id", fabricator.orgId).eq("name", "Powder coat, black").single();
+  assert(Number(coat.waste_pct) === 0, `outsourced work starts with no scrap: ${coat.waste_pct}%`);
+
+  // On the bracket job (10 parts): + $25 of powder coat →
+  //   (69.5652 + 25 + 30 + 60) × 1.1 ÷ 10 = $20.3022 a bracket.
+  await admin.from("recipe_ingredients").insert({ org_id: fabricator.orgId, recipe_id: job.id, ingredient_id: coat.id, quantity: 10, unit: "each" });
+  await fb.goto(`${BASE}/recipes/${job.id}`);
+  await fb.getByRole("button", { name: /^Save job$/i }).waitFor();
+  const withCoat = (await fb.locator("main").innerText()).replace(/\s+/g, " ");
+  assert(withCoat.includes("÷ 10 brackets = $20.3022 each"), `job cost with outsourced powder coat: ${withCoat.match(/÷ \d+ \w+ = \$[\d.]+ each/)?.[0]}`);
+  assert(/Materialsincludes \$5\.57 of waste \$69\.57/.test(withCoat) && /Outsourced work\s*\$25\.00/.test(withCoat), `breakdown splits materials and outsourced work: ${withCoat.match(/Batch cost: .{0,260}/i)?.[0]}`);
+
+  await fb.getByRole("link", { name: "Cost sheet" }).click();
+  await fb.waitForURL(/\/sheet\/[0-9a-f-]{36}$/);
+  const fabSheet = (await fb.getByTestId("cost-sheet").innerText()).replace(/\s+/g, " ");
+  assert(
+    /Powder coat, black\s*outsourced 10 each — \$2\.50\/each \$25\.00/.test(fabSheet) &&
+      fabSheet.includes("Outsourced work $25.00") &&
+      fabSheet.includes("Machine time (45 min × $80.00/h) $60.00") &&
+      fabSheet.includes("Cost per part $20.30"),
+    `fabrication cost sheet: ${fabSheet.slice(0, 900)}`,
+  );
+
 
   // ---- the baker: today's app ---------------------------------------------
   const b = await login(baker.email);

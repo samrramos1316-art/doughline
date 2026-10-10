@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { INDUSTRIES, INDUSTRY_IDS, VOCAB_KEYS, formSuggestions, industryProfile, normalizeIndustryId, resolveIndustry } from "./index.ts";
+import { INDUSTRIES, INDUSTRY_IDS, VOCAB_KEYS, formSuggestions, industryProfile, isServiceCategory, newMaterialWastePct, normalizeIndustryId, resolveIndustry } from "./index.ts";
 import { enabledIndustries, industryOptions, isIndustryEnabled } from "./gate.ts";
 import { extractionHints, withIndustryHints } from "./extraction.ts";
 import { canonicalUnit, isContainerUnit } from "../costing/units.ts";
@@ -154,10 +154,23 @@ test("quotes: a custom piece for jewelry, an event for florists; food has no new
   for (const id of INDUSTRY_IDS) {
     assert.equal(INDUSTRIES[id].features.quote, id === "jewelry" ? "piece" : id === "florist" ? "event" : id === "metalworking" ? "job" : false, id);
     assert.equal(INDUSTRIES[id].features.packSizes, id === "florist", id);
-    assert.equal(INDUSTRIES[id].features.costSheets, id === "jewelry" || id === "florist", id);
+    assert.equal(INDUSTRIES[id].features.costSheets, id === "jewelry" || id === "florist" || id === "metalworking", id);
     assert.equal(INDUSTRIES[id].features.machineTime, id === "metalworking", id);
   }
   assert.equal(resolveIndustry("bakery").features.quote, false);
   assert.equal(resolveIndustry(null).features.quote, false);
   assert.ok(INDUSTRIES.jewelry.categories.includes("outsourced_work"));
+});
+
+test("outsourced work: no scrap by default, and known per industry", () => {
+  const fab = resolveIndustry("metalworking");
+  assert.equal(newMaterialWastePct(fab, "bar_stock"), 8);
+  assert.equal(newMaterialWastePct(fab, "outsourced_service"), 0);
+  assert.equal(newMaterialWastePct(fab, " Outsourced_Service "), 0);
+  assert.equal(newMaterialWastePct(fab, null), 8);
+  assert.equal(newMaterialWastePct(resolveIndustry("jewelry"), "outsourced_work"), 0);
+  assert.equal(newMaterialWastePct(resolveIndustry("jewelry"), "precious_metal"), 5);
+  for (const id of ["bakery", "food_truck", "caterer", "other"]) assert.equal(newMaterialWastePct(resolveIndustry(id), "packaging"), 0);
+  for (const p of Object.values(INDUSTRIES)) for (const c of p.serviceCategories) assert.ok(p.categories.includes(c), `${p.id}: ${c} is one of its categories`);
+  assert.equal(isServiceCategory(resolveIndustry("bakery"), "outsourced_service"), false);
 });
