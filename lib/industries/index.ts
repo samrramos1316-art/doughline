@@ -58,7 +58,9 @@ export type IndustryProfile = {
   // (a custom-order piece from materials + labor; jewelry) or "event"
   // (arrangements × quantities plus delivery and setup; florists).
   // packSizes: materials carry their own bunch/box sizes (migration 028).
-  features: { quote: false | "piece" | "event"; packSizes: boolean };
+  // costSheets: printable cost sheets (/sheet) per build sheet / arrangement
+  // and for event quotes.
+  features: { quote: false | "piece" | "event"; packSizes: boolean; costSheets: boolean };
   market: {
     categoryDefaults: Record<string, string>; // category → commodity_code
     series: MarketSeries[];
@@ -110,7 +112,7 @@ const food = (id: IndustryId, name: string, description: string): IndustryProfil
   units: FOOD_UNITS,
   categories: FOOD_CATEGORIES,
   defaults: { default_waste_pct: 0, default_overhead_pct: 0, show_labor_by_default: false },
-  features: { quote: false, packSizes: false },
+  features: { quote: false, packSizes: false, costSheets: false },
   market: { categoryDefaults: CATEGORY_DEFAULTS, series: FOOD_SERIES },
   extraction: NO_HINTS,
 });
@@ -150,7 +152,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     // outsourced_work: casting, plating, stone setting bought in per piece.
     categories: ["precious_metal", "stone", "finding", "chain", "outsourced_work", "packaging", "tools_consumables"],
     defaults: { default_waste_pct: 5, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "piece", packSizes: false },
+    features: { quote: "piece", packSizes: false, costSheets: true },
     market: {
       categoryDefaults: { precious_metal: "gold_spot" },
       series: [
@@ -194,7 +196,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     units: ["stem", "bunch", "box", "each", "ft", "in"],
     categories: ["cut_flower", "greens", "vase_container", "foam_supplies", "ribbon_packaging"],
     defaults: { default_waste_pct: 10, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "event", packSizes: true },
+    features: { quote: "event", packSizes: true, costSheets: true },
     market: {
       categoryDefaults: { cut_flower: "floral_wholesale" },
       series: [{ code: "floral_wholesale", label: "Wholesale cut flowers (placeholder)", ingesting: false }],
@@ -233,7 +235,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     units: ["kg", "lb", "ft", "in", "m", "sheet", "each"],
     categories: ["bar_stock", "sheet_plate", "tube_pipe", "fasteners", "consumables", "finishing_coating", "outsourced_service"],
     defaults: { default_waste_pct: 8, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: false, packSizes: false },
+    features: { quote: false, packSizes: false, costSheets: false },
     market: {
       categoryDefaults: { sheet_plate: "steel_hrc", bar_stock: "steel_hrc" },
       series: [

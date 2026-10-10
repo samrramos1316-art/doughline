@@ -67,7 +67,14 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
             <Link href="/recipes" className="underline">{v.recipes}</Link> · {lower(v.yield)} {recipe.batch_yield_qty} {recipe.batch_yield_unit}
           </>
         }
-        actions={industry.features.quote === "piece" ? <ButtonLink href={`/quote?from=${id}`}>Quote a custom version</ButtonLink> : undefined}
+        actions={
+          industry.features.costSheets || industry.features.quote === "piece" ? (
+            <>
+              {industry.features.costSheets && <ButtonLink href={`/sheet/${id}`}>Cost sheet</ButtonLink>}
+              {industry.features.quote === "piece" && <ButtonLink href={`/quote?from=${id}`}>Quote a custom version</ButtonLink>}
+            </>
+          ) : undefined
+        }
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">

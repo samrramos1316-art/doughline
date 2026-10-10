@@ -124,6 +124,7 @@ try {
   // ---- the custom-order quote calculator (jewelry core) -------------------
   assert((await navLinks(j)).includes("Quote"), "jeweler nav has Quote");
   await j.goto(`${BASE}/recipes/${recipe.id}`);
+  assert((await j.getByRole("link", { name: "Cost sheet" }).count()) === 1, "jeweler build sheet links its cost sheet");
   await j.getByRole("link", { name: "Quote a custom version" }).click();
   await j.waitForURL(/\/quote\?from=/);
   const result = j.getByTestId("quote-result");
@@ -242,6 +243,45 @@ try {
   await f.goto(`${BASE}/recipes/${centerpiece.id}`);
   assert((await f.getByRole("link", { name: "Quote a custom version" }).count()) === 0, "no jewelry piece-quote link on a florist's arrangement");
 
+  // ---- step 5: printable event quote, cost sheet, price alert --------------
+  await f.goto(copied.toString());
+  await f.getByTestId("quote-result").waitFor();
+  await f.getByRole("button", { name: "Printable quote" }).click();
+  await f.waitForURL(/\/sheet\/event\?/);
+  const evTotals = (await f.getByTestId("event-sheet-totals").innerText()).replace(/\s+/g, " ");
+  assert(evTotals.includes("$340.33") && evTotals.includes("$972.39") && evTotals.includes("62.19%"), `printable event quote matches the screen: ${evTotals}`);
+  assert((await f.locator("h1").innerText()) === "Rivera wedding", "printable quote carries the event name");
+
+  // A package sold from the centerpiece: $65 → (65 − 20.3333) ÷ 65 = 68.72%.
+  await admin.from("menu_items").insert({ org_id: florist.orgId, recipe_id: centerpiece.id, name: "Centerpiece", selling_price: 65 });
+  await f.goto(`${BASE}/recipes/${centerpiece.id}`);
+  await f.getByRole("link", { name: "Cost sheet" }).click();
+  await f.waitForURL(/\/sheet\/[0-9a-f-]{36}$/);
+  const sheet = (await f.getByTestId("cost-sheet").innerText()).replace(/\s+/g, " ");
+  assert(sheet.includes("Red rose 6 stem 10% $1.45/stem $9.67") && sheet.includes("Cost per arrangement $20.33"), `cost sheet lists stems with spoilage and the cost per arrangement: ${sheet.slice(0, 400)}`);
+  assert(sheet.includes("Overhead $0.00") && !sheet.includes("$-"), `no negative zero on the cost sheet: ${sheet.match(/Overhead \S+/)?.[0]}`);
+  assert(sheet.includes("Centerpiece $65.00 $20.33 68.72% $58.10"), `cost sheet shows the package's price, cost, margin and the price for 65%: ${sheet}`);
+
+  // Roses go up: "1 BN $18.00" → $1.80 a stem (+24%). The alert names the
+  // package and how much margin it lost: 68.72% → (65 − 22.6667) ÷ 65 = 65.13%.
+  await admin.from("invoice_line_items").insert({
+    org_id: florist.orgId, invoice_id: flInv.id, raw_text: "ROSE RED 50CM 1 BN", parsed_item_name: "Red rose", parsed_unit: "BN", parsed_unit_cost: 18,
+    matched_ingredient_id: rose.id, match_status: "confirmed",
+  });
+  await f.goto(`${BASE}/ingredients`);
+  await f.getByRole("heading", { name: "Stems & supplies" }).waitFor();
+  await f.locator("tr", { has: f.locator('input[value="Red rose"]') }).locator('input[data-cell$=":6"]').fill("25"); // per box: saving retries the rose's stuck prices
+  await f.getByRole("button", { name: /^Save 1 change$/ }).click();
+  await f.getByText(/Saved —/).waitFor();
+  const { data: roseAlert } = await admin.from("price_alerts").select("id, pct_change").eq("ingredient_id", rose.id).single();
+  assert(Math.round(Number(roseAlert.pct_change)) === 24, `a 24% rose rise raises an alert: ${JSON.stringify(roseAlert)}`);
+  await f.goto(`${BASE}/alerts/${roseAlert.id}`);
+  await f.getByText("Packages affected").waitFor();
+  const alertText = (await f.locator("main").innerText()).replace(/\s+/g, " ");
+  assert(alertText.includes("Red rose price change") && alertText.includes("PACKAGES HIT 1") && /Centerpiece Centerpiece \$65\.00 68\.7% .* 65\.1% .* ▼ 3\.59pp/.test(alertText), `alert shows the package losing margin: ${alertText.slice(0, 500)}`);
+  assert(alertText.includes("of the arrangement's"), "the suggestion speaks the florist's words");
+
+
   // ---- the baker: today's app ---------------------------------------------
   const b = await login(baker.email);
   nav = await navLinks(b);
@@ -261,6 +301,9 @@ try {
   await b.goto(`${BASE}/quote`);
   await b.getByText("This page could not be found").waitFor();
   assert((await b.getByTestId("quote-result").count()) === 0, "food orgs get the not-found page for /quote, no calculator");
+  await b.goto(`${BASE}/sheet/${recipe.id}`);
+  await b.getByText("This page could not be found").waitFor();
+  assert((await b.getByTestId("cost-sheet").count()) === 0, "food orgs get the not-found page for /sheet");
 
   // ---- signup ---------------------------------------------------------------
   const s = await browser.newPage();

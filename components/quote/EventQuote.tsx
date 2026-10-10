@@ -76,12 +76,12 @@ export function EventQuote({
     price: ownPrice,
   });
 
-  function link() {
+  function link(path = "/quote") {
     const p = new URLSearchParams();
     if (f.name.trim()) p.set("name", f.name.trim());
     p.set("items", filled.map((r) => `${r.values.recipe_id}:${parseNumber(r.values.quantity)}`).join(","));
     for (const k of ["delivery", "setup_minutes", "rate", "other", "target", "price"] as const) if (f[k].trim()) p.set(k, f[k].trim());
-    return `${window.location.origin}/quote?${p.toString()}`;
+    return `${window.location.origin}${path}?${p.toString()}`;
   }
 
   if (arrangements.length === 0) {
@@ -175,6 +175,14 @@ export function EventQuote({
             className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >
             Copy link to this quote
+          </button>
+          <button
+            type="button"
+            disabled={errors.size > 0 || filled.length === 0}
+            onClick={() => window.location.assign(link("/sheet/event"))}
+            className="rounded-full border border-stone-300 bg-white px-5 py-2.5 text-sm font-medium text-stone-800 hover:border-stone-500 disabled:opacity-50"
+          >
+            Printable quote
           </button>
           {copied && <span className="text-sm text-green-700">Copied. The link reopens this quote with today&apos;s costs.</span>}
         </div>
