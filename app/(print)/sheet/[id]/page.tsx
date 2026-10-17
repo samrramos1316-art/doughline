@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getIndustry } from "@/lib/supabase/vocab";
 import { effectiveWastePct, laborOverheadOf, laborRate, lineCost, machineRate } from "@/lib/costing/recipeCost";
 import { priceForMargin } from "@/lib/costing/quote";
+import { formatMarginPct, formatMarkup, markupOf, markupValue, targetMarginOf } from "@/lib/costing/markup";
 import { lower } from "@/lib/vocab";
 import { isServiceCategory } from "@/lib/industries";
 import { Today } from "@/components/print/Today";
@@ -35,13 +36,14 @@ export default async function CostSheetPage({ params }: { params: Promise<{ id: 
     supabase.from("recipes").select("name, batch_yield_qty, batch_yield_unit, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour, notes").eq("id", id).maybeSingle(),
     supabase.from("recipe_ingredients").select("quantity, unit, waste_pct, ingredients(name, current_unit_cost, waste_pct, category)").eq("recipe_id", id),
     supabase.from("recipe_costs").select("batch_total_cost, cost_per_serving, materials_cost, labor_cost, machine_cost, unpriced_ingredients").eq("recipe_id", id).maybeSingle(),
-    supabase.from("organizations").select("name, target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
+    supabase.from("organizations").select("name, target_margin_pct, target_markup, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
     supabase.from("menu_items").select("id, name, selling_price, servings_per_batch, is_active").eq("recipe_id", id).order("name"),
     supabase.from("menu_item_margins").select("menu_item_id, cost_per_serving, margin_pct"),
   ]);
   if (!recipe) notFound();
 
-  const target = Number(org?.target_margin_pct ?? 65);
+  const target = targetMarginOf(org);
+  const markup = org ? markupValue(org) : null;
   const rows = (lines ?? [])
     .map((l) => {
       const c = l.ingredients?.current_unit_cost == null ? null : Number(l.ingredients.current_unit_cost);
@@ -117,7 +119,7 @@ export default async function CostSheetPage({ params }: { params: Promise<{ id: 
         ) : (
           <table className="mt-2 w-full">
             <thead>
-              <tr><th className={th}>{v.menuItem}</th><th className={thR}>Price</th><th className={thR}>Cost</th><th className={thR}>Margin</th><th className={thR}>Price for {target}%</th></tr>
+              <tr><th className={th}>{v.menuItem}</th><th className={thR}>Price</th><th className={thR}>Cost</th><th className={thR}>{markup != null ? "Markup" : "Margin"}</th><th className={thR}>Price for {markup != null ? formatMarkup(markup) : formatMarginPct(target)}</th></tr>
             </thead>
             <tbody>
               {(items ?? []).map((m) => {
@@ -129,7 +131,7 @@ export default async function CostSheetPage({ params }: { params: Promise<{ id: 
                     <td className={td}>{m.name}{m.is_active ? "" : <span className="text-stone-400"> (not {v.onMenu})</span>}</td>
                     <td className={tdR}>{money(Number(m.selling_price))}</td>
                     <td className={tdR}>{unit$(costEach)}</td>
-                    <td className={`${tdR} ${pct != null && pct < target ? "font-semibold text-red-700" : ""}`}>{pct == null ? "—" : `${pct}%`}</td>
+                    <td className={`${tdR} ${pct != null && pct < target ? "font-semibold text-red-700" : ""}`}>{pct == null ? "—" : markup != null ? formatMarkup(markupOf(Number(m.selling_price), costEach)) : `${pct}%`}</td>
                     <td className={tdR}>{money(priceForMargin(costEach, target))}</td>
                   </tr>
                 );

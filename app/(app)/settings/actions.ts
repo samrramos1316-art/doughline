@@ -6,12 +6,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { isIndustryEnabled } from "@/lib/industries/gate";
 import { INDUSTRY_IDS } from "@/lib/industries";
+import { marginFromMarkup } from "@/lib/costing/markup";
 
 export type SettingsState = { ok: true } | { error: string } | null;
 
 const schema = z.object({
   name: z.string().trim().min(1, "Business name can't be empty").max(120),
-  target_margin_pct: z.coerce.number().min(1).max(99),
+  // Margin, or markup (migration 030): a markup also stores its margin
+  // (2× = 50%) so anything reading only target_margin_pct agrees.
+  pricing_style: z.enum(["margin", "markup"]).default("margin"),
+  target_margin_pct: z.coerce.number().min(1).max(99).optional(),
+  target_markup: z.coerce.number().min(1.05, "A markup has to be more than 1×").max(100, "Markup can be at most 100×").optional(),
   price_alert_threshold_pct: z.coerce.number().min(0.5).max(100),
   max_unreviewed_line_items: z.coerce.number().int().min(1).max(500),
   // Recipes that log labor time and set no rate of their own use this
@@ -30,8 +35,17 @@ export async function saveSettingsAction(_prev: SettingsState, formData: FormDat
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) return { error: "Not signed in" };
-  const { business_type, ...rest } = parsed.data;
-  const update: typeof rest & { business_type?: string | null } = rest;
+  const { business_type, pricing_style, target_markup, target_margin_pct, ...rest } = parsed.data;
+  const update: typeof rest & { business_type?: string | null; target_margin_pct?: number; target_markup?: number | null } = rest;
+  if (pricing_style === "markup") {
+    if (target_markup == null) return { error: "Enter your target markup" };
+    update.target_markup = target_markup;
+    update.target_margin_pct = Math.round(marginFromMarkup(target_markup) * 100) / 100;
+  } else {
+    if (target_margin_pct == null) return { error: "Enter your target margin" };
+    update.target_margin_pct = target_margin_pct;
+    update.target_markup = null;
+  }
   if (business_type !== undefined) {
     // An industry that isn't offered (ENABLED_INDUSTRIES) can be kept, not chosen.
     const { data: current } = await supabase.from("organizations").select("business_type").eq("id", orgId).single();

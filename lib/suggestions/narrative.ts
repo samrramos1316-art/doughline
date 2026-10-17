@@ -47,7 +47,7 @@ export function narrativeFacts(s: AlertSuggestions) {
   return {
     ingredient: s.alert.ingredient_name,
     price_change: `${money(s.alert.previous_unit_cost)}/${u} -> ${money(s.alert.new_unit_cost)}/${u} (${signed(s.alert.pct_change)}%)`,
-    target_margin: `${s.target_margin_pct}%`,
+    target_margin: s.target_label,
     menu_items: s.items.map((i) => ({
       name: i.menu_item_name,
       sells_for: money(i.selling_price),

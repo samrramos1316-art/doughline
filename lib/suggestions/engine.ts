@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { suggestForItem, type ItemSuggestion } from "./math";
 import { effectiveUnitCost, effectiveWastePct } from "@/lib/costing/recipeCost";
+import { targetLabel, targetMarginOf } from "@/lib/costing/markup";
 
 type Client = SupabaseClient<Database>;
 
@@ -31,6 +32,7 @@ export type AlertSuggestions = {
     ai_narrative_generated_at: string | null;
   };
   target_margin_pct: number;
+  target_label: string; // "65%" or "2× markup" (lib/costing/markup.ts)
   items: AlertSuggestionItem[];
 };
 
@@ -56,7 +58,7 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
 
   const [{ data: org }, { data: menuItems }, { data: margins }, { data: recipes }, { data: recipeIngs }] =
     await Promise.all([
-      supabase.from("organizations").select("target_margin_pct").eq("id", alert.org_id).single(),
+      supabase.from("organizations").select("target_margin_pct, target_markup").eq("id", alert.org_id).single(),
       supabase.from("menu_items").select("id, name, selling_price, servings_per_batch").in("id", menuItemIds),
       supabase.from("menu_item_margins").select("menu_item_id, cost_per_serving").in("menu_item_id", menuItemIds),
       supabase.from("recipes").select("id, name, batch_yield_qty, overhead_pct").in("id", recipeIds),
@@ -68,7 +70,7 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
     ]);
   if (!org) throw new Error("loading org target margin failed");
 
-  const target = Number(org.target_margin_pct);
+  const target = targetMarginOf(org);
   const ingredientCost = Number(alert.ingredients.current_unit_cost);
   const items: AlertSuggestionItem[] = [];
 
@@ -128,6 +130,7 @@ export async function getAlertSuggestions(supabase: Client, alertId: string): Pr
       ai_narrative_generated_at: alert.ai_narrative_generated_at,
     },
     target_margin_pct: target,
+    target_label: targetLabel(org),
     items,
   };
 }

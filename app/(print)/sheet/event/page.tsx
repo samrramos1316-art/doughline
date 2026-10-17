@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getIndustry } from "@/lib/supabase/vocab";
 import { eventQuote } from "@/lib/costing/quote";
+import { formatMarginPct, targetMarginOf } from "@/lib/costing/markup";
 import { lower } from "@/lib/vocab";
 import { SheetBar } from "@/components/print/SheetBar";
 import { Today } from "@/components/print/Today";
@@ -29,7 +30,7 @@ export default async function EventSheetPage({ searchParams }: { searchParams: P
   const [{ data: recipes }, { data: costs }, { data: org }] = await Promise.all([
     supabase.from("recipes").select("id, name, batch_yield_unit"),
     supabase.from("recipe_costs").select("recipe_id, cost_per_serving"),
-    supabase.from("organizations").select("name, target_margin_pct, default_labor_rate_per_hour").maybeSingle(),
+    supabase.from("organizations").select("name, target_margin_pct, target_markup, default_labor_rate_per_hour").maybeSingle(),
   ]);
   const byId = new Map((recipes ?? []).map((r) => [r.id, r]));
   const costOf = new Map((costs ?? []).map((c) => [c.recipe_id, c.cost_per_serving == null ? null : Number(c.cost_per_serving)]));
@@ -38,7 +39,7 @@ export default async function EventSheetPage({ searchParams }: { searchParams: P
     .map((pair) => pair.split(":"))
     .filter(([id, qty]) => byId.has(id) && Number(qty) > 0)
     .map(([id, qty]) => ({ id, name: byId.get(id)!.name, quantity: Number(qty), costEach: costOf.get(id) ?? null }));
-  const target = num(p.target) ?? Number(org?.target_margin_pct ?? 65);
+  const target = num(p.target) ?? targetMarginOf(org);
   const q = eventQuote({
     items,
     delivery: num(p.delivery),
@@ -85,11 +86,11 @@ export default async function EventSheetPage({ searchParams }: { searchParams: P
         <table className="w-full">
           <tbody>
             <tr className="font-semibold"><td className={td}>Total cost</td><td className={tdR}>{money(q.totalCost)}</td></tr>
-            <tr><td className={td}>Suggested price at {target}%</td><td className={tdR}>{money(q.suggestedPrice)}</td></tr>
+            <tr><td className={td}>Suggested price at {formatMarginPct(target)}</td><td className={tdR}>{money(q.suggestedPrice)}</td></tr>
             {num(p.price) != null && <tr><td className={td}>Quoted price</td><td className={tdR}>{money(num(p.price))}</td></tr>}
             <tr className="text-base font-semibold">
               <td className="px-2 py-2">Margin at {money(price)}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{num(p.price) != null ? (q.marginAtPrice == null ? "—" : `${q.marginAtPrice}%`) : q.suggestedPrice == null ? "—" : `${target}%`}</td>
+              <td className="px-2 py-2 text-right tabular-nums">{num(p.price) != null ? (q.marginAtPrice == null ? "—" : `${q.marginAtPrice}%`) : q.suggestedPrice == null ? "—" : formatMarginPct(target)}</td>
             </tr>
           </tbody>
         </table>

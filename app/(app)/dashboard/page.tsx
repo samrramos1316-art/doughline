@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title="Overview"
-        subtitle={`${today} · target margin ${org.target}%`}
+        subtitle={`${today} · target ${org.targetPhrase}`}
         actions={
           <>
             <ButtonLink href="/margins">Margins</ButtonLink>
@@ -78,7 +78,7 @@ export default async function DashboardPage() {
           label="Below target"
           value={`${kpis.belowTarget}/${kpis.activeItems}`}
           tone={kpis.belowTarget ? "critical" : kpis.activeItems ? "good" : "neutral"}
-          sub={kpis.belowTarget ? `${lower(v.menuItems)} under ${org.target}%` : "every item on target"}
+          sub={kpis.belowTarget ? `${lower(v.menuItems)} under ${org.targetText}` : "every item on target"}
           href="/menu"
         />
         <Kpi
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
                     <th className={thNum}>Sells</th>
                     <th className={thNum}>Cost</th>
                     <th className={thNum}>Margin</th>
-                    <th className={th}>vs {org.target}% target</th>
+                    <th className={th}>vs {org.targetText} target</th>
                     <th className={thNum}>30d</th>
                     <th className={th}>90-day trend</th>
                     <th className={th}>Status</th>

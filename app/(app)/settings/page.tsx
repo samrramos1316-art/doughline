@@ -13,7 +13,7 @@ export default async function SettingsPage() {
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
   const [{ data: org }, user] = await Promise.all([
-    supabase.from("organizations").select("name, business_type, target_margin_pct, price_alert_threshold_pct, max_unreviewed_line_items, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
+    supabase.from("organizations").select("name, business_type, target_margin_pct, target_markup,price_alert_threshold_pct, max_unreviewed_line_items, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
     getSessionUser(),
   ]);
   if (!org) redirect("/login");
@@ -27,6 +27,7 @@ export default async function SettingsPage() {
             initial={{
               name: org.name,
               target_margin_pct: Number(org.target_margin_pct),
+              target_markup: org.target_markup == null ? null : Number(org.target_markup),
               price_alert_threshold_pct: Number(org.price_alert_threshold_pct),
               max_unreviewed_line_items: org.max_unreviewed_line_items,
               default_labor_rate_per_hour: Number(org.default_labor_rate_per_hour),

@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { isoDaysAgo } from "@/lib/dates/localDate";
-import { batchCost, effectiveWastePct, laborCost, laborOverheadOf, lineCost, machineCost, marginPctOf, overheadMultiplier, perServing, wasteMultiplier, type LaborOverhead } from "@/lib/costing/recipeCost";
+import { markupValue, targetLabel, targetMarginOf } from "@/lib/costing/markup";
+import { batchCost,effectiveWastePct, laborCost, laborOverheadOf, lineCost, machineCost, marginPctOf, overheadMultiplier, perServing, wasteMultiplier, type LaborOverhead } from "@/lib/costing/recipeCost";
 
 type Client = SupabaseClient<Database>;
 
@@ -84,7 +85,7 @@ export async function getMargins(supabase: Client, orgId: string) {
   const since30 = isoDaysAgo(30);
   const since90 = isoDaysAgo(90);
   const [org, menuItems, recipes, recipeIngredients, ingredients, history, lines] = await Promise.all([
-    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
+    supabase.from("organizations").select("target_margin_pct, target_markup, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch").eq("is_active", true).order("name"),
     supabase.from("recipes").select("id, name, batch_yield_qty, batch_yield_unit, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour"),
     supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct, ingredients(waste_pct)"),
@@ -96,7 +97,9 @@ export async function getMargins(supabase: Client, orgId: string) {
       .not("matched_ingredient_id", "is", null)
       .neq("invoices.status", "failed"),
   ]);
-  const target = Number(org.data?.target_margin_pct ?? 65);
+  const target = targetMarginOf(org.data);
+  const targetText = targetLabel(org.data);
+  const byMarkup = org.data ? markupValue(org.data) != null : false;
   const recipeById = new Map((recipes.data ?? []).map((r) => [r.id, r]));
   const ingById = new Map((ingredients.data ?? []).map((i) => [i.id, i]));
   const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number; wastePct: number }[]>();
@@ -258,7 +261,7 @@ export async function getMargins(supabase: Client, orgId: string) {
   // What matters most first: money spent on it, then its weight in the menu, then name.
   byIngredient.sort((a, b) => b.spend90 - a.spend90 || b.shareOfFoodCost - a.shareOfFoodCost || a.name.localeCompare(b.name));
 
-  return { target, items, total, byIngredient };
+  return { target, targetText, byMarkup, items, total, byIngredient };
 }
 
 export type Margins = Awaited<ReturnType<typeof getMargins>>;

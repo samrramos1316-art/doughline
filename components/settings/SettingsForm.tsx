@@ -1,12 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveSettingsAction, type SettingsState } from "@/app/(app)/settings/actions";
 import type { IndustryOption } from "@/lib/industries/gate";
 import { useVocab } from "@/components/app/VocabProvider";
 import { lower } from "@/lib/vocab";
 
-type Initial = { name: string; target_margin_pct: number; price_alert_threshold_pct: number; max_unreviewed_line_items: number; default_labor_rate_per_hour: number; default_machine_rate_per_hour?: number | null; business_type: string };
+type Initial = { name: string; target_margin_pct: number; target_markup: number | null;price_alert_threshold_pct: number; max_unreviewed_line_items: number; default_labor_rate_per_hour: number; default_machine_rate_per_hour?: number | null; business_type: string };
 
 const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
 
@@ -25,6 +25,7 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint:
 export function SettingsForm({ initial, industries }: { initial: Initial; industries: IndustryOption[] }) {
   const v = useVocab();
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettingsAction, null);
+  const [style, setStyle] = useState<"margin" | "markup">(initial.target_markup != null ? "markup" : "margin");
   return (
     <form action={action} className="space-y-5">
       <Field id="name" label="Business name" hint="Shown in the sidebar.">
@@ -40,9 +41,21 @@ export function SettingsForm({ initial, industries }: { initial: Initial; indust
           ))}
         </select>
       </Field>
-      <Field id="target_margin_pct" label="Target margin (%)" hint="Items under this show red; suggestions aim to get you back to it.">
-        <input id="target_margin_pct" name="target_margin_pct" type="number" min="1" max="99" step="0.5" required defaultValue={initial.target_margin_pct} className={`${input} max-w-32`} />
+      <Field id="pricing_style" label="I price by" hint="A markup is a margin said another way: 2× (keystone) keeps 50% of the price, 3× keeps 66.7%.">
+        <select id="pricing_style" name="pricing_style" value={style} onChange={(e) => setStyle(e.target.value as "margin" | "markup")} className={`${input} max-w-72`}>
+          <option value="margin">Margin (% of the price I keep)</option>
+          <option value="markup">Markup (price = cost × a multiplier)</option>
+        </select>
       </Field>
+      {style === "margin" ? (
+        <Field id="target_margin_pct" label="Target margin (%)" hint="Items under this show red; suggestions aim to get you back to it.">
+          <input id="target_margin_pct" name="target_margin_pct" type="number" min="1" max="99" step="0.5" required defaultValue={initial.target_margin_pct} className={`${input} max-w-32`} />
+        </Field>
+      ) : (
+        <Field id="target_markup" label="Target markup (×)" hint="Prices are suggested at cost × this. Items under it show red; suggestions aim to get you back to it.">
+          <input id="target_markup" name="target_markup" type="number" min="1.05" max="100" step="0.05" required defaultValue={initial.target_markup ?? 2} className={`${input} max-w-32`} />
+        </Field>
+      )}
       <Field id="price_alert_threshold_pct" label="Price alert when a cost moves by (%)" hint="Smaller moves still update your costs — they just don't raise an alert.">
         <input id="price_alert_threshold_pct" name="price_alert_threshold_pct" type="number" min="0.5" max="100" step="0.5" required defaultValue={initial.price_alert_threshold_pct} className={`${input} max-w-32`} />
       </Field>

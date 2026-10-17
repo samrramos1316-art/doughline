@@ -9,7 +9,7 @@ function money(n: number) {
 // optional Claude narrative weighing them. `recipeWord`: the industry's word
 // for a recipe, mid-sentence (lib/industries); "recipe" for food.
 export function SuggestionsPanel({ suggestions, recipeWord = "recipe" }: { suggestions: AlertSuggestions; recipeWord?: string }) {
-  const { alert, items, target_margin_pct } = suggestions;
+  const { alert, items, target_label } = suggestions;
   const ingredient = alert.ingredient_name.toLowerCase();
 
   return (
@@ -23,8 +23,8 @@ export function SuggestionsPanel({ suggestions, recipeWord = "recipe" }: { sugge
               <p className="text-xs text-stone-500">
                 {i.previous_margin_pct}% &rarr; {i.new_margin_pct}% margin ·{" "}
                 {i.target_check.meets_target
-                  ? `still above your ${target_margin_pct}% target`
-                  : `below your ${target_margin_pct}% target`}
+                  ? `still above your ${target_label} target`
+                  : `below your ${target_label} target`}
               </p>
               {!i.goal ? (
                 <p className="mt-2 text-stone-600">Margin didn&apos;t drop — nothing to do.</p>
@@ -35,7 +35,7 @@ export function SuggestionsPanel({ suggestions, recipeWord = "recipe" }: { sugge
                       Raise it from {money(i.selling_price)} to <strong>{money(i.raise_price.new_price)}</strong> (+
                       {money(i.raise_price.increase)}) to{" "}
                       {i.goal.kind === "target"
-                        ? `get back to your ${i.goal.margin_pct}% target`
+                        ? `get back to your ${target_label} target`
                         : `keep its ${i.goal.margin_pct}% margin`}
                       .
                     </li>
