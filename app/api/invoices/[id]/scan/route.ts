@@ -65,12 +65,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     // The org's industry hints (none for food) go into the prompt.
     extraction = await provider.extractInvoice(fileBuffer, mimeType, { hints: extractionHints((await getIndustry()).id, "invoice") });
   } catch (err) {
+    // The invoice page shows error_message to the owner, so it gets a plain
+    // reason; the provider's own error goes to the server log.
+    console.error(`[scan] reading invoice ${id} failed:`, err);
     await supabase
       .from("invoices")
-      .update({
-        status: "failed",
-        error_message: err instanceof Error ? err.message : "Vision extraction failed",
-      })
+      .update({ status: "failed", error_message: readFailureReason(err) })
       .eq("id", id);
     return NextResponse.json({ error: "Vision extraction failed" }, { status: 502 });
   }
@@ -155,4 +155,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     line_items: lineItems,
     prices,
   });
+}
+
+// Why reading failed, in the owner's words (shown as "We couldn't read this
+// invoice automatically (…)"). Provider errors carry the API's HTTP status.
+function readFailureReason(err: unknown): string {
+  const status = typeof err === "object" && err && "status" in err ? Number((err as { status: unknown }).status) : null;
+  if (status === 400 || status === 413) return "the file couldn't be opened as a photo or PDF";
+  if (status === 429 || (status != null && status >= 500)) return "the reading service was busy";
+  return "the reader ran into a problem";
 }

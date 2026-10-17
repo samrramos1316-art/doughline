@@ -346,8 +346,6 @@ and extraction tuning on real trade invoices — waiting on owner interviews.
 
 - Voyage account has no payment method → 3 requests/min. Scans and "Add
   new" wait on 429 retries (a re-scan took ~53s instead of ~10s).
-- `scripts/smoke-test-scan-route.mjs` is stale: written for the stub
-  provider, it sends random bytes and now fails against real Claude.
 - Costing views assume recipe quantities are in the ingredient's base unit.
   That now holds (`lib/costing/rebaseUnit.ts`): recipe saves convert lines
   to it (8 oz → 0.5 lb, a bunch by the material's size) and refuse units
@@ -364,7 +362,7 @@ and extraction tuning on real trade invoices — waiting on owner interviews.
 - `scripts/test-signup-org-creation.mjs`
 - `scripts/test-costing-views.mjs`
 - `scripts/test-invoice-upload.mjs`
-- `scripts/smoke-test-scan-route.mjs` (stale — see Known issues)
+- `scripts/smoke-test-scan-route.mjs` (an unreadable file: 502, invoice kept as failed with a plain reason)
 - `scripts/test-claude-vision-scan.mjs`
 - `scripts/test-matching-e2e.mjs`
 - `scripts/test-price-cascade-e2e.mjs`
