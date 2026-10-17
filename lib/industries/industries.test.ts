@@ -6,6 +6,7 @@ import { enabledIndustries, industryOptions, isIndustryEnabled } from "./gate.ts
 import { extractionHints, withIndustryHints } from "./extraction.ts";
 import { canonicalUnit, isContainerUnit } from "../costing/units.ts";
 import { vocabFor } from "../vocab.ts";
+import { commodityFor } from "../market/categoryDefaults.ts";
 
 const ALL = "bakery,food_truck,caterer,jewelry,florist,metalworking";
 
@@ -36,13 +37,29 @@ test("registry: food is live, the trades are beta, with the spec's defaults", ()
   );
 });
 
-test("market: only food has ingesting series; they are the ones lib/market/series.ts fetches", () => {
+test("market: food and fabrication have ingesting series; they are the ones lib/market/series.ts fetches", () => {
   const series = readFileSync(new URL("../market/series.ts", import.meta.url), "utf8");
   for (const p of Object.values(INDUSTRIES)) {
     for (const s of p.market.series.filter((x) => x.ingesting)) assert.ok(series.includes(`"${s.code}"`), `${s.code} is ingested`);
     for (const s of p.market.series.filter((x) => !x.ingesting)) assert.ok(!series.includes(`"${s.code}"`) && /placeholder/i.test(s.label), `${s.code} is a marked placeholder`);
-    assert.equal(resolveIndustry(p.id).hasMarketData, p.family === "food", `${p.id}: Market Watch shown only with data`);
+    assert.equal(resolveIndustry(p.id).hasMarketData, p.family === "food" || p.id === "metalworking", `${p.id}: Market Watch shown only with data`);
+    assert.equal(!!p.market.sources, resolveIndustry(p.id).hasMarketData, `${p.id}: names its sources when it has data`);
+    for (const [, code] of p.market.nameRules) assert.ok(p.market.series.some((s) => s.code === code), `${p.id}: name rule → ${code} is a listed series`);
   }
+});
+
+test("market: fabrication stock follows steel unless it's aluminum; food rules unchanged", () => {
+  const fab = INDUSTRIES.metalworking.market;
+  const follows = (name: string, category: string | null = null) => commodityFor({ name, category, commodity_code: null }, fab);
+  assert.equal(follows("A36 steel flat bar 1/4 x 2 in", "bar_stock"), "steel");
+  assert.equal(follows("6061 aluminum sheet 0.125 in", "sheet_plate"), "aluminum");
+  assert.equal(follows("Aluminium angle 2x2"), "aluminum");
+  assert.equal(follows("Square tube 2x2 11ga", "tube_pipe"), "steel");
+  assert.equal(follows("304 SS round bar"), "steel");
+  assert.equal(follows("Powder coat, black", "outsourced_service"), null);
+  assert.equal(follows("Cutting oil", "consumables"), null); // food's "oil" rule doesn't apply
+  assert.equal(commodityFor({ name: "Unsalted butter", category: "dairy", commodity_code: null }), "butter");
+  assert.equal(commodityFor({ name: "Unsalted butter", category: "dairy", commodity_code: null }, INDUSTRIES.bakery.market), "butter");
 });
 
 test("gate: by default every industry is offered, the trades as beta", () => {

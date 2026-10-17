@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   // Market Watch only for an industry with a series actually ingested (lib/industries).
   const [o, trends] = await Promise.all([
     getOverview(supabase, orgId, industry.vocab),
-    industry.hasMarketData ? getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS }) : Promise.resolve([]),
+    industry.hasMarketData ? getMarketTrends(supabase, { windowDays: DEFAULT_WINDOW_DAYS, market: industry.market }) : Promise.resolve([]),
   ]);
   const v = industry.vocab;
   const { kpis, org } = o;
@@ -295,7 +295,7 @@ export default async function DashboardPage() {
         {industry.hasMarketData && (
         <Panel title={`Market watch · ${DEFAULT_WINDOW_DAYS} days`} action={{ href: "/market", label: "Market" }} flush className="xl:col-span-4">
           {watched.length === 0 ? (
-            <Empty>{trends.length ? "None of your ingredients follow a tracked commodity yet." : "Market data loads once a day from USDA and FAO."}</Empty>
+            <Empty>{trends.length ? `None of your ${lower(v.ingredients)} follow a tracked commodity yet.` : "Market data loads once a day."}</Empty>
           ) : (
             <table className="w-full">
               <tbody>

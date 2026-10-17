@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { USDA_SERIES, fetchUsdaSeries, fetchFaoSeries, type SeriesPoint } from "./series";
+import { USDA_SERIES, fetchUsdaSeries, fetchFaoSeries, fetchBlsSeries, type SeriesPoint } from "./series";
 
 export type IngestSummary = {
   commodity_code: string;
@@ -25,6 +25,7 @@ export async function ingestMarketData({ days = 400 }: { days?: number } = {}): 
   const jobs: { code: string; source: string; run: () => Promise<SeriesPoint[]> }[] = [
     ...USDA_SERIES.map((s) => ({ code: s.code, source: "usda_ams", run: () => fetchUsdaSeries(s, from, to) })),
     { code: "fao_*", source: "fao_fpi", run: () => fetchFaoSeries(from) },
+    { code: "bls_*", source: "bls_ppi", run: () => fetchBlsSeries(from) },
   ];
 
   for (const job of jobs) {

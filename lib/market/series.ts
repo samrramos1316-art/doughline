@@ -6,7 +6,7 @@ import { parseCsv } from "@/lib/csv";
 // a series must pin those down or the "trend" would mix apples and pears).
 
 export type SeriesPoint = {
-  source: "usda_ams" | "fao_fpi";
+  source: "usda_ams" | "fao_fpi" | "bls_ppi";
   commodity_code: string;
   commodity_label: string;
   region: "US" | "global";
@@ -159,6 +159,57 @@ export async function fetchFaoSeries(since: Date): Promise<SeriesPoint[]> {
         unit: "index_point",
       });
     });
+  }
+  return points;
+}
+
+// US producer price indexes (BLS, 1982 = 100), monthly: what US mills charge
+// for metal stock — the trade series for metal fabrication (§14.3). US
+// government data, public domain. The API works without a key (a small
+// daily quota per IP); BLS_API_KEY, a free registration key, raises it.
+export const BLS_SERIES = [
+  { id: "WPU1017", code: "steel", label: "Steel mill products (US producer prices)" },
+  { id: "WPU102501", code: "aluminum", label: "Aluminum mill shapes (US producer prices)" },
+];
+
+export async function fetchBlsSeries(since: Date): Promise<SeriesPoint[]> {
+  const key = process.env.BLS_API_KEY;
+  const res = await fetch("https://api.bls.gov/publicAPI/v2/timeseries/data/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      seriesid: BLS_SERIES.map((s) => s.id),
+      startyear: String(since.getUTCFullYear()),
+      endyear: String(new Date().getUTCFullYear()),
+      ...(key ? { registrationkey: key } : {}),
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`BLS: HTTP ${res.status}`);
+  const body = await res.json();
+  if (body.status !== "REQUEST_SUCCEEDED") throw new Error(`BLS: ${body.status} ${(body.message ?? []).join(" ")}`);
+
+  const sinceMonth = since.toISOString().slice(0, 7);
+  const points: SeriesPoint[] = [];
+  for (const s of body.Results?.series ?? []) {
+    const def = BLS_SERIES.find((d) => d.id === s.seriesID);
+    if (!def) continue;
+    for (const p of s.data ?? []) {
+      // M01–M12 are months; M13 is the annual average.
+      const m = /^M(0[1-9]|1[0-2])$/.exec(p.period ?? "");
+      const value = Number(p.value);
+      const month = `${p.year}-${m?.[1]}`;
+      if (!m || !Number.isFinite(value) || month < sinceMonth) continue;
+      points.push({
+        source: "bls_ppi",
+        commodity_code: def.code,
+        commodity_label: def.label,
+        region: "US",
+        period_date: `${month}-01`,
+        value,
+        unit: "index_point",
+      });
+    }
   }
   return points;
 }
