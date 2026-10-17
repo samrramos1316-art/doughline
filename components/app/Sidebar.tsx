@@ -38,6 +38,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { href: "/invoices", label: "Invoices", icon: "doc", badge: (c) => (c.failed ? { n: c.failed, tone: "amber" } : null) },
       { href: "/review", label: "Match lines", icon: "check", badge: (c) => (c.review ? { n: c.review, tone: c.reviewBlocked ? "red" : "amber" } : null) },
       { href: "/alerts", label: "Price alerts", icon: "bell", badge: (c) => (c.alerts ? { n: c.alerts, tone: "red" } : null) },
+      { href: "/plan", label: "Order plan", icon: "check" },
       { href: "/seasons", label: "Seasons", icon: "chart" },
       { href: "/market", label: "Market watch", icon: "chart" },
     ],

@@ -1,6 +1,8 @@
 // Florist extras end to end, against a real server and the real database:
 //   /seasons — prices month by month against last year, and before each
 //   flower holiday (lib/costing/seasons.ts), every % worked out by hand.
+//   /plan — an event quote's arrangements → stems to buy, with spoilage, in
+//   bunches and boxes (lib/costing/orderPlan.ts).
 //
 // The price history is laid out around this year's holidays, so run it
 // between Mother's Day and Christmas (the latest past holidays are then
@@ -92,10 +94,48 @@ try {
   assert(/\$2\.40 \$2\.00 · ▲ 20\.0%/.test(months) && /\$1\.20 \$1\.10 · ▲ 9\.1%/.test(months), `month by month: ${months}`);
   await f.screenshot({ path: "test-output/seasons.png", fullPage: true });
 
+  // ---- /plan --------------------------------------------------------------
+  // Roses lose 10% and come in bunches of 10 or boxes of 25; eucalyptus 10%,
+  // bunches of 10. A centerpiece is 6 roses + 3 eucalyptus; a batch of 4
+  // boutonnieres is 4 roses at that line's own 20% loss.
+  const euc = mats.find((m) => m.name === "Eucalyptus");
+  await admin.from("ingredients").update({ waste_pct: 10, pack_sizes: { bunch: 10, box: 25 } }).eq("id", rose.id);
+  await admin.from("ingredients").update({ waste_pct: 10, pack_sizes: { bunch: 10 } }).eq("id", euc.id);
+  const { data: arr } = await admin.from("recipes").insert([
+    { org_id: florist.orgId, name: "Centerpiece", batch_yield_qty: 1, batch_yield_unit: "centerpiece" },
+    { org_id: florist.orgId, name: "Boutonniere", batch_yield_qty: 4, batch_yield_unit: "boutonnieres" },
+  ]).select("id, name");
+  const cp = arr.find((a) => a.name === "Centerpiece");
+  const bt = arr.find((a) => a.name === "Boutonniere");
+  await admin.from("recipe_ingredients").insert([
+    { org_id: florist.orgId, recipe_id: cp.id, ingredient_id: rose.id, quantity: 6, unit: "stem" },
+    { org_id: florist.orgId, recipe_id: cp.id, ingredient_id: euc.id, quantity: 3, unit: "stem" },
+    { org_id: florist.orgId, recipe_id: bt.id, ingredient_id: rose.id, quantity: 4, unit: "stem", waste_pct: 20 },
+  ]);
+  assert((await navLinks(f)).includes("Order plan"), "florist nav has Order plan");
+  // From an event quote of 10 centerpieces and 6 boutonnieres.
+  await f.goto(`${BASE}/quote?name=Rivera%20wedding&items=${cp.id}:10,${bt.id}:6`);
+  await f.getByRole("button", { name: "Plan what to buy" }).click();
+  await f.waitForURL(/\/plan\?/);
+  const plan = f.getByTestId("order-plan");
+  await plan.getByText("Red rose 50cm").waitFor();
+  // Roses: 60 + 6 = 66 used; 60/0.9 + 6/0.8 = 74.17 → 75 → exactly 3 boxes of 25 ($90.00 at $1.20).
+  const roseRow = await text(plan.locator('tr[data-name="Red rose 50cm"]'));
+  assert(roseRow.includes("66 stem") && roseRow.includes("75 stem +10–20% loss") && roseRow.includes("3 boxes of 25") && roseRow.includes("or 8 bunches of 10 (5 spare)") && roseRow.includes("$90.00"), `roses to buy: ${roseRow}`);
+  // Eucalyptus: 30 used; 30/0.9 = 33.33 → 34 → 4 bunches of 10, 6 spare ($17.00 at $0.50).
+  const eucRow = await text(plan.locator('tr[data-name="Eucalyptus"]'));
+  assert(eucRow.includes("30 stem") && eucRow.includes("34 stem") && eucRow.includes("4 bunches of 10 (6 spare)") && eucRow.includes("$17.00"), `eucalyptus to buy: ${eucRow}`);
+  assert((await text(f.getByTestId("order-plan-total"))) === "$107.00", "plan total at today's prices: $107.00");
+  assert((await text(f.locator("main"))).toUpperCase().includes("RIVERA WEDDING"), "the plan keeps the event's name");
+  await f.screenshot({ path: "test-output/order-plan.png", fullPage: true });
+
   const b = await login(baker.email);
-  assert(!(await navLinks(b)).includes("Seasons"), "food nav has no Seasons");
-  await b.goto(`${BASE}/seasons`);
-  assert(/could not be found|404/i.test(await b.locator("body").innerText()), "food orgs get the not-found page for /seasons");
+  const foodNav = await navLinks(b);
+  assert(!foodNav.includes("Seasons") && !foodNav.includes("Order plan"), "food nav has no Seasons or Order plan");
+  for (const path of ["/seasons", "/plan"]) {
+    await b.goto(`${BASE}${path}`);
+    assert(/could not be found|404/i.test(await b.locator("body").innerText()), `food orgs get the not-found page for ${path}`);
+  }
 
   console.log("\nAll florist extras checks passed.");
 } finally {
