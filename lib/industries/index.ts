@@ -66,7 +66,9 @@ export type IndustryProfile = {
   // costSheets: printable cost sheets (/sheet) per build sheet / arrangement
   // and for event quotes. machineTime: jobs log machine minutes at a machine
   // rate, separate from labor (migration 029), and Settings has a default.
-  features: { quote: false | "piece" | "job" | "event"; packSizes: boolean; costSheets: boolean; machineTime: boolean };
+  // seasons: /seasons, prices by month vs last year and before holidays.
+  // orderPlan: /plan, stems to buy for the week's orders.
+  features: { quote: false | "piece" | "job" | "event"; packSizes: boolean; costSheets: boolean; machineTime: boolean; seasons: boolean; orderPlan: boolean };
   market: {
     categoryDefaults: Record<string, string>; // category → commodity_code
     nameRules: NameRule[]; // material name → commodity_code, checked before the category
@@ -121,7 +123,7 @@ const food = (id: IndustryId, name: string, description: string): IndustryProfil
   categories: FOOD_CATEGORIES,
   serviceCategories: [],
   defaults: { default_waste_pct: 0, default_overhead_pct: 0, show_labor_by_default: false },
-  features: { quote: false, packSizes: false, costSheets: false, machineTime: false },
+  features: { quote: false, packSizes: false, costSheets: false, machineTime: false, seasons: false, orderPlan: false },
   market: { categoryDefaults: CATEGORY_DEFAULTS, nameRules: NAME_RULES, series: FOOD_SERIES, sources: "USDA + FAO, updated daily" },
   extraction: NO_HINTS,
 });
@@ -162,7 +164,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     categories: ["precious_metal", "stone", "finding", "chain", "outsourced_work", "packaging", "tools_consumables"],
     serviceCategories: ["outsourced_work"],
     defaults: { default_waste_pct: 5, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "piece", packSizes: false, costSheets: true, machineTime: false },
+    features: { quote: "piece", packSizes: false, costSheets: true, machineTime: false, seasons: false, orderPlan: false },
     market: {
       categoryDefaults: { precious_metal: "gold_spot" },
       nameRules: [],
@@ -209,7 +211,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     categories: ["cut_flower", "greens", "vase_container", "foam_supplies", "ribbon_packaging"],
     serviceCategories: [],
     defaults: { default_waste_pct: 10, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "event", packSizes: true, costSheets: true, machineTime: false },
+    features: { quote: "event", packSizes: true, costSheets: true, machineTime: false, seasons: true, orderPlan: true },
     market: {
       categoryDefaults: { cut_flower: "floral_wholesale" },
       nameRules: [],
@@ -251,7 +253,7 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     categories: ["bar_stock", "sheet_plate", "tube_pipe", "fasteners", "consumables", "finishing_coating", "outsourced_service"],
     serviceCategories: ["outsourced_service"],
     defaults: { default_waste_pct: 8, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "job", packSizes: false, costSheets: true, machineTime: true },
+    features: { quote: "job", packSizes: false, costSheets: true, machineTime: true, seasons: false, orderPlan: false },
     market: {
       // Stock follows steel unless its name says aluminum (BLS producer
       // price indexes, lib/market/series.ts). Aluminum first: "6061 sheet".

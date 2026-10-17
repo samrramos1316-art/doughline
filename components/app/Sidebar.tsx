@@ -10,7 +10,7 @@ import { CameraIcon } from "@/components/ui/dash";
 export type NavCounts = { review: number; alerts: number; failed: number; reviewBlocked: boolean };
 // Industry wording for the three links that have it (lib/vocab.ts).
 // market / quote: whether those pages exist for this industry (lib/industries).
-export type NavLabels = { menu: string; recipes: string; ingredients: string; market?: boolean; quote?: boolean };
+export type NavLabels = { menu: string; recipes: string; ingredients: string; market?: boolean; quote?: boolean; seasons?: boolean; orderPlan?: boolean };
 
 type Item = { href: string; label: string; icon: keyof typeof ICONS; badge?: (c: NavCounts) => { n: number; tone: "red" | "amber" } | null };
 // Grouped the way the money moves: what you sell, what you make it from,
@@ -38,6 +38,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { href: "/invoices", label: "Invoices", icon: "doc", badge: (c) => (c.failed ? { n: c.failed, tone: "amber" } : null) },
       { href: "/review", label: "Match lines", icon: "check", badge: (c) => (c.review ? { n: c.review, tone: c.reviewBlocked ? "red" : "amber" } : null) },
       { href: "/alerts", label: "Price alerts", icon: "bell", badge: (c) => (c.alerts ? { n: c.alerts, tone: "red" } : null) },
+      { href: "/seasons", label: "Seasons", icon: "chart" },
       { href: "/market", label: "Market watch", icon: "chart" },
     ],
   },
@@ -52,6 +53,8 @@ const groupsFor = (admin: boolean, labels?: NavLabels) =>
     items: g.items
       .filter((it) => it.href !== "/market" || labels?.market !== false)
       .filter((it) => it.href !== "/quote" || labels?.quote === true)
+      .filter((it) => it.href !== "/seasons" || labels?.seasons === true)
+      .filter((it) => it.href !== "/plan" || labels?.orderPlan === true)
       .map((it) => (labels && LABEL_KEYS[it.href] ? { ...it, label: labels[LABEL_KEYS[it.href]] as string } : it)),
   }));
 
