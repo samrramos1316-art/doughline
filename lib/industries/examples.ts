@@ -17,6 +17,7 @@ export type WorkedExample = {
   moved: { name: string; unit: string; from: number; to: number; qty: number; wastePct?: number };
   rest: { name: string; cost: number }[]; // everything else in the batch, per batch
   labor?: { minutes: number; ratePerHour: number };
+  machine?: { minutes: number; ratePerHour: number };
   invoiceLine: string; // how the moved line looks on the supplier's invoice
 };
 
@@ -61,6 +62,23 @@ export const EXAMPLES: WorkedExample[] = [
     labor: { minutes: 20, ratePerHour: 18 },
     invoiceLine: "ROSE RED FREEDOM 50CM 25ST · $36.25",
   },
+  {
+    // Bar stock priced per hundredweight: $333.20 for 3.4 CWT = $0.98/lb.
+    id: "bracket",
+    industry: "metalworking",
+    tab: "Fabricator",
+    product: "Mounting bracket",
+    price: 22,
+    perBatch: 10,
+    moved: { name: "A36 flat bar", unit: "lb", from: 0.82, to: 0.98, qty: 34, wastePct: 8 },
+    rest: [
+      { name: "Fasteners", cost: 6 },
+      { name: "Powder coat (outsourced)", cost: 25 },
+    ],
+    labor: { minutes: 90, ratePerHour: 32 },
+    machine: { minutes: 30, ratePerHour: 60 },
+    invoiceLine: "A36 HR FB 1/4 X 2 20' · 3.4 CWT · $333.20",
+  },
 ];
 
 export type ExampleResult = {
@@ -78,7 +96,12 @@ export function workExample(x: WorkedExample): ExampleResult {
       { quantity: x.moved.qty, unitCost, wastePct: x.moved.wastePct ?? 0 },
       ...x.rest.map((r) => ({ quantity: 1, unitCost: r.cost })),
     ];
-    const b = batchCost(lines, { laborMinutes: x.labor?.minutes ?? 0, laborRatePerHour: x.labor?.ratePerHour ?? null });
+    const b = batchCost(lines, {
+      laborMinutes: x.labor?.minutes ?? 0,
+      laborRatePerHour: x.labor?.ratePerHour ?? null,
+      machineMinutes: x.machine?.minutes ?? 0,
+      machineRatePerHour: x.machine?.ratePerHour ?? null,
+    });
     return b!.total / x.perBatch;
   };
   const costBefore = cost(x.moved.from);
