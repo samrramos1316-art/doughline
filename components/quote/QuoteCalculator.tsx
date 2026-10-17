@@ -209,7 +209,7 @@ export function QuoteCalculator({
 
   return (
     <div className="grid gap-5 xl:grid-cols-12">
-      <div className="flex flex-col gap-4 xl:col-span-7">
+      <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
         <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
           <label className="block text-sm">
             <span className="font-medium text-stone-800">{c.name}</span>
@@ -234,7 +234,7 @@ export function QuoteCalculator({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 xl:col-span-5">
+      <div className="flex min-w-0 flex-col gap-4 xl:col-span-5">
         {q.batch ? (
           <CostBreakdown
             materials={q.batch.materials}

@@ -76,7 +76,7 @@ try {
   log("\n=== 1. signup lands on the import, once ===");
   await page.goto(`${BASE}/signup`);
   await page.getByLabel("Business name").fill(BUSINESS.name);
-  await page.getByLabel("What kind of business?").selectOption(BUSINESS.type);
+  await page.getByTestId("industry-cards").locator(`input[value="${BUSINESS.type}"]`).check({ force: true }); // the picker is cards over hidden radios
   await page.getByLabel("Your name").fill(BUSINESS.owner);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -107,13 +107,16 @@ try {
   await page.goto(`${BASE}/recipes`);
   await page.getByRole("link", { name: "Import recipes from a photo" }).click();
   await page.waitForURL(/\/onboarding\/import\?kind=recipe$/);
+  await page.getByTestId("drop-recipe").waitFor(); // past the loading skeleton
   check((await page.getByTestId("drop-recipe").isVisible()) && !(await page.getByTestId("drop-menu").isVisible()), "Recipes → the recipe import, with no menu drop zone");
   await page.goto(`${BASE}/menu`);
   await page.getByRole("link", { name: "Import menu from a photo" }).click();
   await page.waitForURL(/\/onboarding\/import\?kind=menu$/);
+  await page.getByTestId("drop-menu").waitFor();
   check((await page.getByTestId("drop-menu").isVisible()) && !(await page.getByTestId("drop-recipe").isVisible()), "Menu → the menu import, with no recipe drop zone");
   // Both at once, as on first run, to exercise the menu → recipe linking.
   await page.goto(`${BASE}/onboarding/import`);
+  await page.getByTestId("drop-recipe").waitFor();
   await page.getByLabel("Choose menu files").setInputFiles(`${FIX}/${MENU_BOARD.file}`);
   await page.getByLabel("Choose recipe files").setInputFiles([`${FIX}/${RECIPE_CARD.file}`, `${FIX}/${RECIPE_DOC.file}`]);
   await page.screenshot({ path: `${OUT}/02-files.png`, fullPage: true });
@@ -283,6 +286,7 @@ try {
   const failed = results.filter((r) => !r.ok);
   log(`\n${results.length - failed.length}/${results.length} checks passed.`);
   for (const f of failed) log(`  FAIL: ${f.msg}`);
+  if (failed.length) process.exitCode = 1;
   if (KEEP) log(`Kept: ${email} / ${password}`);
   else if (userId) {
     if (orgId) await admin.from("organizations").delete().eq("id", orgId);

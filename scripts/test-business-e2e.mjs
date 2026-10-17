@@ -156,8 +156,14 @@ async function reviewAll(page, label) {
 
 async function bulkImport(page, files, label) {
   await page.goto(`${BASE}/invoices/import`);
-  await page.getByLabel("Choose invoice files").setInputFiles(files.map((f) => `${FIX}/${f}`));
-  await page.getByRole("button", { name: /^Import \d+ files?$/ }).click();
+  // The input is in the server HTML before React hydrates; files chosen that
+  // early are dropped, so choose again until the button counts them.
+  const importButton = page.getByRole("button", { name: /^Import \d+ files?$/ });
+  for (let i = 0; i < 5; i++) {
+    await page.getByLabel("Choose invoice files").setInputFiles(files.map((f) => `${FIX}/${f}`));
+    if (await importButton.waitFor({ timeout: 5_000 }).then(() => true, () => false)) break;
+  }
+  await importButton.click();
   const t0 = Date.now();
   await page.waitForFunction(
     (n) => [...document.querySelectorAll("[data-testid=import-item]")].filter((e) => ["needs_review", "completed", "failed", "not_invoice", "error"].includes(e.dataset.status)).length >= n,
@@ -183,7 +189,7 @@ try {
   banner("1. sign up");
   await page.goto(`${BASE}/signup`);
   await page.getByLabel("Business name").fill(BUSINESS.name);
-  await page.getByLabel("What kind of business?").selectOption(BUSINESS.type);
+  await page.getByTestId("industry-cards").locator(`input[value="${BUSINESS.type}"]`).check({ force: true }); // the picker is cards over hidden radios
   await page.getByLabel("Your name").fill(BUSINESS.owner);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -240,6 +246,7 @@ try {
 
   banner("4. dashboard vs. hand calculation");
   await page.goto(`${BASE}/dashboard`);
+  await page.locator("main h1").first().waitFor(); // past the loading skeleton
   const cardsText = await page.locator("main").innerText();
   for (const [item, m] of Object.entries(startMargins)) {
     check(cardsText.includes(item) && cardsText.includes(`${m.pct.toFixed(1)}%`), `dashboard: ${item} ${m.pct.toFixed(1)}% margin (cost $${m.cps.toFixed(2)}, sells $${m.price.toFixed(2)})`);
@@ -374,6 +381,7 @@ try {
   const endMargins = margins(finalCost);
   await page.goto(`${BASE}/dashboard`);
   await page.waitForLoadState("networkidle");
+  await page.locator("main h1").first().waitFor(); // past the loading skeleton
   const endText = await page.locator("main").innerText();
   const { data: mv } = await admin.from("menu_item_margins").select("name, cost_per_serving, margin_pct").eq("org_id", orgId);
   for (const [item, m] of Object.entries(endMargins)) {
@@ -383,8 +391,10 @@ try {
   }
   await snap(page, "dashboard-end");
   await phone.goto(`${BASE}/dashboard`);
+  await phone.locator("main h1").first().waitFor();
   await phone.screenshot({ path: `${OUT}/${String(++shot).padStart(2, "0")}-phone-dashboard.png`, fullPage: true });
   await phone.goto(`${BASE}/market`);
+  await phone.locator("main h1").first().waitFor();
   const marketText = await phone.locator("main").innerText();
   await phone.screenshot({ path: `${OUT}/${String(++shot).padStart(2, "0")}-phone-market.png`, fullPage: true });
   check(/butter/i.test(marketText) && /egg/i.test(marketText), "Market Watch links the bakery's butter and eggs to USDA prices");
@@ -416,6 +426,7 @@ try {
   fs.writeFileSync(`${OUT}/review-decisions.json`, JSON.stringify(reviewLog, null, 2));
   const failed = results.filter((r) => !r.ok);
   log(`\n${results.length - failed.length}/${results.length} checks passed.`);
+  if (failed.length) process.exitCode = 1;
   for (const f of failed) log(`  FAIL: ${f.msg}${f.detail ? `\n        ${typeof f.detail === "string" ? f.detail : JSON.stringify(f.detail)}` : ""}`);
   fs.writeFileSync(`${OUT}/results.json`, JSON.stringify({ email, orgId, results }, null, 2));
   if (KEEP) log(`\nKept the account: ${email} / ${password}`);

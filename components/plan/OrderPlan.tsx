@@ -38,7 +38,7 @@ export function OrderPlan({ arrangements, materials, start }: { arrangements: Pl
 
   return (
     <div className="grid gap-5 xl:grid-cols-12">
-      <div className="flex flex-col gap-4 xl:col-span-5">
+      <div className="flex min-w-0 flex-col gap-4 xl:col-span-5">
         <label className="block text-sm">
           <span className="font-medium text-stone-800">Orders for</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Week of Feb 9" className={`${input} mt-1`} />
@@ -69,7 +69,7 @@ export function OrderPlan({ arrangements, materials, start }: { arrangements: Pl
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 xl:col-span-7">
+      <div className="flex min-w-0 flex-col gap-3 xl:col-span-7">
         <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
           <table className="w-full text-[13px]" data-testid="order-plan">
             <thead>

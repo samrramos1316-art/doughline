@@ -112,7 +112,10 @@ try {
   console.log("=======================================================\n");
 
   assert(scanRes.status === 200, "scan route returns 200");
-  assert(scanBody.status === "processing", "invoice moves to 'processing' with line items extracted");
+  // Matching runs right after reading (step 7), so the invoice ends up
+  // needs_review or completed, not left in 'processing'.
+  const AFTER_SCAN = ["needs_review", "completed"];
+  assert(AFTER_SCAN.includes(scanBody.status), `invoice read and matched (status '${scanBody.status}')`);
 
   const ex = scanBody.extraction;
   assert(/sysco/i.test(ex.vendor_name_guess ?? ""), `vendor_name_guess mentions Sysco (${ex.vendor_name_guess})`);
@@ -134,7 +137,7 @@ try {
 
   const { data: invoiceRow } = await admin
     .from("invoices").select("status, invoice_number, invoice_date, raw_extraction").eq("id", invoiceId).single();
-  assert(invoiceRow.status === "processing" && invoiceRow.raw_extraction !== null, "invoice row persisted with raw_extraction");
+  assert(AFTER_SCAN.includes(invoiceRow.status) && invoiceRow.raw_extraction !== null, "invoice row persisted with raw_extraction");
   assert(invoiceRow.invoice_number === "7719-204583", "invoice_number persisted on the row");
 
   const { data: lineRows } = await admin
