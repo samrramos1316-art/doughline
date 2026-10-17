@@ -184,6 +184,14 @@ export function EventQuote({
           >
             Printable quote
           </button>
+          <button
+            type="button"
+            disabled={errors.size > 0 || filled.length === 0}
+            onClick={() => window.location.assign(link("/plan"))}
+            className="rounded-full border border-stone-300 bg-white px-5 py-2.5 text-sm font-medium text-stone-800 hover:border-stone-500 disabled:opacity-50"
+          >
+            Plan what to buy
+          </button>
           {copied && <span className="text-sm text-green-700">Copied. The link reopens this quote with today&apos;s costs.</span>}
         </div>
         <p className="text-xs text-stone-500">Costs are live: each {lower(v.recipe)}&apos;s cost moves with your invoices, spoilage % and labor, so a reopened quote shows today&apos;s numbers.</p>

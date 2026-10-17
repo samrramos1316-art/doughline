@@ -3,6 +3,7 @@ import { getMarketTrends, DEFAULT_WINDOW_DAYS } from "@/lib/market/trends";
 import { MarketWatchPanel } from "@/components/market/MarketWatchPanel";
 import { PageHeader, Kpi, Delta, Panel, Empty } from "@/components/ui/dash";
 import { getIndustry } from "@/lib/supabase/vocab";
+import { lower } from "@/lib/vocab";
 
 const WINDOWS = [30, 90, 180];
 
@@ -23,7 +24,7 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
       </>
     );
   }
-  const trends = await getMarketTrends(supabase, { windowDays });
+  const trends = await getMarketTrends(supabase, { windowDays, market: industry.market });
   const yours = trends.filter((t) => t.exposed_ingredients.length > 0);
   const up = yours.filter((t) => t.pct_change >= 1);
   const biggest = [...yours].sort((a, b) => Math.abs(b.pct_change) - Math.abs(a.pct_change))[0];
@@ -36,12 +37,12 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
         tabs={WINDOWS.map((w) => ({ href: `/market?window=${w}`, label: `${w} days`, active: w === windowDays }))}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Kpi label="Series tracked" value={trends.length} sub="USDA + FAO, updated daily" />
+        <Kpi label="Series tracked" value={trends.length} sub={industry.market.sources} />
         <Kpi label="Linked to you" value={yours.length} sub={yours.map((t) => t.label).slice(0, 2).join(", ") || "none yet"} />
         <Kpi label="Rising for you" value={up.length} tone={up.length ? "warning" : "good"} sub={`over ${windowDays} days`} />
         <Kpi label="Biggest move" value={biggest ? <Delta value={biggest.pct_change} /> : "—"} sub={biggest?.label ?? "—"} />
       </div>
-      <MarketWatchPanel trends={trends} windowDays={windowDays} />
+      <MarketWatchPanel trends={trends} windowDays={windowDays} ingredients={lower(industry.vocab.ingredients)} />
     </>
   );
 }

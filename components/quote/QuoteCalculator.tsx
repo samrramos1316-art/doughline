@@ -7,10 +7,12 @@ import { CostBreakdown } from "@/components/recipes/CostBreakdown";
 import { useVocab } from "@/components/app/VocabProvider";
 import { effectiveWastePct, laborRate, lineCost, machineRate } from "@/lib/costing/recipeCost";
 import { quote } from "@/lib/costing/quote";
+import { costOnBasis, type PriceBasis } from "@/lib/costing/priceBasis";
+import { formatMarginPct, formatMarkup, marginFromMarkup, markupOf } from "@/lib/costing/markup";
 import { cap, lower } from "@/lib/vocab";
 import { money } from "@/components/ui/dash";
 
-type Material = { id: string; name: string; base_unit: string; unitCost: number | null; wastePct: number; service?: boolean };
+type Material = { id: string; name: string; base_unit: string; unitCost: number | null; wastePct: number; service?: boolean; average?: { avg: number; count: number } | null };
 export type QuoteStart = {
   name: string;
   pieces: number;
@@ -39,6 +41,7 @@ export function QuoteCalculator({
   materials,
   start,
   targetMarginPct,
+  targetMarkup = null,
   defaultLaborRate,
   mode = "piece",
   defaultMachineRate = 0,
@@ -46,6 +49,7 @@ export function QuoteCalculator({
   materials: Material[];
   start: QuoteStart;
   targetMarginPct: number;
+  targetMarkup?: number | null; // set when the owner prices by markup (lib/costing/markup.ts)
   defaultLaborRate: number;
   mode?: "piece" | "job";
   defaultMachineRate?: number;
@@ -92,9 +96,10 @@ export function QuoteCalculator({
     overhead_pct: blankIfZero(start.overhead_pct),
     machine_minutes: blankIfZero(start.machine_minutes ?? 0),
     machine_rate_per_hour: start.machine_rate_per_hour == null ? "" : String(start.machine_rate_per_hour),
-    target: String(targetMarginPct),
+    target: String(targetMarkup ?? targetMarginPct),
     price: "",
   });
+  const byMarkup = targetMarkup != null;
   const [showAllErrors, setShowAllErrors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,12 +113,24 @@ export function QuoteCalculator({
   }
 
   const filled = rows.filter((r) => !isBlankRow(columns, r) && r.values.ingredient_id && (parseNumber(r.values.quantity) ?? 0) > 0);
-  const lines = filled.map((r) => {
+  const [basis, setBasis] = useState<PriceBasis>("latest");
+  const linesOn = (b: PriceBasis) => filled.map((r) => {
     const m = byId.get(r.values.ingredient_id);
     const qty = parseNumber(r.values.quantity) ?? 0;
     const waste = effectiveWastePct(parseNumber(r.values.waste_pct ?? ""), m?.wastePct ?? 0);
-    return { name: m?.name ?? "?", service: m?.service ?? false, quantity: qty, unitCost: m?.unitCost ?? null, wastePct: waste };
+    return { name: m?.name ?? "?", service: m?.service ?? false, quantity: qty, unitCost: costOnBasis(b, m?.unitCost ?? null, m?.average?.avg ?? null), wastePct: waste };
   });
+  const lines = linesOn(basis);
+  // The switch only matters when a material in the quote has an average
+  // that differs from its latest price.
+  const basisMatters = filled.some((r) => {
+    const m = byId.get(r.values.ingredient_id);
+    return m?.average != null && m.unitCost != null && Math.abs(m.average.avg - m.unitCost) >= 0.00005;
+  });
+  const materialsOn = (b: PriceBasis) => {
+    const ls = linesOn(b);
+    return ls.some((l) => l.unitCost == null) ? null : ls.reduce((s, l) => s + lineCost(l.quantity, l.unitCost!, l.wastePct), 0);
+  };
   const laborOverhead = {
     laborMinutes: parseNumber(f.labor_minutes) ?? 0,
     laborRatePerHour: parseNumber(f.labor_rate_per_hour),
@@ -122,7 +139,10 @@ export function QuoteCalculator({
     ...(job ? { machineMinutes: parseNumber(f.machine_minutes) ?? 0, machineRatePerHour: parseNumber(f.machine_rate_per_hour), defaultMachineRatePerHour: defaultMachineRate } : {}),
   };
   const pieces = parseNumber(f.pieces) ?? 0;
-  const target = parseNumber(f.target) ?? targetMarginPct;
+  // The target field holds a multiplier for owners who price by markup.
+  const markupTyped = byMarkup ? (parseNumber(f.target) ?? targetMarkup) : null;
+  const target = markupTyped != null && markupTyped > 1 ? marginFromMarkup(markupTyped) : byMarkup ? targetMarginPct : (parseNumber(f.target) ?? targetMarginPct);
+  const targetText = markupTyped != null && markupTyped > 1 ? formatMarkup(markupTyped) : formatMarginPct(target);
   const ownPrice = parseNumber(f.price);
   const q = quote({ lines, laborOverhead, pieces, targetMarginPct: target, price: ownPrice });
   const wasteExtra = lines.reduce((s, l) => s + (l.unitCost == null ? 0 : lineCost(l.quantity, l.unitCost, l.wastePct) - l.quantity * l.unitCost), 0);
@@ -240,15 +260,36 @@ export function QuoteCalculator({
           </p>
         )}
 
+        {basisMatters && (
+          <fieldset className="rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm" data-testid="price-basis">
+            <legend className="px-1 text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Price {lower(v.ingredients)} at</legend>
+            <label className="flex items-start gap-2 py-0.5">
+              <input type="radio" name="basis" checked={basis === "latest"} onChange={() => setBasis("latest")} className="mt-1" />
+              <span>Latest invoice price <span className="text-stone-500">(what restocking costs): {money(materialsOn("latest"))}</span></span>
+            </label>
+            <label className="flex items-start gap-2 py-0.5">
+              <input type="radio" name="basis" checked={basis === "average"} onChange={() => setBasis("average")} className="mt-1" />
+              <span>Average paid, last 6 months <span className="text-stone-500">(what your stock cost): {money(materialsOn("average"))}</span></span>
+            </label>
+            <p className="mt-1 text-xs text-stone-500">{cap(lower(v.ingredients))} with no price in the last 6 months use their latest price either way. Kept {lower(v.recipes)} always cost at the latest price.</p>
+          </fieldset>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
-          {field("target", "Target margin %", "From Settings; change it for this quote.", String(targetMarginPct))}
+          {byMarkup
+            ? field("target", "Target markup ×", "From Settings; change it for this quote.", String(targetMarkup))
+            : field("target", "Target margin %", "From Settings; change it for this quote.", String(targetMarginPct))}
           {field("price", "Your price ($, optional)", "Quote your own number and see its margin.", "")}
         </div>
         <div className="rounded-lg border-2 border-stone-900 bg-white px-4 py-3" data-testid="quote-result">
           <p className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Suggested price per {c.one}</p>
           <p className="mt-1 text-3xl font-semibold text-stone-900 tabular-nums">{money(q.suggestedPrice)}</p>
           <p className="mt-1 text-xs text-stone-500">
-            {q.costPerPiece == null ? "Needs a cost first." : `Costs ${money(q.costPerPiece)} to make; at ${money(q.suggestedPrice)} you keep ${target}%.`}
+            {q.costPerPiece == null
+              ? "Needs a cost first."
+              : byMarkup
+                ? `Costs ${money(q.costPerPiece)} to make; ${targetText} is ${money(q.suggestedPrice)} (a ${formatMarginPct(target)} margin).`
+                : `Costs ${money(q.costPerPiece)} to make; at ${money(q.suggestedPrice)} you keep ${targetText}.`}
           </p>
           {job && sellAt != null && pieces > 1 && (
             <p className="mt-2 text-sm text-stone-800" data-testid="quote-job-total">
@@ -258,7 +299,8 @@ export function QuoteCalculator({
           )}
           {q.marginAtPrice != null && (
             <p className={`mt-2 text-sm font-medium ${q.marginAtPrice < target ? "text-red-600" : "text-green-700"}`} data-testid="quote-own-margin">
-              At your {money(ownPrice)}: {q.marginAtPrice}% margin{q.marginAtPrice < target ? `, under your ${target}% target` : ""}.
+              At your {money(ownPrice)}: {byMarkup ? `${formatMarkup(markupOf(ownPrice, q.costPerPiece))} (${q.marginAtPrice}% margin)` : `${q.marginAtPrice}% margin`}
+              {q.marginAtPrice < target ? `, under your ${targetText} target` : ""}.
             </p>
           )}
         </div>

@@ -18,6 +18,12 @@ function formatValue(value: number, unit: string) {
   }
 }
 
+const SOURCE_NAMES: Record<string, string> = {
+  usda_ams: "USDA AMS MyMarketNews",
+  fao_fpi: "FAO Food Price Index (2014–16 = 100)",
+  bls_ppi: "BLS Producer Price Index (1982 = 100)",
+};
+
 function formatDate(iso: string, monthly: boolean) {
   const d = new Date(`${iso}T00:00:00Z`);
   return d.toLocaleDateString("en-US", monthly ? { month: "short", year: "numeric", timeZone: "UTC" } : { month: "short", day: "numeric", timeZone: "UTC" });
@@ -31,10 +37,12 @@ export function MarketWatchPanel({
   trends,
   windowDays,
   compact = false,
+  ingredients = "ingredients",
 }: {
   trends: MarketTrend[];
   windowDays: number;
   compact?: boolean;
+  ingredients?: string; // the business's word, lower case: "materials"
 }) {
   const shown = compact ? trends.filter((t) => t.exposed_ingredients.length > 0).slice(0, 3) : trends;
 
@@ -58,13 +66,13 @@ export function MarketWatchPanel({
       {shown.length === 0 ? (
         <p className="text-sm text-slate-500">
           {trends.length === 0
-            ? "No market data yet — it's pulled from USDA and FAO once a day."
-            : "None of your ingredients follow a tracked commodity yet."}
+            ? "No market data yet — it's pulled once a day."
+            : `None of your ${ingredients} follow a tracked commodity yet.`}
         </p>
       ) : (
         <ul className={`grid gap-3 ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-3"}`}>
           {shown.map((t) => {
-            const monthly = t.source === "fao_fpi";
+            const monthly = t.source !== "usda_ams";
             return (
               <li key={t.commodity_code} data-testid="market-trend" data-code={t.commodity_code} className="rounded-md border border-stone-200 bg-stone-50/60 p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -86,7 +94,7 @@ export function MarketWatchPanel({
                 </p>
                 {!compact && (
                   <p className="mt-1 text-xs text-slate-400">
-                    {t.source === "usda_ams" ? "USDA AMS MyMarketNews" : "FAO Food Price Index (2014–16 = 100)"} ·{" "}
+                    {SOURCE_NAMES[t.source] ?? t.source} ·{" "}
                     {t.region === "US" ? "US" : "Global"}
                   </p>
                 )}

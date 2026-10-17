@@ -10,7 +10,9 @@
 //      to the meat index rather than eggs, which the name rule covers.
 //   4. nothing — the ingredient isn't shown against any series.
 
-const NAME_RULES: [RegExp, string][] = [
+export type NameRule = [RegExp, string];
+
+export const NAME_RULES: NameRule[] = [
   [/\beggs?\b/i, "eggs_large_white"],
   [/\bbutter\b(?!milk)/i, "butter"],
   [/\b(flour|wheat)\b/i, "wheat"],
@@ -26,8 +28,13 @@ export const CATEGORY_DEFAULTS: Record<string, string> = {
   protein: "fao_meat_index",
 };
 
-export function commodityFor(ingredient: { name: string; category: string | null; commodity_code: string | null }) {
+// The rules above are food's; another industry passes its own
+// (lib/industries market.nameRules / categoryDefaults).
+export function commodityFor(
+  ingredient: { name: string; category: string | null; commodity_code: string | null },
+  rules: { nameRules: NameRule[]; categoryDefaults: Record<string, string> } = { nameRules: NAME_RULES, categoryDefaults: CATEGORY_DEFAULTS },
+) {
   if (ingredient.commodity_code) return ingredient.commodity_code;
-  for (const [re, code] of NAME_RULES) if (re.test(ingredient.name)) return code;
-  return ingredient.category ? (CATEGORY_DEFAULTS[ingredient.category] ?? null) : null;
+  for (const [re, code] of rules.nameRules) if (re.test(ingredient.name)) return code;
+  return ingredient.category ? (rules.categoryDefaults[ingredient.category] ?? null) : null;
 }

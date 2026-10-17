@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { UNRESOLVED_STATUSES } from "@/lib/matching/review";
 import { isoDaysAgo } from "@/lib/dates/localDate";
+import { markupValue, targetLabel, targetMarginOf } from "@/lib/costing/markup";
 import { lower, vocabFor, type Vocab } from "@/lib/vocab";
 import { batchCost, effectiveWastePct, lineCost, laborCost, laborOverheadOf as laborOverheadFor, machineCost, overheadMultiplier, perServing, marginPctOf, type LaborOverhead } from "@/lib/costing/recipeCost";
 
@@ -37,7 +38,7 @@ export async function getOverview(supabase: Client, orgId: string, v: Vocab = vo
   const since30 = isoDaysAgo(30);
 
   const [org, menuItems, recipes, recipeIngredients, ingredients, history, alerts, invoices, unresolved] = await Promise.all([
-    supabase.from("organizations").select("name, target_margin_pct, max_unreviewed_line_items, price_alert_threshold_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
+    supabase.from("organizations").select("name, target_margin_pct, target_markup, max_unreviewed_line_items, price_alert_threshold_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").eq("id", orgId).single(),
     supabase.from("menu_items").select("id, name, selling_price, recipe_id, servings_per_batch, is_active").order("name"),
     supabase.from("recipes").select("id, name, batch_yield_qty, labor_minutes, labor_rate_per_hour, overhead_pct, machine_minutes, machine_rate_per_hour"),
     supabase.from("recipe_ingredients").select("recipe_id, ingredient_id, quantity, waste_pct, ingredients(waste_pct)"),
@@ -57,7 +58,7 @@ export async function getOverview(supabase: Client, orgId: string, v: Vocab = vo
   ]);
   if (org.error || !org.data) throw new Error("loading organization failed: " + (org.error?.message ?? "not found"));
 
-  const target = Number(org.data.target_margin_pct);
+  const target = targetMarginOf(org.data);
   const ing = new Map((ingredients.data ?? []).map((i) => [i.id, i]));
   const recipeById = new Map((recipes.data ?? []).map((r) => [r.id, r]));
   const linesByRecipe = new Map<string, { ingredient_id: string; quantity: number; wastePct: number }[]>();
@@ -253,7 +254,7 @@ export async function getOverview(supabase: Client, orgId: string, v: Vocab = vo
   }
 
   return {
-    org: { name: org.data.name, target, cap, threshold: Number(org.data.price_alert_threshold_pct) },
+    org: { name: org.data.name, target, targetText: targetLabel(org.data), targetPhrase: markupValue(org.data) != null ? targetLabel(org.data) : `margin ${targetLabel(org.data)}`, cap, threshold: Number(org.data.price_alert_threshold_pct) },
     kpis: {
       avgMargin,
       marginChange30d: avgMarginNowComparable != null && avgMargin30dAgo != null ? avgMarginNowComparable - avgMargin30dAgo : null,

@@ -8,6 +8,7 @@ import { getVocab, getIndustry } from "@/lib/supabase/vocab";
 import { isServiceCategory } from "@/lib/industries";
 import { lower } from "@/lib/vocab";
 import { Panel, Kpi, PageHeader, HBar, Empty, ButtonLink, money, unitMoney, th, thNum, td, tdNum, row } from "@/components/ui/dash";
+import { targetMarginOf } from "@/lib/costing/markup";
 
 export default async function RecipeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,7 +20,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
     supabase.from("ingredients").select("id, name, base_unit, waste_pct").order("name"),
     supabase.from("recipe_costs").select("*").eq("recipe_id", id).maybeSingle(),
     supabase.from("menu_item_margins").select("menu_item_id, name, selling_price, margin_pct"),
-    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
+    supabase.from("organizations").select("target_margin_pct, target_markup, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
     supabase.from("menu_items").select("id").eq("recipe_id", id),
     getVocab(),
   ]);
@@ -46,7 +47,7 @@ export default async function RecipeDetailPage({ params }: { params: Promise<{ i
     })
     .sort((a, b) => (b.line ?? 0) - (a.line ?? 0));
   const batch = cost?.batch_total_cost == null ? null : Number(cost.batch_total_cost);
-  const target = Number(org?.target_margin_pct ?? 65);
+  const target = targetMarginOf(org);
   const defaultLaborRate = Number(org?.default_labor_rate_per_hour ?? 0);
   const laborOverhead = laborOverheadOf(recipe, org);
   const anyWaste = breakdown.some((b) => b.waste > 0);

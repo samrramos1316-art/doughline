@@ -328,9 +328,17 @@ Food screens are unchanged throughout (text snapshots and e2e checks).
 Tested: `scripts/test-industries-e2e.mjs` (all industries offered) and
 `--food` (food only), against the real database, plus 53 unit tests.
 
-Still deferred (§14.3, jewelry/florist outline §5): market data for the
-trades (series are placeholders, so Market Watch stays hidden for them),
-and extraction tuning on real trade invoices — waiting on owner interviews.
+Market data for fabrication (§14.3): BLS producer price indexes, monthly —
+steel mill products (WPU1017) and aluminum mill shapes (WPU102501), public
+domain, ingested by the same daily cron (`fetchBlsSeries`; optional
+`BLS_API_KEY` raises the keyless daily quota). Each business sees only its
+industry's series; fabrication links stock by category and by name
+(6061/aluminum → aluminum, A36/steel → steel). Tested in
+`scripts/test-market-e2e.mjs` (stored index = BLS's own number).
+
+Still deferred: market data for jewelry (no free licensed spot-price
+source found) and florists, and extraction tuning on real trade invoices —
+waiting on owner interviews.
 
 ## Not started yet
 

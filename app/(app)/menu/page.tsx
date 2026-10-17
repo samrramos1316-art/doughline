@@ -38,7 +38,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
     <>
       <PageHeader
         title={v.menu}
-        subtitle={`What you sell and for how much · ${items.length} item${items.length === 1 ? "" : "s"} · target margin ${target}%`}
+        subtitle={`What you sell and for how much · ${items.length} item${items.length === 1 ? "" : "s"} · target ${o.org.targetPhrase}`}
         tabs={Object.entries(SORTS).map(([k, label]) => ({ href: `/menu?sort=${k}`, label: `Sort: ${label}`, active: sort === k }))}
         actions={
           <>
@@ -51,7 +51,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Avg margin" value={o.kpis.avgMargin == null ? "—" : `${o.kpis.avgMargin.toFixed(1)}%`} tone={marginTone(o.kpis.avgMargin, target)} sub={<><Delta value={o.kpis.marginChange30d} suffix="pp" goodWhenUp /> in 30 days</>} />
-        <Kpi label="Below target" value={`${o.kpis.belowTarget}/${o.kpis.activeItems}`} tone={o.kpis.belowTarget ? "critical" : "good"} sub={`under ${target}%`} />
+        <Kpi label="Below target" value={`${o.kpis.belowTarget}/${o.kpis.activeItems}`} tone={o.kpis.belowTarget ? "critical" : "good"} sub={`under ${o.org.targetText}`} />
         <Kpi label="Best" value={best ? `${best.marginPct!.toFixed(1)}%` : "—"} tone="good" sub={best?.name ?? "—"} />
         <Kpi label="Weakest" value={worst ? `${worst.marginPct!.toFixed(1)}%` : "—"} tone={marginTone(worst?.marginPct ?? null, target)} sub={worst?.name ?? "—"} />
       </div>

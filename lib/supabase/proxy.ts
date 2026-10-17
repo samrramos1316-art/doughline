@@ -62,6 +62,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/admin") ||
     request.nextUrl.pathname.startsWith("/quote") ||
     request.nextUrl.pathname.startsWith("/sheet") ||
+    request.nextUrl.pathname.startsWith("/seasons") ||
+    request.nextUrl.pathname.startsWith("/plan") ||
     request.nextUrl.pathname === "/add";
 
   if (isAppRoute && !user) {

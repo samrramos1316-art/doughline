@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getIndustry } from "@/lib/supabase/vocab";
 import { lower } from "@/lib/vocab";
 import { isServiceCategory } from "@/lib/industries";
+import { markupValue, targetMarginOf } from "@/lib/costing/markup";
+import { AVERAGE_WINDOW_DAYS, averagePaid, type PricePoint } from "@/lib/costing/priceBasis";
+import { isoDaysAgo } from "@/lib/dates/localDate";
 import { PageHeader, Panel } from "@/components/ui/dash";
 import { QuoteCalculator, type QuoteStart } from "@/components/quote/QuoteCalculator";
 import { EventQuote, type EventStart } from "@/components/quote/EventQuote";
@@ -26,9 +29,10 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
   const supabase = await createClient();
   const v = industry.vocab;
 
-  const [{ data: materials }, { data: org }, base] = await Promise.all([
+  const since = isoDaysAgo(AVERAGE_WINDOW_DAYS);
+  const [{ data: materials }, { data: org }, base, { data: history }] = await Promise.all([
     supabase.from("ingredients").select("id, name, base_unit, current_unit_cost, waste_pct, category").order("name"),
-    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
+    supabase.from("organizations").select("target_margin_pct, target_markup, default_labor_rate_per_hour, default_machine_rate_per_hour").maybeSingle(),
     from
       ? supabase
           .from("recipes")
@@ -36,7 +40,11 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
           .eq("id", from)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // For the price basis switch: what each material cost over six months.
+    supabase.from("ingredient_price_history").select("ingredient_id, unit_cost, unit, effective_date").gte("effective_date", since),
   ]);
+  const pricesOf = new Map<string, PricePoint[]>();
+  for (const h of history ?? []) pricesOf.set(h.ingredient_id, [...(pricesOf.get(h.ingredient_id) ?? []), h]);
 
   // ?from=<build sheet>: start from that piece, to quote a variation of it.
   const start: QuoteStart = base.data
@@ -71,9 +79,11 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
             unitCost: m.current_unit_cost == null ? null : Number(m.current_unit_cost),
             wastePct: Number(m.waste_pct ?? 0),
             service: isServiceCategory(industry, m.category),
+            average: averagePaid(pricesOf.get(m.id) ?? [], m.base_unit, since),
           }))}
           start={start}
-          targetMarginPct={Number(org?.target_margin_pct ?? 65)}
+          targetMarginPct={targetMarginOf(org)}
+          targetMarkup={org ? markupValue(org) : null}
           defaultLaborRate={Number(org?.default_labor_rate_per_hour ?? 0)}
           mode={job ? "job" : "piece"}
           defaultMachineRate={Number(org?.default_machine_rate_per_hour ?? 0)}
@@ -89,7 +99,7 @@ async function EventQuotePage({ params }: { params: Params }) {
   const [{ data: recipes }, { data: costs }, { data: org }] = await Promise.all([
     supabase.from("recipes").select("id, name, batch_yield_unit").order("name"),
     supabase.from("recipe_costs").select("recipe_id, cost_per_serving"),
-    supabase.from("organizations").select("target_margin_pct, default_labor_rate_per_hour").maybeSingle(),
+    supabase.from("organizations").select("target_margin_pct, target_markup, default_labor_rate_per_hour").maybeSingle(),
   ]);
   const costOf = new Map((costs ?? []).map((c) => [c.recipe_id, c.cost_per_serving == null ? null : Number(c.cost_per_serving)]));
   const ids = new Set((recipes ?? []).map((r) => r.id));
@@ -118,7 +128,7 @@ async function EventQuotePage({ params }: { params: Params }) {
         <EventQuote
           arrangements={(recipes ?? []).map((r) => ({ id: r.id, name: r.name, unit: r.batch_yield_unit, costEach: costOf.get(r.id) ?? null }))}
           start={start}
-          targetMarginPct={Number(org?.target_margin_pct ?? 65)}
+          targetMarginPct={Math.round(targetMarginOf(org) * 100) / 100}
           defaultLaborRate={Number(org?.default_labor_rate_per_hour ?? 0)}
         />
       </Panel>

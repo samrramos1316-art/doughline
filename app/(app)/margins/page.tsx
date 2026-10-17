@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { getMargins, type ItemMargin, type IngredientMargin } from "@/lib/dashboard/margins";
+import { formatMarkup, markupOf } from "@/lib/costing/markup";
 import { Panel, Kpi, PageHeader, Pill, Delta, MarginBar, HBar, Empty, marginTone, money, unitMoney } from "@/components/ui/dash";
 import { getIndustry } from "@/lib/supabase/vocab";
 import { lower, withArticle, type Vocab } from "@/lib/vocab";
@@ -27,7 +28,7 @@ export default async function MarginsPage({ searchParams }: { searchParams: Prom
   const supabase = await createClient();
   const orgId = await getCurrentOrgId(supabase);
   if (!orgId) redirect("/login");
-  const [{ target, items, total, byIngredient }, industry] = await Promise.all([getMargins(supabase, orgId), getIndustry()]);
+  const [{ target, targetText, byMarkup, items, total, byIngredient }, industry] = await Promise.all([getMargins(supabase, orgId), getIndustry()]);
   const v = industry.vocab;
   const w: Words = { v, food: industry.family === "food" };
   const tabs = [
@@ -46,7 +47,7 @@ export default async function MarginsPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader
         title="Margins"
-        subtitle={`Every ${lower(v.menuItem)}'s cost worked out from its ${lower(v.recipe)}, and your ${possessive(lower(v.menu))} total margin · target ${target}%`}
+        subtitle={`Every ${lower(v.menuItem)}'s cost worked out from its ${lower(v.recipe)}, and your ${possessive(lower(v.menu))} total margin · target ${targetText}`}
         tabs={tabs}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -56,7 +57,7 @@ export default async function MarginsPage({ searchParams }: { searchParams: Prom
           tone={marginTone(total.marginPct, target)}
           sub={total.items ? `${money(total.profit)} kept of ${money(total.sales)} · one of each item` : "no costed items yet"}
         />
-        <Kpi label="Below target" value={`${below.length}/${priced.length}`} tone={below.length ? "critical" : priced.length ? "good" : "neutral"} sub={below.length ? below.map((m) => m.name).join(", ") : `all at ${target}% or more`} />
+        <Kpi label="Below target" value={`${below.length}/${priced.length}`} tone={below.length ? "critical" : priced.length ? "good" : "neutral"} sub={below.length ? below.map((m) => m.name).join(", ") : `all at ${targetText} or more`} />
         <Kpi label="Best" value={best ? pct(best.marginPct) : "—"} tone={best ? "good" : "neutral"} sub={best?.name ?? "—"} />
         <Kpi label="Not costed" value={notCosted} tone={notCosted ? "warning" : "good"} sub={notCosted ? `no ${lower(v.recipe)} or a missing price` : "every item costed"} />
       </div>
@@ -74,7 +75,7 @@ export default async function MarginsPage({ searchParams }: { searchParams: Prom
             Worst margin first. Open an item to see the working: each {lower(v.ingredient)}&apos;s amount in the batch, divided by the {v.servings} a batch makes, times what you pay for it — added up to the cost of one, then taken off the selling price.
           </p>
           {sorted.map((m) => (
-            <ItemCard key={m.id} m={m} target={target} w={w} />
+            <ItemCard key={m.id} m={m} target={target} targetText={targetText} byMarkup={byMarkup} w={w} />
           ))}
           <TotalCard total={total} items={items} target={target} w={w} />
         </div>
@@ -83,7 +84,7 @@ export default async function MarginsPage({ searchParams }: { searchParams: Prom
   );
 }
 
-function ItemCard({ m, target, w: { v } }: { m: ItemMargin; target: number; w: Words }) {
+function ItemCard({ m, target, targetText, byMarkup, w: { v } }: { m: ItemMargin; target: number; targetText: string; byMarkup: boolean; w: Words }) {
   const tone = marginTone(m.marginPct, target);
   return (
     <details className="group rounded-lg border border-stone-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,0.04)]" data-testid="margin-item" data-name={m.name}>
@@ -92,13 +93,13 @@ function ItemCard({ m, target, w: { v } }: { m: ItemMargin; target: number; w: W
           <span className="block truncate font-semibold text-stone-900">{m.name}</span>
           <span className="block truncate text-xs text-stone-500">{m.recipe ? `${m.recipe}${m.servings ? ` · ${qtyFmt(m.servings)} per batch` : ""}` : `no ${lower(v.recipe)} linked`}</span>
           <span className="mt-0.5 block text-xs tabular-nums text-stone-700 md:hidden">
-            {m.cost == null ? `Sells for ${money(m.price)} · not costed yet` : <>{money(m.price)} − {cents(m.cost)} = {cents(m.profit)} · <b>{pct(m.marginPct)}</b></>}
+            {m.cost == null ? `Sells for ${money(m.price)} · not costed yet` : <>{money(m.price)} − {cents(m.cost)} = {cents(m.profit)} · <b>{pct(m.marginPct)}</b>{byMarkup ? ` · ${formatMarkup(markupOf(m.price, m.cost))} markup` : ""}</>}
           </span>
         </span>
         <Stat label="Sells for" value={money(m.price)} />
         <Stat label="Costs to make" value={cents(m.cost)} />
         <Stat label="Profit" value={cents(m.profit)} />
-        <Stat label="Margin" value={pct(m.marginPct)} strong />
+        <Stat label={byMarkup ? "Margin · markup" : "Margin"} value={byMarkup && m.cost != null ? `${pct(m.marginPct)} · ${formatMarkup(markupOf(m.price, m.cost))}` : pct(m.marginPct)} strong />
         <span className="hidden md:block"><MarginBar pct={m.marginPct} target={target} /></span>
         <span className="flex items-center gap-2 justify-self-end">
           {!m.recipe ? (
@@ -197,7 +198,7 @@ function ItemCard({ m, target, w: { v } }: { m: ItemMargin; target: number; w: W
                 <tr>
                   <td className={`${cellL} font-semibold`} colSpan={4}>Margin (profit ÷ price)</td>
                   <td className={`${cellR} font-semibold ${tone === "critical" ? "text-red-600" : "text-stone-900"}`}>{pct(m.marginPct)}</td>
-                  <td className={`${cellL} text-xs text-stone-500`}>{m.marginPct == null ? `waiting on a price for ${m.unpriced.join(", ")}` : `target ${target}%`}</td>
+                  <td className={`${cellL} text-xs text-stone-500`}>{m.marginPct == null ? `waiting on a price for ${m.unpriced.join(", ")}` : `target ${targetText}`}</td>
                 </tr>
               </tfoot>
             </table>

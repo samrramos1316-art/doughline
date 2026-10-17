@@ -8,7 +8,7 @@
 // whose industry isn't offered any more keeps its profile in full.
 //
 // Pure (relative imports only), so it runs under `node --test`.
-import { CATEGORY_DEFAULTS } from "../market/categoryDefaults.ts";
+import { CATEGORY_DEFAULTS, NAME_RULES, type NameRule } from "../market/categoryDefaults.ts";
 
 export const INDUSTRY_IDS = ["bakery", "food_truck", "caterer", "jewelry", "florist", "metalworking", "other"] as const;
 export type IndustryId = (typeof INDUSTRY_IDS)[number];
@@ -66,10 +66,14 @@ export type IndustryProfile = {
   // costSheets: printable cost sheets (/sheet) per build sheet / arrangement
   // and for event quotes. machineTime: jobs log machine minutes at a machine
   // rate, separate from labor (migration 029), and Settings has a default.
-  features: { quote: false | "piece" | "job" | "event"; packSizes: boolean; costSheets: boolean; machineTime: boolean };
+  // seasons: /seasons, prices by month vs last year and before holidays.
+  // orderPlan: /plan, stems to buy for the week's orders.
+  features: { quote: false | "piece" | "job" | "event"; packSizes: boolean; costSheets: boolean; machineTime: boolean; seasons: boolean; orderPlan: boolean };
   market: {
     categoryDefaults: Record<string, string>; // category → commodity_code
+    nameRules: NameRule[]; // material name → commodity_code, checked before the category
     series: MarketSeries[];
+    sources: string; // under "Series tracked" on /market
   };
   // Appended to the vision prompts (lib/industries/extraction.ts). Empty for
   // food: the base prompts were written for food businesses.
@@ -119,8 +123,8 @@ const food = (id: IndustryId, name: string, description: string): IndustryProfil
   categories: FOOD_CATEGORIES,
   serviceCategories: [],
   defaults: { default_waste_pct: 0, default_overhead_pct: 0, show_labor_by_default: false },
-  features: { quote: false, packSizes: false, costSheets: false, machineTime: false },
-  market: { categoryDefaults: CATEGORY_DEFAULTS, series: FOOD_SERIES },
+  features: { quote: false, packSizes: false, costSheets: false, machineTime: false, seasons: false, orderPlan: false },
+  market: { categoryDefaults: CATEGORY_DEFAULTS, nameRules: NAME_RULES, series: FOOD_SERIES, sources: "USDA + FAO, updated daily" },
   extraction: NO_HINTS,
 });
 
@@ -160,9 +164,11 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     categories: ["precious_metal", "stone", "finding", "chain", "outsourced_work", "packaging", "tools_consumables"],
     serviceCategories: ["outsourced_work"],
     defaults: { default_waste_pct: 5, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "piece", packSizes: false, costSheets: true, machineTime: false },
+    features: { quote: "piece", packSizes: false, costSheets: true, machineTime: false, seasons: false, orderPlan: false },
     market: {
       categoryDefaults: { precious_metal: "gold_spot" },
+      nameRules: [],
+      sources: "",
       series: [
         { code: "gold_spot", label: "Gold spot price (placeholder)", ingesting: false },
         { code: "silver_spot", label: "Silver spot price (placeholder)", ingesting: false },
@@ -205,9 +211,11 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     categories: ["cut_flower", "greens", "vase_container", "foam_supplies", "ribbon_packaging"],
     serviceCategories: [],
     defaults: { default_waste_pct: 10, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "event", packSizes: true, costSheets: true, machineTime: false },
+    features: { quote: "event", packSizes: true, costSheets: true, machineTime: false, seasons: true, orderPlan: true },
     market: {
       categoryDefaults: { cut_flower: "floral_wholesale" },
+      nameRules: [],
+      sources: "",
       series: [{ code: "floral_wholesale", label: "Wholesale cut flowers (placeholder)", ingesting: false }],
     },
     extraction: {
@@ -245,13 +253,20 @@ export const INDUSTRIES: Record<IndustryId, IndustryProfile> = {
     categories: ["bar_stock", "sheet_plate", "tube_pipe", "fasteners", "consumables", "finishing_coating", "outsourced_service"],
     serviceCategories: ["outsourced_service"],
     defaults: { default_waste_pct: 8, default_overhead_pct: 0, show_labor_by_default: true },
-    features: { quote: "job", packSizes: false, costSheets: true, machineTime: true },
+    features: { quote: "job", packSizes: false, costSheets: true, machineTime: true, seasons: false, orderPlan: false },
     market: {
-      categoryDefaults: { sheet_plate: "steel_hrc", bar_stock: "steel_hrc" },
-      series: [
-        { code: "steel_hrc", label: "Hot-rolled steel coil (placeholder)", ingesting: false },
-        { code: "aluminum", label: "Aluminum (placeholder)", ingesting: false },
+      // Stock follows steel unless its name says aluminum (BLS producer
+      // price indexes, lib/market/series.ts). Aluminum first: "6061 sheet".
+      categoryDefaults: { sheet_plate: "steel", bar_stock: "steel", tube_pipe: "steel" },
+      nameRules: [
+        [/\b(alum(inum|inium)?|6061|6063|5052|3003|7075)\b/i, "aluminum"],
+        [/\b(steel|a36|a500|a513|hrpo|crs|hrs|stainless|304|316)\b/i, "steel"],
       ],
+      series: [
+        { code: "steel", label: "Steel mill products (US producer prices)", ingesting: true },
+        { code: "aluminum", label: "Aluminum mill shapes (US producer prices)", ingesting: true },
+      ],
+      sources: "US producer prices (BLS), monthly",
     },
     extraction: {
       invoice: `This business is a metal fabrication shop, not a food business. Its suppliers are metal service centers, fastener and welding-supply distributors, and outside finishers (powder coat, plating).
