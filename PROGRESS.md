@@ -340,6 +340,27 @@ Still deferred: market data for jewelry (no free licensed spot-price
 source found) and florists, and extraction tuning on real trade invoices —
 waiting on owner interviews.
 
+## Trade extras (branch `trade-extras`, PR #6)
+
+- Markup pricing (jewelry): Settings → "I price by" margin or markup
+  (`organizations.target_markup`, migration `030`, rollback in
+  `supabase/rollback/`). Quotes, Margins ("Margin · markup"), cost sheets,
+  the dashboard and suggestions follow it (`lib/costing/markup.ts`).
+- Price basis on quotes: latest invoice price or the average paid over the
+  last 182 days (`lib/costing/priceBasis.ts`), shown when they differ. No
+  licensed live metal price yet, so "today's price" is the latest invoice.
+- Seasons (florists, `/seasons`): each material's price by month against
+  last year, and the lift in the 3 weeks before Valentine's, Mother's Day
+  and Christmas vs the year before (`lib/costing/seasons.ts`).
+- Order plan (florists, `/plan`): the week's arrangements → stems and
+  supplies to buy with spoilage, rounded up, in the bunch/box with the
+  fewest spare, at today's prices (`lib/costing/orderPlan.ts`). The event
+  quote's "Plan what to buy" opens it. Nothing is saved; the link keeps it.
+
+Tested: `scripts/test-markup-e2e.mjs`, `scripts/test-florist-extras-e2e.mjs`
+and `scripts/test-industries-e2e.mjs` against the real database, plus 68
+unit tests.
+
 ## Not started yet
 
 - Gemini vision provider (needs `GEMINI_API_KEY`).
@@ -385,6 +406,8 @@ waiting on owner interviews.
 - `scripts/test-pwa-e2e.mjs [--base=https://…]` (after `npm run build`; manifest, icons, service worker, offline, install card)
 - `scripts/test-recipe-units-e2e.mjs` (after `npm run build`; base-unit changes, recipe line units)
 - `scripts/test-industries-e2e.mjs [--food]` (after `npm run build`; industry words, costing, quotes, cost sheets, signup gate)
+- `scripts/test-markup-e2e.mjs` (after `npm run build`; markup pricing, quote price basis)
+- `scripts/test-florist-extras-e2e.mjs` (after `npm run build`; Seasons and Order plan; run between Mother's Day and Christmas)
 - `scripts/make-icons.mjs` (regenerates the app icons, not a test)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
