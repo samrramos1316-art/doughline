@@ -1,10 +1,9 @@
-// Not a correctness test (there's no real vision provider yet — see the TODOs
-// in lib/ai/vision/{gemini,claude}.ts) — this just proves the §5.2 step 4
-// plumbing that IS real doesn't crash: the route fetches the file from
-// Storage, calls the (stubbed) provider, and persists the documented status
-// transition. Because the stub always returns zero line items, the expected
-// outcome here is status: 'failed' with raw_extraction populated — that's
-// the correct behavior for "the provider found nothing," not a bug.
+// The scan route's failure path (§5.2 step 4) with the real vision provider:
+// a file that isn't a readable image (random bytes saved as .jpg) must not
+// crash the route or leave the invoice stuck. The provider call fails, the
+// route answers 502, and the invoice is kept as 'failed' with the reason,
+// so the owner can delete it or type it in. Readable invoices are covered
+// by test-claude-vision-scan.mjs and the e2e tests.
 //
 // Run: node scripts/smoke-test-scan-route.mjs
 import crypto from "node:crypto";
@@ -74,8 +73,7 @@ try {
   });
   const scanBody = await scanRes.json();
   console.log("Query result — POST /api/invoices/[id]/scan response:", scanRes.status, JSON.stringify(scanBody));
-  assert(scanRes.status === 200, "the scan route runs end-to-end without crashing (fetch Storage -> call stub provider -> persist)");
-  assert(scanBody.status === "failed", "with the stub provider returning zero line items, status correctly lands on 'failed'");
+  assert(scanRes.status === 502 && scanBody.error === "Vision extraction failed", "an unreadable file is answered 502, not a crash");
 
   const { data: invoiceRow, error: invoiceRowErr } = await admin
     .from("invoices")
@@ -84,11 +82,10 @@ try {
     .single();
   if (invoiceRowErr) throw new Error("invoice row missing: " + invoiceRowErr.message);
   console.log("Query result — invoices row after scan:", JSON.stringify(invoiceRow));
-  assert(invoiceRow.status === "failed", "the persisted row also shows status 'failed'");
-  assert(invoiceRow.raw_extraction !== null, "raw_extraction was persisted from the (stub) provider result");
-  assert(invoiceRow.error_message === "No line items extracted", "error_message explains why it failed");
+  assert(invoiceRow.status === "failed", "the invoice is kept as 'failed', not left pending");
+  assert(invoiceRow.error_message === "the file couldn't be opened as a photo or PDF", `the owner sees a plain reason, not the API's error: ${invoiceRow.error_message}`);
 
-  console.log("\nScan route smoke test passed (stub extraction, real plumbing).");
+  console.log("\nScan route failure-path test passed.");
 } finally {
   console.log("\nCleaning up test fixtures...");
   killDevServer(devServer);
