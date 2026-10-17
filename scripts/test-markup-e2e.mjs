@@ -2,7 +2,8 @@
 // against a real server and the real database: a jeweler switches Settings
 // to a 2.5× markup; the quote, Margins tab, build sheet's cost sheet and the
 // saved settings all follow it; 3× prices at exactly 3×; switching back to a
-// margin clears the markup.
+// margin clears the markup. Then the quote's price basis switch: latest
+// invoice price vs. the six-month average paid.
 //
 // Needs a production build (`npx next build`); starts `next start` itself.
 //   node scripts/test-markup-e2e.mjs
@@ -101,6 +102,24 @@ try {
   await page.goto(`${BASE}/quote?from=${sheet.id}`);
   r = await text(page.getByTestId("quote-result"));
   assert(r.includes("$342.86") && r.includes("you keep 65%"), `quote back at a 65% margin ($120 ÷ 0.35): ${r}`);
+
+  // 6. Price basis (lib/costing/priceBasis.ts): gold bought at $50, $55 and
+  // $60/g over six months (and $40 a year ago, outside the window). Latest
+  // is $60 → 2 g = $120; the six-month average $55 → $110.
+  assert((await page.getByTestId("price-basis").count()) === 0, "no basis switch while the material has no price history");
+  const daysAgo = (d) => new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10);
+  await admin.from("ingredient_price_history").insert([[40, 365], [50, 120], [55, 60], [60, 5]].map(([unit_cost, d]) => (
+    { org_id: orgId, ingredient_id: gold.id, unit_cost, unit: "g", effective_date: daysAgo(d), source: "manual" })));
+  await page.goto(`${BASE}/quote?from=${sheet.id}`);
+  const basis = page.getByTestId("price-basis");
+  const basisText = await text(basis);
+  assert(basisText.includes("Latest invoice price (what restocking costs): $120.00") && basisText.includes("Average paid, last 6 months (what your stock cost): $110.00"), `basis switch shows both: ${basisText}`);
+  await basis.getByLabel(/Average paid/).check();
+  r = await text(page.getByTestId("quote-result"));
+  assert(r.includes("$314.29") && r.includes("Costs $110.00"), `quote at the average paid ($110 ÷ 0.35): ${r}`);
+  await basis.getByLabel(/Latest invoice price/).check();
+  r = await text(page.getByTestId("quote-result"));
+  assert(r.includes("$342.86"), `and back at the latest price: ${r}`);
 
   console.log("\nAll markup checks passed.");
 } finally {
