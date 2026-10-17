@@ -17,7 +17,7 @@ export function HeroExample() {
   const r = workExample(ex);
   return (
     <div className="hero-ticker relative w-full max-w-md rotate-[1.5deg] rounded-md border border-white/10 bg-[#14120f]/90 p-5 shadow-[0_40px_120px_-30px_rgba(255,91,31,0.35)] backdrop-blur">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="rounded-sm border border-[#ece4d6]/30 px-1.5 py-0.5 font-ledger text-[10px] tracking-[0.2em] text-[#ece4d6] uppercase">Example</span>
         <div role="tablist" aria-label="Worked example" className="flex gap-1 rounded-full border border-white/10 p-0.5">
           {EXAMPLES.map((e) => (
@@ -76,7 +76,8 @@ function ExampleBody({ ex, r }: { ex: WorkedExample; r: ReturnType<typeof workEx
       )}
       <p className="mt-3 text-[11px] leading-snug text-[#6d665c]">
         Example numbers{ex.moved.wastePct ? `, with ${ex.moved.wastePct}% waste` : ""}
-        {ex.labor ? ` and ${ex.labor.minutes} min of labor` : ""} — the same arithmetic the app runs on your invoices.
+        {ex.labor ? `${ex.machine ? "," : " and"} ${ex.labor.minutes} min of labor` : ""}
+        {ex.machine ? ` and ${ex.machine.minutes} min of machine time` : ""} — the same arithmetic the app runs on your invoices.
       </p>
     </div>
   );
@@ -89,6 +90,7 @@ const CARDS: { key: string; title: string; industries: IndustryId[]; href: strin
   { key: "food", title: "Bakeries & caterers", industries: ["bakery", "caterer", "food_truck"], href: "/food", blurb: "Recipes, menu items and ingredients — butter by the case, flour by the bag, eggs by the dozen." },
   { key: "florist", title: "Florists", industries: ["florist"], href: "/florists", blurb: "" },
   { key: "jewelry", title: "Jewelers", industries: ["jewelry"], href: "/jewelry", blurb: "" },
+  { key: "metalworking", title: "Metal fabricators", industries: ["metalworking"], href: "/fabrication", blurb: "" },
   { key: "other", title: "Other makers & shops", industries: ["other"], href: "/signup", blurb: "If you buy supplies on invoices and sell what you make from them, the same costing works for you." },
 ];
 
@@ -104,13 +106,13 @@ export function IndustriesSection({ enabled }: { enabled: IndustryId[] }) {
         <h2 id="industries-title" className="mt-4 max-w-[22ch] font-display text-4xl leading-[0.98] font-bold tracking-[-0.035em] text-white sm:text-5xl">
           Built for businesses that make what they sell.
         </h2>
-        <ul className="mt-12 grid gap-px overflow-hidden rounded-md border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-12 grid gap-px overflow-hidden rounded-md border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-5">
           {CARDS.map((c) => {
             const p = INDUSTRIES[c.industries[0]];
             const open = c.key === "other" || c.industries.some((i) => enabled.includes(i));
             const v = p.vocab;
             return (
-              <li key={c.key} className="flex flex-col bg-[#0c0b09] p-6">
+              <li key={c.key} className={`flex flex-col bg-[#0c0b09] p-6 ${c.key === "other" ? "sm:col-span-2 lg:col-span-1" : ""}`}>
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="font-display text-xl font-semibold tracking-tight text-white">{c.title}</h3>
                   <span className={`shrink-0 rounded-sm px-1.5 py-0.5 font-ledger text-[10px] tracking-[0.15em] uppercase ${open ? "bg-[#ff5b1f] text-[#0c0b09]" : "border border-white/20 text-[#a79f92]"}`}>

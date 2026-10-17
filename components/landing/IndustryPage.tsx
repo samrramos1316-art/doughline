@@ -9,7 +9,7 @@ import { CONTACT_EMAIL } from "@/lib/legal";
 const money = (n: number) => `$${n.toFixed(2)}`;
 const label = (category: string) => category.replace(/_/g, " ");
 
-// A page per industry (/florists, /jewelry), built from its profile in
+// A page per industry (/florists, /jewelry, /fabrication), built from its profile in
 // lib/industries: its words, units, categories, defaults and a worked
 // example. Industries not in ENABLED_INDUSTRIES get the waitlist version —
 // there's no signup link for them, only a way to ask to be told.
@@ -71,7 +71,10 @@ export function IndustryPage({ id, audience }: { id: IndustryId; audience: strin
               <dl className="mt-4 divide-y divide-white/[0.06] text-[15px]">
                 {[
                   [`${ex.moved.name}, per ${ex.moved.unit}`, `${money(ex.moved.from)} → ${money(ex.moved.to)} (+${r.priceMovePct}%)`],
-                  [`In one ${ex.product.toLowerCase()}`, `${ex.moved.qty} ${ex.moved.unit}${ex.moved.wastePct ? ` + ${ex.moved.wastePct}% waste` : ""}${ex.labor ? `, ${ex.labor.minutes} min labor at ${money(ex.labor.ratePerHour)}/h` : ""}`],
+                  [
+                    ex.perBatch > 1 ? `In one ${lower(v.recipe)} of ${ex.perBatch}` : `In one ${ex.product.toLowerCase()}`,
+                    `${ex.moved.qty} ${ex.moved.unit}${ex.moved.wastePct ? ` + ${ex.moved.wastePct}% waste` : ""}${ex.labor ? `, ${ex.labor.minutes} min labor at ${money(ex.labor.ratePerHour)}/h` : ""}${ex.machine ? `, ${ex.machine.minutes} min machine time at ${money(ex.machine.ratePerHour)}/h` : ""}`,
+                  ],
                   ["Cost of one", `${money(r.costBefore)} → ${money(r.costAfter)}`],
                   [`Margin at ${money(ex.price)}`, `${r.marginBefore.toFixed(2)}% → ${r.marginAfter.toFixed(2)}%`],
                   ...(r.fixPrice != null ? [["To keep the old margin", `charge ${money(r.fixPrice)}`]] : []),
@@ -90,9 +93,11 @@ export function IndustryPage({ id, audience }: { id: IndustryId; audience: strin
             <h2 id="fit-title" className="font-display text-xl font-semibold text-white">Set up the way you work</h2>
             <ul className="mt-4 space-y-3 text-[15px] leading-relaxed">
               <li><b className="text-white">{v.ingredients}</b>, priced from your invoices, by {p.units.join(", ")}.</li>
-              <li><b className="text-white">{v.recipes}</b> list what goes into each piece, with labor time. Each {lower(v.ingredient)} carries its own waste % (new ones start at {p.defaults.default_waste_pct}%), and any line can override it.</li>
+              <li><b className="text-white">{v.recipes}</b> list what goes into each {v.serving}, with labor time{p.features.machineTime ? " and machine time at its own hourly rate" : ""}. Each {lower(v.ingredient)} carries its own waste % (new ones start at {p.defaults.default_waste_pct}%), and any line can override it.</li>
               <li><b className="text-white">{v.menuItems}</b> carry your selling price, so every margin stays current.</li>
               <li>Suggested categories: {p.categories.map(label).join(", ")}.</li>
+              {p.serviceCategories.length > 0 && <li>Bought-in work (category: {p.serviceCategories.map(label).join(", ")}) starts at 0% waste and is listed apart from materials.</li>}
+              {p.features.quote === "job" && <li><b className="text-white">Quote a job</b> from materials, labor and machine time: a price per {v.serving} and a job total at your target margin, with a printable cost sheet.</li>}
             </ul>
             <h2 className="mt-10 font-display text-xl font-semibold text-white">Not there yet</h2>
             <ul className="mt-4 space-y-2 text-[15px] text-[#a79f92]">

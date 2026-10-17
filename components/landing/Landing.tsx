@@ -51,7 +51,8 @@ const dollars = (n: number) => `$${n.toFixed(2)}`;
 const percent = (n: number) => `${n.toFixed(2)}%`;
 const ring = workExample(EXAMPLES[1]);
 const arrangement = workExample(EXAMPLES[2]);
-const STORIES: Record<"croissant" | "ring" | "arrangement", Story> = {
+const bracket = workExample(EXAMPLES[3]);
+const STORIES: Record<"croissant" | "ring" | "arrangement" | "bracket", Story> = {
   croissant: {
     tab: EXAMPLES[0].tab,
     vendor: "LONE STAR FOODSERVICE",
@@ -104,6 +105,27 @@ const STORIES: Record<"croissant" | "ring" | "arrangement", Story> = {
       { k: "arrangement margin", v: arrangement.marginAfter, fmt: percent, d: `sold at $75. It was ${percent(arrangement.marginBefore)} last week.` },
     ],
     stamp: `Fix: ${dollars(arrangement.fixPrice!)} to keep ${percent(arrangement.marginBefore)}`,
+  },
+  bracket: {
+    tab: EXAMPLES[3].tab,
+    vendor: "IRONBRIDGE METAL SUPPLY",
+    meta: "INV 88-41207 · 09/23 · TRUCK 6",
+    rows: [
+      ["A36 HR FB 1/4 X 2 20' CWT", "3.4", "333.20"],
+      ["HHCS 3/8-16 X 1 GR5 BX/100", "1", "14.80"],
+      ["ER70S-6 .035 MIG WIRE 33#", "1", "89.50"],
+      ["CUT CHARGE", "6", "18.00"],
+      ["FUEL SURCHARGE", "1", "9.25"],
+    ],
+    hit: "A36",
+    total: "$464.75",
+    chain: [
+      { k: "the invoice line", v: 333.2, fmt: dollars, d: "3.4 hundredweight (340 lb) of A36 flat bar" },
+      { k: "per pound", v: 0.98, fmt: dollars, d: "$333.20 ÷ 340 lb. Last order was $0.82." },
+      { k: "per bracket", v: bracket.costAfter, fmt: dollars, d: "all-in, a job of 10: 34 lb of bar with 8% scrap, fasteners, powder coat, 90 min at $32/h, 30 machine min at $60/h" },
+      { k: "bracket margin", v: bracket.marginAfter, fmt: percent, d: `sold at $22. It was ${percent(bracket.marginBefore)} on the last job.` },
+    ],
+    stamp: `Fix: ${dollars(bracket.fixPrice!)} to keep ${percent(bracket.marginBefore)}`,
   },
 };
 type StoryId = keyof typeof STORIES;
@@ -267,7 +289,7 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
   const copy = COPY[variant];
   const faq = FAQ.map(([q, a], i) => copy.faq[i] ?? ([q, i === 3 ? copy.market : a] as const));
   const tour = TOUR.map((t, i) => ({ ...t, ...copy.tour[i] }));
-  // The general page lets you follow a jeweler's or a florist's line too; the
+  // The general page lets you follow a jeweler's, florist's or fabricator's line too; the
   // scroll animation plays on the first one shown (the bakery's).
   const [storyId, setStoryId] = useState<StoryId>("croissant");
   // After a switch the slip is remounted outside the animation, so its line is marked statically.
@@ -714,7 +736,7 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
                         setStoryId(id);
                         setSwitched(true);
                       }}
-                      className={`rounded-full px-3.5 py-1.5 font-ledger text-[12px] transition-colors ${id === storyId ? "bg-[#ff5b1f] text-[#0c0b09]" : "text-[#a79f92] hover:text-white"}`}
+                      className={`rounded-full px-3 py-1.5 font-ledger text-[12px] transition-colors sm:px-3.5 ${id === storyId ? "bg-[#ff5b1f] text-[#0c0b09]" : "text-[#a79f92] hover:text-white"}`}
                     >
                       {STORIES[id].tab}
                     </button>

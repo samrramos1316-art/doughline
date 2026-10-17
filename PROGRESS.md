@@ -299,6 +299,39 @@ days); screenshots in `test-output/market/`.
   (`POST /api/onboarding/link-menu`). Falls back to the matcher / name
   overlap. Tested: `scripts/test-smart-links-e2e.mjs` (74/74 on prod).
 
+## Industry expansion (branch `industry-expansion`, §14)
+
+One schema and cost formula for every industry; `lib/industries/index.ts`
+is the single source of what changes per `organizations.business_type`
+(words, units, categories, defaults, features, market series, vision hints).
+Food screens are unchanged throughout (text snapshots and e2e checks).
+
+- **Costing** (`60c955a`, `2bf5fd3`; migrations `025`-`027`): labor minutes
+  and rate, overhead %, waste % per material with per-line override.
+  Live parity check after each migration: 0 cost differences.
+- **Profiles and words** (`60c955a`, `c1b239a`): jewelry, florist and metal
+  fabrication profiles; every app screen uses the business's words.
+- **Site and signup** (`f8763ec`, `29e0361`): general homepage, industry
+  pages, business-type cards at signup; trades marked Beta.
+  `ENABLED_INDUSTRIES` still narrows what's offered.
+- **Jewelry** (`7b3fda9`): custom-piece quote calculator (`/quote`), troy
+  weight spellings, outsourced work category.
+- **Florists** (`8d5a241`, `f828616`; migration `028`): bunch/box sizes per
+  material, event quotes, printable cost sheets (`/sheet`), price alerts
+  verified in florist words.
+- **Metal fabrication** (`3502132`, `9f5f095`, `8e88537`; migration `029`):
+  machine time on jobs (shop default rate in Settings), job quotes with a
+  parts count, outsourced work shown apart from materials, cost sheets.
+  `f74fcfd`: CWT (100 lb) invoice pricing, `/fabrication` page and the
+  homepage's fabricator example.
+
+Tested: `scripts/test-industries-e2e.mjs` (all industries offered) and
+`--food` (food only), against the real database, plus 53 unit tests.
+
+Still deferred (§14.3, jewelry/florist outline §5): market data for the
+trades (series are placeholders, so Market Watch stays hidden for them),
+and extraction tuning on real trade invoices — waiting on owner interviews.
+
 ## Not started yet
 
 - Gemini vision provider (needs `GEMINI_API_KEY`).
@@ -337,6 +370,7 @@ days); screenshots in `test-output/market/`.
 - `scripts/test-import-guards-e2e.mjs [--base=…] [--keep]` (menus/recipes turned away, case pricing, no duplicate ingredients)
 - `scripts/screenshot-app.mjs --email=… --password=…` (every screen, desktop + phone)
 - `scripts/test-pwa-e2e.mjs [--base=https://…]` (after `npm run build`; manifest, icons, service worker, offline, install card)
+- `scripts/test-industries-e2e.mjs [--food]` (after `npm run build`; industry words, costing, quotes, cost sheets, signup gate)
 - `scripts/make-icons.mjs` (regenerates the app icons, not a test)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)

@@ -12,6 +12,8 @@ const UNITS: Record<string, { dim: Dim; factor: number | null; container?: true 
   kg: { dim: "mass", factor: 1000 },
   oz: { dim: "mass", factor: 28.349523125 },
   lb: { dim: "mass", factor: 453.59237 },
+  // Steel and other metal stock is priced per hundredweight (US, 100 lb).
+  cwt: { dim: "mass", factor: 45359.237 },
   ml: { dim: "volume", factor: 1 },
   l: { dim: "volume", factor: 1000 },
   tsp: { dim: "volume", factor: 4.92892159375 },
@@ -39,7 +41,7 @@ const UNITS: Record<string, { dim: Dim; factor: number | null; container?: true 
 };
 
 const ALIASES: Record<string, string> = {
-  "#": "lb", lbs: "lb", pound: "lb", pounds: "lb",
+  "#": "lb", lbs: "lb", pound: "lb", pounds: "lb", hundredweight: "cwt", "cwt.": "cwt", "/cwt": "cwt", "per cwt": "cwt",
   gram: "g", grams: "g", kilogram: "kg", kilograms: "kg",
   ounce: "oz", ounces: "oz",
   liter: "l", liters: "l", litre: "l", litres: "l",

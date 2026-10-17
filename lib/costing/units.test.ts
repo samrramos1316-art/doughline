@@ -60,6 +60,14 @@ test("length", () => {
   assert.deepEqual(toBaseUnitCost(line(3, "ft"), "in"), { ok: true, cost: 0.25, basis: "$3 per ft" });
 });
 
+test("hundredweight (metal stock)", () => {
+  for (const u of ["CWT", "cwt.", "Hundredweight", "per CWT"]) assert.equal(canonicalUnit(u), "cwt", u);
+  assert.equal(conversionFactor("cwt", "lb"), 100);
+  close(conversionFactor("cwt", "kg"), 45.359237);
+  // A36 flat bar at $98 per CWT, costed per lb.
+  assert.deepEqual(toBaseUnitCost(line(98, "CWT"), "lb"), { ok: true, cost: 0.98, basis: "$98 per CWT" });
+});
+
 test("stems, bunches and sheets", () => {
   assert.equal(conversionFactor("bunch", "stem", { bunch: 10 }), 10);
   assert.equal(conversionFactor("stems", "bunch", { bunch: 10 }), 0.1);
