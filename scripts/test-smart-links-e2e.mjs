@@ -153,7 +153,7 @@ try {
   log("\n=== signup + price list ===");
   await page.goto(`${BASE}/signup`);
   await page.getByLabel("Business name").fill("Corner Crumb Bakery");
-  await page.getByLabel("What kind of business?").selectOption({ index: 1 });
+  await page.getByTestId("industry-cards").locator('input[value="bakery"]').check({ force: true }); // the picker is cards over hidden radios
   await page.getByLabel("Your name").fill("Robin Test");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);

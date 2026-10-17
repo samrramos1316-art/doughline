@@ -380,10 +380,10 @@ try {
 
   await page.goto(`${BASE_URL}/alerts`);
   await page.getByRole("heading", { name: "Price Alerts" }).waitFor();
-  const listText = (await page.locator("main ul").innerText()).replace(/\s+/g, " ").trim();
+  const listText = (await page.locator("main table").first().innerText()).replace(/\s+/g, " ").trim();
   console.log(`/alerts list: "${listText}"`);
   await screenshot("alerts-list");
-  assert(/Unsalted Butter \$3\.40\/lb → \$3\.96\/lb/.test(listText) && /\+16\.5%/.test(listText), "alerts list shows the real butter alert");
+  assert(/Unsalted Butter .*\$3\.40 → \$3\.96\/lb/.test(listText) && /16\.5%/.test(listText), "alerts list shows the real butter alert");
 
   await page.goto(`${BASE_URL}/alerts/${alert.id}`);
   await page.getByRole("table").waitFor();

@@ -84,7 +84,7 @@ try {
     title: document.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute("content"),
   }));
   console.log(JSON.stringify(head));
-  assert(head.manifest === "/manifest.webmanifest" && head.apple?.startsWith("/apple-icon") && head.icon.some((h) => h.startsWith("/icon")) && head.theme === "#ffffff", "manifest, Apple icon, tab icon and theme colour linked");
+  assert(head.manifest === "/manifest.webmanifest" && head.apple?.startsWith("/apple-icon") && head.icon.some((h) => h.startsWith("/icon")) && head.theme === "#0c0b09", "manifest, Apple icon, tab icon and theme colour (the homepage's dark bar) linked");
   assert(head.capable === "yes" && head.title === "DoughTally", "iOS home-screen tags set");
   const apple = await fetch(`${BASE}${head.apple}`);
   assert(pngSize(Buffer.from(await apple.arrayBuffer())).join("x") === "180x180", "Apple icon is 180x180");
@@ -129,7 +129,7 @@ try {
   const look = await page.evaluate(() => ({ url: location.pathname, bg: getComputedStyle(document.querySelector("main")).backgroundColor, font: getComputedStyle(document.querySelector("h1")).fontFamily }));
   console.log(JSON.stringify(look));
   await page.screenshot({ path: `${OUT}/01-offline-phone.png` });
-  assert(look.url === "/market" && /Instrument/i.test(look.font), "offline: /market shows the styled offline screen (from cache, no network)");
+  assert(look.url === "/market" && /Bricolage/i.test(look.font), "offline: /market shows the styled offline screen (from cache, no network)");
   await ctx.setOffline(false);
   await page.waitForURL(`${BASE}/market`);
   await page.getByRole("heading", { name: "You're offline" }).waitFor({ state: "detached", timeout: 20_000 });

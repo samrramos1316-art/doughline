@@ -361,6 +361,22 @@ Tested: `scripts/test-markup-e2e.mjs`, `scripts/test-florist-extras-e2e.mjs`
 and `scripts/test-industries-e2e.mjs` against the real database, plus 68
 unit tests.
 
+## Full test run (2026-10-17)
+
+Every script below run against main and the real database (import-guards
+and smart-links against the live site, their default). Fixes:
+- Phones: Quote, Event quote and Order plan clipped inputs and prices at
+  the right edge (grid columns lacked `min-w-0`).
+- Tests that predated later changes: signup industry cards (not a select),
+  invoice reading names lines plainly (eggs now match outright), scan
+  route matches straight away (status past 'processing'), alerts and
+  import page redesign, plain scan failure reasons, Bricolage font and the
+  homepage's dark theme colour, embeddings written in `after()`.
+- Tests that read pages under the loading skeleton now wait for them;
+  business and onboarding exit non-zero on a failed check.
+A click-through of every screen for bakery, jewelry, florist and
+fabrication (desktop + phone) found nothing else.
+
 ## Not started yet
 
 - Gemini vision provider (needs `GEMINI_API_KEY`).
@@ -398,10 +414,11 @@ unit tests.
 - `scripts/test-suggestions-e2e.mjs` (needs `KEEP_FIXTURES=1` output of the above)
 - `scripts/test-bulk-import-e2e.mjs`
 - `scripts/test-market-e2e.mjs` (live USDA + FAO)
+- `scripts/test-smart-links-e2e.mjs [--base=…]` (import reasoning; defaults to the live site)
 - `scripts/test-auth-e2e.mjs [--base=https://…]` (login/signup/confirm flows, landing page)
-- `scripts/test-business-e2e.mjs [--base=…] [--keep]` (a whole bakery, live Claude/Voyage)
-- `scripts/test-onboarding-e2e.mjs [--base=…] [--keep]` (§9.3 import)
-- `scripts/test-import-guards-e2e.mjs [--base=…] [--keep]` (menus/recipes turned away, case pricing, no duplicate ingredients)
+- `scripts/test-business-e2e.mjs [--base=…] [--keep]` (a whole bakery, live Claude/Voyage; needs a server on :3000 by default)
+- `scripts/test-onboarding-e2e.mjs [--base=…] [--keep]` (§9.3 import; needs a server on :3000 by default)
+- `scripts/test-import-guards-e2e.mjs [--base=…] [--keep]` (menus/recipes turned away, case pricing, no duplicate ingredients; defaults to the live site)
 - `scripts/screenshot-app.mjs --email=… --password=…` (every screen, desktop + phone)
 - `scripts/test-pwa-e2e.mjs [--base=https://…]` (after `npm run build`; manifest, icons, service worker, offline, install card)
 - `scripts/test-recipe-units-e2e.mjs` (after `npm run build`; base-unit changes, recipe line units)

@@ -98,7 +98,7 @@ export function EventQuote({
 
   return (
     <div className="grid gap-5 xl:grid-cols-12">
-      <div className="flex flex-col gap-4 xl:col-span-7">
+      <div className="flex min-w-0 flex-col gap-4 xl:col-span-7">
         <label className="block text-sm">
           <span className="font-medium text-stone-800">Event</span>
           <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Rivera wedding, June 14" className={`${input} mt-1`} />
@@ -112,7 +112,7 @@ export function EventQuote({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 xl:col-span-5">
+      <div className="flex min-w-0 flex-col gap-4 xl:col-span-5">
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           <table className="w-full text-[13px]" aria-label="Event cost">
             <tbody>

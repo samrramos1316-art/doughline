@@ -56,7 +56,7 @@ try {
   log("\n=== signup ===");
   await page.goto(`${BASE}/signup`);
   await page.getByLabel("Business name").fill(BUSINESS.name);
-  await page.getByLabel("What kind of business?").selectOption(BUSINESS.type);
+  await page.getByTestId("industry-cards").locator(`input[value="${BUSINESS.type}"]`).check({ force: true }); // the picker is cards over hidden radios
   await page.getByLabel("Your name").fill(BUSINESS.owner);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);

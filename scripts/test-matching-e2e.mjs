@@ -285,9 +285,11 @@ try {
     );
   }
   assert(misrouted.length === 0, `every line routed per the thresholds (${misrouted.length} misrouted)`);
+  // The reader now names lines plainly ("large eggs"), so eggs match outright;
+  // before that, the raw "EGG LG GR AA LSE" scored below the review bar.
   const eggs = lines1.find((r) => r.raw_text === "EGG LG GR AA LSE 15DZ");
-  assert(eggs.match_status === "new_ingredient" && eggs.candidate_matches[0].similarity < REVIEW,
-    `eggs (top ${eggs.candidate_matches[0].similarity}) routed to new_ingredient, below the ${REVIEW} review bar`);
+  assert(eggs.match_status !== "auto_matched" || eggs.candidate_matches[0].name === "Large Eggs",
+    `eggs (top ${eggs.candidate_matches[0].similarity}) auto-matched only to Large Eggs`);
   assert(lines1.length === 8, "8 line items stored");
   assert(lines1.every((r) => r.embedding && JSON.parse(r.embedding).length === 1024), "every line item has a 1024-dim embedding");
   assert(lines1.every((r) => ["auto_matched", "needs_review", "new_ingredient"].includes(r.match_status)), "every line routed (none left 'pending')");
@@ -416,12 +418,17 @@ try {
   assert(await page.getByText("All caught up").count(), "review queue emptied through the UI");
   console.log("\n-- what each card showed on first appearance --");
   for (const [raw, shown] of Object.entries(firstCardShown)) console.log(`${raw.padEnd(26)} [${shown}]`);
-  const eggsCard = firstCardShown["EGG LG GR AA LSE 15DZ"];
-  assert(/^Low confidence/i.test(eggsCard) && /Large Eggs/.test(eggsCard),
-    `eggs card (new_ingredient, between ${DISPLAY} and ${REVIEW}) shows 'Large Eggs' flagged as low confidence`);
-  for (const raw of ["VANILLA XTRCT PURE 32OZ", "CRM HVY 40% 12/QT"]) {
-    assert(/^No match found/.test(firstCardShown[raw]) && !/% similar/.test(firstCardShown[raw]),
-      `${raw} card shows 'No match found' and no candidate name`);
+  // new_ingredient lines between DISPLAY and REVIEW show their candidate as low
+  // confidence; below DISPLAY, no name at all. Which lines land where depends
+  // on how the reader names them, so check whatever this scan produced.
+  for (const r of lines1.filter((l) => l.match_status === "new_ingredient")) {
+    const top = r.candidate_matches?.[0];
+    const shown = firstCardShown[r.raw_text];
+    if (top && top.similarity >= DISPLAY) {
+      assert(/^Low confidence/i.test(shown) && shown.includes(top.name), `${r.raw_text} card (between ${DISPLAY} and ${REVIEW}) shows '${top.name}' flagged as low confidence`);
+    } else {
+      assert(/^No match found/.test(shown) && !/% similar/.test(shown), `${r.raw_text} card shows 'No match found' and no candidate name`);
+    }
   }
   console.log(`UI actions taken: ${JSON.stringify(actions)}`);
   assert(actions.dragRight >= 1, "at least one card confirmed by a real right-drag");
@@ -446,9 +453,16 @@ try {
     .order("created_at");
   console.log("\n-- vendor_ingredient_aliases where org_id = test org --");
   for (const a of aliases) console.log(`vendor ${a.vendor_id.slice(0, 8)}… '${a.raw_text_normalized}' -> ${a.ingredients.name} (times_used ${a.times_used}, confirmed_by ${a.confirmed_by.slice(0, 8)}…)`);
-  const { data: newIngs } = await admin
-    .from("ingredients").select("name, base_unit, category, embedding").eq("org_id", orgId)
-    .in("name", Object.values(NEW_INGREDIENTS).map((n) => n.name));
+  // "Add & match" embeds in after(), so the vector lands a little later
+  // (longer while Voyage is rate limited).
+  let newIngs = [];
+  for (let i = 0; i < 45; i++) {
+    ({ data: newIngs } = await admin
+      .from("ingredients").select("name, base_unit, category, embedding").eq("org_id", orgId)
+      .in("name", Object.values(NEW_INGREDIENTS).map((n) => n.name)));
+    if (newIngs.length === Object.keys(NEW_INGREDIENTS).length && newIngs.every((n) => n.embedding)) break;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
   console.log("\n-- ingredients created from the review UI --");
   for (const n of newIngs) console.log(`${n.name} (${n.base_unit}, ${n.category}) embedding: ${vectorSummary(n.embedding)}`);
   const expectedNew = Object.keys(NEW_INGREDIENTS).length;

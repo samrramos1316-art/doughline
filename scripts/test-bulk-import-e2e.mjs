@@ -139,7 +139,7 @@ try {
   // ------------------------------------------------------------------ 2
   banner("STAGE 2 — bulk import through /invoices/import: a real PDF + a blurry photo");
   await page.goto(`${BASE_URL}/invoices/import`);
-  await page.getByRole("heading", { name: "Import past invoices" }).waitFor();
+  await page.getByRole("heading", { name: "Import invoices" }).waitFor();
   await page.getByLabel("Choose invoice files").setInputFiles([PDF, BLURRY]);
   await page.getByRole("button", { name: "Import 2 files" }).waitFor();
   await screenshot("files-chosen");
@@ -174,7 +174,7 @@ try {
   const pdfLines = await printLines(pdfInv.id, "PDF, read by Claude as a document");
   const expectPdf = ["BUTTER UNSALTED AA 36/1 LB", "MILK WHOLE 4/1 GAL", "CREAM HEAVY 40% 12/1 QT", "EGGS LARGE GR A 15 DZ", "CREAM CHEESE BLOCK 30 LB"];
   assert(pdfLines.length === 5 && expectPdf.every((t) => pdfLines.some((l) => l.raw_text === t)), "all 5 PDF lines extracted verbatim");
-  assert(failedInv.status === "failed" && /No line items/.test(failedInv.error_message ?? ""), `blurry photo → status 'failed' (${failedInv.error_message})`);
+  assert(failedInv.status === "failed" && /No line items|no purchased items/i.test(failedInv.error_message ?? ""), `blurry photo → status 'failed' (${failedInv.error_message})`);
   console.log(`blurry photo raw_extraction: ${JSON.stringify(failedInv.raw_extraction)}`);
 
   // ------------------------------------------------------------------ 3
