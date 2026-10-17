@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/supabase/org";
 import { updateRecipeSchema } from "@/lib/validators/recipe";
+import { linesInBaseUnits, loadIngredientUnits } from "@/lib/costing/rebaseUnit";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,7 +34,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
-  const { ingredients, ...recipeFields } = parsed.data;
+  const { ingredients: given, ...recipeFields } = parsed.data;
+  let ingredients = given;
+  if (given) {
+    const converted = linesInBaseUnits(given, await loadIngredientUnits(supabase, given.map((i) => i.ingredient_id)));
+    if ("error" in converted) return NextResponse.json({ error: converted.error }, { status: 400 });
+    ingredients = converted.lines;
+  }
 
   if (Object.keys(recipeFields).length > 0) {
     const { error } = await supabase.from("recipes").update(recipeFields).eq("id", id);

@@ -348,8 +348,15 @@ and extraction tuning on real trade invoices — waiting on owner interviews.
   new" wait on 429 retries (a re-scan took ~53s instead of ~10s).
 - `scripts/smoke-test-scan-route.mjs` is stale: written for the stub
   provider, it sends random bytes and now fails against real Claude.
-- Costing views assume recipe quantities are in the ingredient's base unit
-  (`recipe_ingredients.unit` isn't converted yet).
+- Costing views assume recipe quantities are in the ingredient's base unit.
+  That now holds (`lib/costing/rebaseUnit.ts`): recipe saves convert lines
+  to it (8 oz → 0.5 lb, a bunch by the material's size) and refuse units
+  that don't convert; changing a base unit to one it converts to (lb → oz)
+  carries the price, pack sizes and recipe quantities over. Left: a change
+  that doesn't convert (lb → case) leaves both as they were, so the owner
+  must fix the price and quantities. Prices keep 4 decimals, so per-gram
+  prices of cheap items round (butter at $4/lb → $0.0088/g, 0.2% low).
+  Tested: `scripts/test-recipe-units-e2e.mjs`.
 
 ## Test scripts (all repeatable against real Supabase)
 
@@ -370,6 +377,7 @@ and extraction tuning on real trade invoices — waiting on owner interviews.
 - `scripts/test-import-guards-e2e.mjs [--base=…] [--keep]` (menus/recipes turned away, case pricing, no duplicate ingredients)
 - `scripts/screenshot-app.mjs --email=… --password=…` (every screen, desktop + phone)
 - `scripts/test-pwa-e2e.mjs [--base=https://…]` (after `npm run build`; manifest, icons, service worker, offline, install card)
+- `scripts/test-recipe-units-e2e.mjs` (after `npm run build`; base-unit changes, recipe line units)
 - `scripts/test-industries-e2e.mjs [--food]` (after `npm run build`; industry words, costing, quotes, cost sheets, signup gate)
 - `scripts/make-icons.mjs` (regenerates the app icons, not a test)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)

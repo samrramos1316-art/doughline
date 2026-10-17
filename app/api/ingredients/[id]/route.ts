@@ -6,6 +6,8 @@ import { updateIngredientSchema } from "@/lib/validators/ingredient";
 import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 import { retryUnappliedPrices } from "@/lib/costing/retryPrices";
+import { rebaseCost, rebasePackSizes, rebaseRecipeLines, unitChangeFactor } from "@/lib/costing/rebaseUnit";
+import { cleanPackSizes, type PackSizes } from "@/lib/costing/units";
 
 // Claude and Voyage calls (Voyage retries 429s on its free tier) can take
 // most of a minute; don't let the platform's default timeout cut them off.
@@ -37,8 +39,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
+  // A new base unit it converts to (lb → oz) carries the price, pack sizes
+  // and recipe quantities over, unless a new price comes with it.
+  let unitFactor: number | null = null;
+  const rebase: { current_unit_cost?: number | null; pack_sizes?: PackSizes } = {};
+  if (rest.base_unit != null) {
+    const { data: before } = await supabase.from("ingredients").select("base_unit, current_unit_cost, pack_sizes").eq("id", id).single();
+    unitFactor = before ? unitChangeFactor(before.base_unit, rest.base_unit) : null;
+    if (before && unitFactor) {
+      if (current_unit_cost == null) rebase.current_unit_cost = rebaseCost(before.current_unit_cost, unitFactor);
+      const packs = cleanPackSizes(before.pack_sizes);
+      if (Object.keys(packs).length) rebase.pack_sizes = rebasePackSizes(packs, unitFactor);
+    }
+  }
+
   const updates = {
     ...rest,
+    ...rebase,
     ...embeddingUpdate,
     ...(current_unit_cost != null
       ? { current_unit_cost, current_unit_cost_updated_at: new Date().toISOString() }
@@ -65,6 +82,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       source: "manual",
       effective_date: localDateFrom(request),
     });
+  }
+
+  if (unitFactor && rest.base_unit != null) {
+    try {
+      await rebaseRecipeLines(supabase, id, unitFactor, rest.base_unit);
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Converting recipe lines failed" }, { status: 500 });
+    }
   }
 
   // A new base unit may be one this ingredient's stuck invoice prices can

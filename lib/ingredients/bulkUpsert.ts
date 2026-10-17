@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 import { cleanPackSizes, type PackSizes } from "@/lib/costing/units";
+import { rebaseCost, rebasePackSizes, rebaseRecipeLines, unitChangeFactor } from "@/lib/costing/rebaseUnit";
 
 type Client = SupabaseClient<Database>;
 
@@ -112,6 +113,7 @@ export async function bulkUpsertIngredients(
   const now = new Date().toISOString();
   const outcomes: RowOutcome[] = [];
   const history: Database["public"]["Tables"]["ingredient_price_history"]["Insert"][] = [];
+  const rebased: { id: string; factor: number; unit: string }[] = [];
 
   const inserts = rows.filter((r) => !r.target);
   if (inserts.length) {
@@ -153,25 +155,36 @@ export async function bulkUpsertIngredients(
       update.category = r.category;
       changes.push(`category ${t.category ?? "—"} → ${r.category ?? "—"}`);
     }
+    // A unit it converts to (lb → oz) carries the price, pack sizes and
+    // recipe quantities over (lib/costing/rebaseUnit.ts), unless the row
+    // also gives a new price.
+    const factor = t.base_unit !== r.base_unit ? unitChangeFactor(t.base_unit, r.base_unit) : null;
     if (t.base_unit !== r.base_unit) {
       update.base_unit = r.base_unit;
       changes.push(`base unit ${t.base_unit} → ${r.base_unit}`);
     }
+    const priceGiven = r.cost != null && Number(t.current_unit_cost) !== r.cost;
+    if (factor && !priceGiven && t.current_unit_cost != null) {
+      update.current_unit_cost = rebaseCost(t.current_unit_cost, factor);
+      changes.push(`cost ${t.current_unit_cost}/${t.base_unit} → ${update.current_unit_cost}/${r.base_unit}`);
+    }
+    if (factor) rebased.push({ id: t.id, factor, unit: r.base_unit });
     if ((t.commodity_code ?? null) !== r.commodity_code) {
       update.commodity_code = r.commodity_code;
       changes.push(`commodity ${t.commodity_code ?? "—"} → ${r.commodity_code ?? "—"}`);
     }
-    const packsBefore = cleanPackSizes(t.pack_sizes);
+    const packsStored = cleanPackSizes(t.pack_sizes);
+    const packsBefore = factor ? rebasePackSizes(packsStored, factor) : packsStored;
     const packsAfter = withPacks(packsBefore, r.packs);
     for (const unit of ["bunch", "box"] as const) {
       if (packsBefore[unit] !== packsAfter[unit]) changes.push(`per ${unit} ${packsBefore[unit] ?? "—"} → ${packsAfter[unit] ?? "—"}`);
     }
-    if (JSON.stringify(packsBefore) !== JSON.stringify(packsAfter)) update.pack_sizes = packsAfter;
+    if (JSON.stringify(packsStored) !== JSON.stringify(packsAfter)) update.pack_sizes = packsAfter;
     if (r.waste != null && Number(t.waste_pct) !== r.waste) {
       update.waste_pct = r.waste;
       changes.push(`waste ${Number(t.waste_pct)}% → ${r.waste}%`);
     }
-    if (r.cost != null && Number(t.current_unit_cost) !== r.cost) {
+    if (priceGiven && r.cost != null) {
       update.current_unit_cost = r.cost;
       update.current_unit_cost_updated_at = now;
       changes.push(`cost ${t.current_unit_cost ?? "—"} → ${r.cost}`);
@@ -184,6 +197,8 @@ export async function bulkUpsertIngredients(
     }
     outcomes.push({ row: r.row, id: t.id, name: r.name, action: changes.length ? "updated" : "unchanged", changes });
   }
+
+  for (const r of rebased) await rebaseRecipeLines(supabase, r.id, r.factor, r.unit);
 
   if (history.length) {
     const { error } = await supabase.from("ingredient_price_history").insert(history);
