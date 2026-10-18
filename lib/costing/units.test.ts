@@ -21,10 +21,15 @@ test("existing kitchen conversions are unchanged", () => {
 
 test("existing invoice price conversions are unchanged", () => {
   assert.deepEqual(toBaseUnitCost(line(2.5, "LB"), "lb"), { ok: true, cost: 2.5, basis: "$2.5 per LB" });
-  assert.deepEqual(toBaseUnitCost(line(97.5, "CS", 36, "lb"), "lb"), { ok: true, cost: 2.7083, basis: "$97.5 per CS of 36 lb = 36 lb" });
-  assert.deepEqual(toBaseUnitCost(line(48.75, "EA", 15, "dozen"), "each"), { ok: true, cost: 0.2708, basis: "$48.75 per EA of 15 dozen = 180 each" });
+  assert.deepEqual(toBaseUnitCost(line(97.5, "CS", 36, "lb"), "lb"), { ok: true, cost: 2.70833333, basis: "$97.5 per CS of 36 lb = 36 lb" });
+  assert.deepEqual(toBaseUnitCost(line(48.75, "EA", 15, "dozen"), "each"), { ok: true, cost: 0.27083333, basis: "$48.75 per EA of 15 dozen = 180 each" });
   assert.deepEqual(toBaseUnitCost(line(30, "Cases"), "case"), { ok: true, cost: 30, basis: "$30 per Cases" });
   assert.equal(toBaseUnitCost(line(30, "case", 6, "#10 can"), "lb").ok, false);
+});
+
+test("cheap materials costed per small unit keep their price (8 decimals)", () => {
+  // Butter at $4.00/lb, costed per gram: $0.0088 at 4 decimals was 0.2% low.
+  assert.deepEqual(toBaseUnitCost(line(4, "lb"), "g"), { ok: true, cost: 0.00881849, basis: "$4 per lb" });
 });
 
 test("per-container units stay containers: priced as printed, pack sizes still used", () => {
@@ -43,7 +48,7 @@ test("troy weights", () => {
   assert.equal(conversionFactor("pennyweight", "g"), 1.55517384);
   close(conversionFactor("troy oz", "dwt"), 20);
   // Gold at $2,400 per troy ounce, costed per gram.
-  assert.deepEqual(toBaseUnitCost(line(2400, "ozt"), "g"), { ok: true, cost: 77.1618, basis: "$2400 per ozt" });
+  assert.deepEqual(toBaseUnitCost(line(2400, "ozt"), "g"), { ok: true, cost: 77.16179176, basis: "$2400 per ozt" });
 });
 
 test("carats and centimeters", () => {

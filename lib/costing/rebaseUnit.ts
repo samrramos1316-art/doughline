@@ -17,12 +17,12 @@ export function unitChangeFactor(from: string | null | undefined, to: string | n
 
 // The cost per new unit, at the column's 4 decimals (as invoice prices are).
 export function rebaseCost(cost: number | null | undefined, factor: number): number | null {
-  return cost == null ? null : Math.round((Number(cost) / factor) * 10000) / 10000;
+  return cost == null ? null : round8(Number(cost) / factor);
 }
 
 // Pack sizes count the base unit (a box of 10 lb), so they scale with it.
 export function rebasePackSizes(sizes: PackSizes, factor: number): PackSizes {
-  return Object.fromEntries(Object.entries(sizes).map(([unit, n]) => [unit, round4(n * factor)]));
+  return Object.fromEntries(Object.entries(sizes).map(([unit, n]) => [unit, round8(n * factor)]));
 }
 
 // Every recipe line of this ingredient, converted to the new base unit.
@@ -37,7 +37,7 @@ export async function rebaseRecipeLines(
   for (const line of lines ?? []) {
     const { error: updateError } = await supabase
       .from("recipe_ingredients")
-      .update({ quantity: round4(Number(line.quantity) * factor), unit: newUnit })
+      .update({ quantity: round8(Number(line.quantity) * factor), unit: newUnit })
       .eq("id", line.id);
     if (updateError) throw new Error("converting a recipe line failed: " + updateError.message);
   }
@@ -63,7 +63,7 @@ export function linesInBaseUnits<L extends LineIn>(lines: L[], ingredients: Ingr
     }
     const factor = conversionFactor(line.unit, ing.base_unit) ?? packSizeFor(cleanPackSizes(ing.pack_sizes), line.unit);
     if (!factor) return { error: `Can't use "${line.unit}" for ${ing.name}: it's costed per ${ing.base_unit}` };
-    out.push({ ...line, quantity: round4(line.quantity * factor), unit: ing.base_unit });
+    out.push({ ...line, quantity: round8(line.quantity * factor), unit: ing.base_unit });
   }
   return { lines: out };
 }
@@ -75,6 +75,7 @@ export async function loadIngredientUnits(supabase: SupabaseClient<Database>, id
   return data ?? [];
 }
 
-function round4(n: number) {
-  return Math.round(n * 10000) / 10000;
+// Prices and recipe amounts are stored to 8 decimals (migration 031).
+function round8(n: number) {
+  return Math.round(n * 1e8) / 1e8;
 }

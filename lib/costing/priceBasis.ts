@@ -21,7 +21,7 @@ export function averagePaid(points: PricePoint[], baseUnit: string, sinceIso: st
   const usable = points.filter((p) => p.effective_date >= sinceIso && sameUnit(p.unit, baseUnit) && Number.isFinite(Number(p.unit_cost)));
   if (!usable.length) return null;
   const avg = usable.reduce((s, p) => s + Number(p.unit_cost), 0) / usable.length;
-  return { avg: Math.round(avg * 10000) / 10000, count: usable.length };
+  return { avg: Math.round(avg * 1e8) / 1e8, count: usable.length };
 }
 
 // The unit cost a quote uses for a material under the chosen basis: the

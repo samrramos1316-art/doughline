@@ -66,7 +66,7 @@ const CATEGORIES = ["dairy", "dry_goods", "produce", "protein", "packaging", "be
 const cell = "w-full min-w-0 rounded border border-stone-300 bg-white px-2 py-1 text-[13px] text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
 const th = "px-2 py-1.5 text-left text-[11px] font-semibold tracking-wider text-stone-500 uppercase whitespace-nowrap";
 const newKey = () => crypto.randomUUID();
-const round4 = (n: number) => Math.round(n * 10000) / 10000;
+const round8 = (n: number) => Math.round(n * 1e8) / 1e8; // recipe amounts keep 8 decimals (migration 031)
 const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
 
 // What a brand-new ingredient is costed in: weights in lb (converted), a bare
@@ -75,7 +75,7 @@ function newIngredientUnit(unitGuess: string | null, qty: number | null) {
   const u = canonicalUnit(unitGuess);
   if (!unitGuess) return { unit: "each", qty };
   const toLb = conversionFactor(u, "lb");
-  if (toLb != null && qty != null) return { unit: "lb", qty: round4(qty * toLb) };
+  if (toLb != null && qty != null) return { unit: "lb", qty: round8(qty * toLb) };
   return { unit: u ?? unitGuess.toLowerCase(), qty };
 }
 
@@ -84,7 +84,7 @@ function qtyIn(base: string, qtyGuess: number | null, unitGuess: string | null) 
   if (qtyGuess == null) return "";
   if (!unitGuess) return base === "each" ? String(qtyGuess) : "";
   const f = conversionFactor(unitGuess, base);
-  return f == null ? "" : String(round4(qtyGuess * f));
+  return f == null ? "" : String(round8(qtyGuess * f));
 }
 
 // Fallback when the linking call fails: best token overlap between a menu
@@ -391,7 +391,7 @@ export function OnboardingImport({
           const id = l.choice === "new" ? idByNewName.get(l.newName.trim().toLowerCase()) : l.choice;
           if (!id) throw new Error(`Couldn't create "${l.newName}"`);
           const prev = merged.get(id); // "butter" listed twice in one recipe
-          merged.set(id, { ingredient_id: id, unit: unitOf(l), quantity: round4((prev?.quantity ?? 0) + num(l.qty)) });
+          merged.set(id, { ingredient_id: id, unit: unitOf(l), quantity: round8((prev?.quantity ?? 0) + num(l.qty)) });
         }
         const { recipe } = await postJson("/api/recipes", { name: d.name.trim(), batch_yield_qty: num(d.yieldQty), batch_yield_unit: d.yieldUnit.trim() || "servings", ingredients: [...merged.values()] });
         recipeIdByDraft.set(d.key, recipe.id);

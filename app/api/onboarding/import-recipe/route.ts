@@ -157,7 +157,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ recipe, lines });
 }
 
-const positive = (n: number | null | undefined) => (n != null && Number.isFinite(n) && n > 0 ? Math.round(n * 10000) / 10000 : null);
+const positive = (n: number | null | undefined) => (n != null && Number.isFinite(n) && n > 0 ? Math.round(n * 1e8) / 1e8 : null);
 
 // A recipe amount in `base` when it's pure arithmetic: same kind of unit
 // (g → lb), a bare count for an "each" ingredient, or through the container's

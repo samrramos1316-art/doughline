@@ -134,7 +134,7 @@ async function screenshot(label) {
 }
 
 const round2 = (n) => Math.round(n * 100) / 100;
-const round4 = (n) => Math.round(n * 10000) / 10000;
+const round8 = (n) => Math.round(n * 1e8) / 1e8; // unit prices keep 8 decimals (migration 031)
 const close = (a, b, tol) => Math.abs(Number(a) - Number(b)) <= tol;
 
 async function ingredientIds() {
@@ -288,12 +288,12 @@ try {
   }
   ings = await ingredientIds();
   await printPriceHistory(ings["Large Eggs"].id, "Large Eggs");
-  assert(Number(ings["Large Eggs"].current_unit_cost) === round4(48.75 / 180), `Large Eggs current_unit_cost = $48.75 / (15 dozen × 12) = ${round4(48.75 / 180)}`);
+  assert(Number(ings["Large Eggs"].current_unit_cost) === round8(48.75 / 180), `Large Eggs current_unit_cost = $48.75 / (15 dozen × 12) = ${round8(48.75 / 180)}`);
 
   // ------------------------------------------------------------------ 4
   banner("STAGE 4 — confirm butter (+16%): price alert + margin-impact cascade");
   const butter = ings["Unsalted Butter"];
-  const newButter = round4(142.56 / 36);
+  const newButter = round8(142.56 / 36);
   const expectedPct = round2(((newButter - Number(butter.current_unit_cost)) / Number(butter.current_unit_cost)) * 100);
   console.log(`Unsalted Butter current_unit_cost before: $${butter.current_unit_cost}/lb; invoice: $142.56 per 36 lb case = $${newButter}/lb (${expectedPct > 0 ? "+" : ""}${expectedPct}%)`);
 
