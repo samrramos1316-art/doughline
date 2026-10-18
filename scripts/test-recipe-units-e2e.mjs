@@ -86,11 +86,52 @@ try {
   assert(Number(s.ing.current_unit_cost) === 5 && near(s.line.quantity, 2) && s.line.unit === "lb", `new price kept, line back to ${s.line.quantity} ${s.line.unit}`);
   assert(near(s.batch, 10), `batch at the new price: $${s.batch}`);
 
-  // 4. A change that doesn't convert (lb → case) leaves price and lines alone.
+  // 4. A change with no fixed conversion (lb → case) needs a size.
+  // Without one it's refused, single edit and grid alike, and nothing moves.
   res = await api.patch(`${BASE}/api/ingredients/${butter.id}`, { data: { base_unit: "case" } });
   s = await state();
-  assert(res.ok() && Number(s.ing.current_unit_cost) === 5 && near(s.line.quantity, 2), `lb → case: nothing converted ($${s.ing.current_unit_cost}, ${s.line.quantity} ${s.line.unit})`);
-  await api.patch(`${BASE}/api/ingredients/${butter.id}`, { data: { base_unit: "lb" } });
+  assert(res.status() === 400 && s.ing.base_unit === "lb" && Number(s.ing.current_unit_cost) === 5, `lb → case with no size refused: ${res.status()} ${(await res.json()).error}`);
+  res = await api.post(`${BASE}/api/ingredients/import`, { data: { rows: [{ id: butter.id, name: "Butter", base_unit: "case" }] } });
+  const refused = await res.json();
+  s = await state();
+  assert(res.status() === 400 && /doesn't convert on its own/.test(refused.row_errors?.[0]?.message) && s.ing.base_unit === "lb", `grid lb → case with no size refused: ${JSON.stringify(refused.row_errors)}`);
+  // With a 36 lb case: $5/lb → $180/case, 2 lb → 0.0556 case, the box of 36
+  // lb → 1 case, and lb kept as a size; the batch still costs $10.
+  res = await api.post(`${BASE}/api/ingredients/import`, { data: { rows: [{ id: butter.id, name: "Butter", base_unit: "case", new_unit_per_old: 1 / 36 }] } });
+  assert(res.ok(), `grid lb → case with a size saved: ${res.status()} ${await res.text()}`);
+  s = await state();
+  assert(s.ing.base_unit === "case" && Number(s.ing.current_unit_cost) === 180 && near(s.line.quantity, 2 / 36, 1e-8) && s.line.unit === "case",
+    `price and line carried into cases: $${s.ing.current_unit_cost}/case, ${s.line.quantity} ${s.line.unit}`);
+  assert(near(s.ing.pack_sizes.box, 1) && near(s.ing.pack_sizes.lb, 1 / 36, 1e-8), `pack sizes in cases: ${JSON.stringify(s.ing.pack_sizes)}`);
+  assert(near(s.batch, 10, 1e-4), `batch cost unchanged: $${s.batch}`);
+
+  // Back to lb through the ingredients grid. It knows the size (lb was kept)
+  // and says so; with that size removed, it asks "1 case = ? lb".
+  await page.goto(`${BASE}/ingredients`);
+  await page.getByLabel("Base unit, row 1").fill("lb");
+  const prompt = page.getByTestId("unit-changes");
+  await prompt.waitFor();
+  assert((await prompt.innerText()).includes("using its size, 1 case = 36 lb"), `grid uses the known size: ${await prompt.innerText()}`);
+  await admin.from("ingredients").update({ pack_sizes: { box: 1 } }).eq("id", butter.id);
+  await page.goto(`${BASE}/ingredients`);
+  await page.getByLabel("Base unit, row 1").fill("lb");
+  await prompt.waitFor();
+  await page.getByRole("button", { name: /^Save 1 change/ }).click();
+  await page.getByRole("status").filter({ hasText: /Say how the units relate for Butter/ }).waitFor();
+  await page.getByLabel("How many lb in one case for Butter").fill("36");
+  await page.getByRole("button", { name: /^Save 1 change/ }).click();
+  await page.getByRole("status").filter({ hasText: /Saved/ }).waitFor();
+  s = await state();
+  assert(s.ing.base_unit === "lb" && near(s.ing.current_unit_cost, 5, 1e-6) && near(s.line.quantity, 2, 1e-6) && s.line.unit === "lb",
+    `grid case → lb: $${s.ing.current_unit_cost}/lb, ${s.line.quantity} ${s.line.unit}`);
+  assert(near(s.ing.pack_sizes.case, 36) && near(s.ing.pack_sizes.box, 36) && s.ing.pack_sizes.lb == null, `case kept as a 36 lb size: ${JSON.stringify(s.ing.pack_sizes)}`);
+  // Now it knows its case size, lb → case needs nothing more.
+  res = await api.patch(`${BASE}/api/ingredients/${butter.id}`, { data: { base_unit: "case" } });
+  s = await state();
+  assert(res.ok() && near(s.ing.current_unit_cost, 180, 1e-6) && near(s.line.quantity, 2 / 36, 1e-8), `lb → case by its own case size: $${s.ing.current_unit_cost}, ${s.line.quantity} case`);
+  res = await api.patch(`${BASE}/api/ingredients/${butter.id}`, { data: { base_unit: "lb" } });
+  s = await state();
+  assert(res.ok() && near(s.ing.current_unit_cost, 5, 1e-6) && near(s.line.quantity, 2, 1e-6) && s.line.unit === "lb", `and back: $${s.ing.current_unit_cost}/lb, ${s.line.quantity} lb`);
 
   // 5. Recipe saves convert other units, refuse ones that don't convert.
   res = await api.patch(`${BASE}/api/recipes/${recipe.id}`, { data: { ingredients: [{ ingredient_id: butter.id, quantity: 8, unit: "oz" }] } });

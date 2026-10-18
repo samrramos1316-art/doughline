@@ -1,21 +1,59 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { cleanPackSizes, conversionFactor, packSizeFor, sameUnit, type PackSizes } from "./units.ts";
+import { cleanPackSizes, conversionFactor, packSizeFor, sameUnit, unitKey, type PackSizes } from "./units.ts";
 
 // Recipe quantities and current_unit_cost are both in the ingredient's base
 // unit (the costing views multiply them as they are). When the base unit
 // changes to one it converts to (lb → oz), both are converted, so the
 // ingredient costs what it did: 2 lb at $4/lb becomes 32 oz at $0.25/oz.
-// A change it can't convert (lb → case) leaves them as they were.
+// A change with no fixed conversion (lb → case) needs a size — the
+// material's case size, or one the owner gives — and is refused without one
+// rather than leaving the price and amounts in the old unit.
 
 // How many of the new unit are in one of the old (lb → oz = 16), or null
-// when there's nothing to convert: the same unit, or no fixed conversion.
+// when there's no fixed conversion (see unitChangeFactorWith).
 export function unitChangeFactor(from: string | null | undefined, to: string | null | undefined): number | null {
   if (sameUnit(from, to)) return null;
   return conversionFactor(from, to);
 }
 
-// The cost per new unit, at the column's 4 decimals (as invoice prices are).
+// A change with no fixed conversion (lb → case) converts by a size: the one
+// the owner gives (`given`: how many of the new unit are in one of the old),
+// else the material's own pack size for the new unit (a case of 36 lb,
+// stored as { case: 36 }). Null when neither says.
+export function unitChangeFactorWith(
+  from: string | null | undefined,
+  to: string | null | undefined,
+  packs: PackSizes,
+  given?: number | null,
+): number | null {
+  if (sameUnit(from, to)) return null;
+  const fixed = conversionFactor(from, to);
+  if (fixed) return fixed;
+  if (given != null && given > 0) return given;
+  const size = packSizeFor(packs, to);
+  return size ? 1 / size : null;
+}
+
+// True when a base unit change needs the owner to say how the units relate.
+export function needsUnitSize(from: string | null | undefined, to: string | null | undefined, packs: PackSizes): boolean {
+  return !sameUnit(from, to) && unitChangeFactorWith(from, to, packs) == null;
+}
+
+// Pack sizes after a base unit change. They count the base unit, so they
+// scale; the new base unit's own entry goes (a case is 1 case); and after a
+// change with no fixed conversion the old unit stays as a size, so invoices
+// still priced per lb convert to the case ({ lb: 1/36 }).
+export function packSizesAfterUnitChange(packs: PackSizes, factor: number, from: string, to: string): PackSizes {
+  const out = rebasePackSizes(packs, factor);
+  const toKey = unitKey(to);
+  if (toKey) delete out[toKey];
+  const fromKey = unitKey(from);
+  if (fromKey && conversionFactor(from, to) == null) out[fromKey] = round8(factor);
+  return out;
+}
+
+// The cost per new unit, at the column's 8 decimals (as invoice prices are).
 export function rebaseCost(cost: number | null | undefined, factor: number): number | null {
   return cost == null ? null : round8(Number(cost) / factor);
 }

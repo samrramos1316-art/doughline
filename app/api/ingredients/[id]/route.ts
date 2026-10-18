@@ -6,8 +6,8 @@ import { updateIngredientSchema } from "@/lib/validators/ingredient";
 import { INGREDIENT_COLUMNS } from "@/lib/supabase/columns";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
 import { retryUnappliedPrices } from "@/lib/costing/retryPrices";
-import { rebaseCost, rebasePackSizes, rebaseRecipeLines, unitChangeFactor } from "@/lib/costing/rebaseUnit";
-import { cleanPackSizes, type PackSizes } from "@/lib/costing/units";
+import { packSizesAfterUnitChange, rebaseCost, rebaseRecipeLines, unitChangeFactorWith } from "@/lib/costing/rebaseUnit";
+import { cleanPackSizes, sameUnit, type PackSizes } from "@/lib/costing/units";
 
 // Claude and Voyage calls (Voyage retries 429s on its free tier) can take
 // most of a minute; don't let the platform's default timeout cut them off.
@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
-  const { current_unit_cost, ...rest } = parsed.data;
+  const { current_unit_cost, new_unit_per_old, ...rest } = parsed.data;
 
   // §4: re-embed when the name changes, so matching follows the new name.
   // On a Voyage failure the old embedding is cleared rather than left
@@ -39,17 +39,29 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  // A new base unit it converts to (lb → oz) carries the price, pack sizes
-  // and recipe quantities over, unless a new price comes with it.
+  // A new base unit carries the price, pack sizes and recipe quantities
+  // over, unless a new price comes with it: by the fixed conversion (lb →
+  // oz), else by a size (lb → a 36 lb case). With neither, the change is
+  // refused when there's a price or recipe amounts to carry.
   let unitFactor: number | null = null;
   const rebase: { current_unit_cost?: number | null; pack_sizes?: PackSizes } = {};
   if (rest.base_unit != null) {
     const { data: before } = await supabase.from("ingredients").select("base_unit, current_unit_cost, pack_sizes").eq("id", id).single();
-    unitFactor = before ? unitChangeFactor(before.base_unit, rest.base_unit) : null;
+    const packs = cleanPackSizes(before?.pack_sizes);
+    unitFactor = before ? unitChangeFactorWith(before.base_unit, rest.base_unit, packs, new_unit_per_old) : null;
+    if (before && !unitFactor && !sameUnit(before.base_unit, rest.base_unit)) {
+      const { count } = await supabase.from("recipe_ingredients").select("id", { count: "exact", head: true }).eq("ingredient_id", id);
+      if ((before.current_unit_cost != null && current_unit_cost == null) || (count ?? 0) > 0) {
+        return NextResponse.json(
+          { error: `${before.base_unit} → ${rest.base_unit} doesn't convert on its own: send new_unit_per_old, how many ${rest.base_unit} in one ${before.base_unit}` },
+          { status: 400 },
+        );
+      }
+    }
     if (before && unitFactor) {
       if (current_unit_cost == null) rebase.current_unit_cost = rebaseCost(before.current_unit_cost, unitFactor);
-      const packs = cleanPackSizes(before.pack_sizes);
-      if (Object.keys(packs).length) rebase.pack_sizes = rebasePackSizes(packs, unitFactor);
+      const after = packSizesAfterUnitChange(packs, unitFactor, before.base_unit, rest.base_unit);
+      if (JSON.stringify(after) !== JSON.stringify(packs)) rebase.pack_sizes = after;
     }
   }
 
