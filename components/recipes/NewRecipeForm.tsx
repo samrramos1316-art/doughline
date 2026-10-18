@@ -46,7 +46,7 @@ export function NewRecipeForm({ labels = { recipe: "recipe", yield: "Batch makes
 
       <div className="flex flex-col gap-1">
         <label htmlFor="recipe-name" className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Name</label>
-        <input id="recipe-name" name="name" required className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200" />
+        <input id="recipe-name" name="name" required className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200" />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -58,7 +58,7 @@ export function NewRecipeForm({ labels = { recipe: "recipe", yield: "Batch makes
             type="number"
             step="0.0001"
             required
-            className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200"
+            className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200"
           />
         </div>
 
@@ -69,7 +69,7 @@ export function NewRecipeForm({ labels = { recipe: "recipe", yield: "Batch makes
             name="batch_yield_unit"
             required
             placeholder={`e.g. ${labels.yieldExample}`}
-            className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200"
+            className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200"
           />
         </div>
       </div>

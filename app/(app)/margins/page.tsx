@@ -65,8 +65,8 @@ export default async function MarginsPage({ searchParams }: { searchParams: Prom
       {items.length === 0 ? (
         <Panel title="Margins">
           <Empty>
-            Nothing {v.onMenu} yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your {lower(v.menu)}</Link> and{" "}
-            <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">your {lower(v.recipes)}</Link>, and each item&apos;s margin is worked out here.
+            Nothing {v.onMenu} yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-ember-700 underline">Import your {lower(v.menu)}</Link> and{" "}
+            <Link href="/onboarding/import?kind=recipe" className="font-medium text-ember-700 underline">your {lower(v.recipes)}</Link>, and each item&apos;s margin is worked out here.
           </Empty>
         </Panel>
       ) : (
@@ -115,15 +115,15 @@ function ItemCard({ m, target, targetText, byMarkup, w: { v } }: { m: ItemMargin
       <div className="border-t border-stone-100 pb-3">
         {!m.recipe ? (
           <Empty>
-            No {lower(v.recipe)} linked, so there&apos;s nothing to cost. <Link href="/menu" className="font-medium text-amber-700 underline">{v.menu}</Link> → Edit to pick the {lower(v.recipe)} it&apos;s made from.
+            No {lower(v.recipe)} linked, so there&apos;s nothing to cost. <Link href="/menu" className="font-medium text-ember-700 underline">{v.menu}</Link> → Edit to pick the {lower(v.recipe)} it&apos;s made from.
           </Empty>
         ) : m.parts.length === 0 ? (
           <Empty>
-            {m.recipe} has no {lower(v.ingredients)} yet. <Link href={`/recipes/${m.recipeId}`} className="font-medium text-amber-700 underline">Add them to the {lower(v.recipe)}</Link>.
+            {m.recipe} has no {lower(v.ingredients)} yet. <Link href={`/recipes/${m.recipeId}`} className="font-medium text-ember-700 underline">Add them to the {lower(v.recipe)}</Link>.
           </Empty>
         ) : !m.servings ? (
           <Empty>
-            {m.recipe} doesn&apos;t say how many a batch makes. Set it on the <Link href={`/recipes/${m.recipeId}`} className="font-medium text-amber-700 underline">{lower(v.recipe)}</Link> or with {v.menu} → Edit.
+            {m.recipe} doesn&apos;t say how many a batch makes. Set it on the <Link href={`/recipes/${m.recipeId}`} className="font-medium text-ember-700 underline">{lower(v.recipe)}</Link> or with {v.menu} → Edit.
           </Empty>
         ) : (
           <div className="overflow-x-auto">
@@ -145,7 +145,7 @@ function ItemCard({ m, target, targetText, byMarkup, w: { v } }: { m: ItemMargin
                     <td className={cellR}>{qtyFmt(p.batchQty)} {p.unit}</td>
                     <td className={cellR}>{qtyFmt(p.qty)} {p.unit}</td>
                     <td className={cellR}>
-                      {p.unitCost == null ? <Link href="/ingredients" className="text-xs font-medium text-amber-700 hover:underline">no price yet</Link> : `${unitMoney(p.unitCost)}/${p.unit}`}
+                      {p.unitCost == null ? <Link href="/ingredients" className="text-xs font-medium text-ember-700 hover:underline">no price yet</Link> : `${unitMoney(p.unitCost)}/${p.unit}`}
                       {p.wastePct > 0 && <span className="block text-[11px] text-stone-500">+{Math.round(p.wastePct * 10) / 10}% waste</span>}
                     </td>
                     <td className={cellR}>{cents(p.cost)}</td>
@@ -206,7 +206,7 @@ function ItemCard({ m, target, targetText, byMarkup, w: { v } }: { m: ItemMargin
         )}
         {m.recipeId && (
           <div className="flex gap-4 px-3 pt-2 text-xs font-medium">
-            <Link href={`/recipes/${m.recipeId}`} className="text-amber-700 hover:underline">Open the {lower(v.recipe)} →</Link>
+            <Link href={`/recipes/${m.recipeId}`} className="text-ember-700 hover:underline">Open the {lower(v.recipe)} →</Link>
             <Link href="/menu" className="text-stone-500 hover:underline">Change the price or {v.servings} on {v.menu} →</Link>
           </div>
         )}
@@ -275,7 +275,7 @@ function IngredientsView({ list, target, tabs, w }: { list: IngredientMargin[]; 
       {list.length === 0 ? (
         <Panel title={v.ingredients}>
           <Empty>
-            No {lower(v.ingredients)} yet. <Link href="/invoices/scan" className="font-medium text-amber-700 underline">Scan an invoice</Link> and every item you buy shows up here with its price.
+            No {lower(v.ingredients)} yet. <Link href="/invoices/scan" className="font-medium text-ember-700 underline">Scan an invoice</Link> and every item you buy shows up here with its price.
           </Empty>
         </Panel>
       ) : (
@@ -358,7 +358,7 @@ function IngredientCard({ i, target, w: { v, food } }: { i: IngredientMargin; ta
         ) : (
           <p className="px-3 pt-3 text-sm text-stone-600">
             {i.otherRecipes.length ? `In ${i.otherRecipes.join(", ")}, which isn't sold as ${withArticle(lower(v.menuItem))} yet.` : `Not in any ${lower(v.recipe)} yet.`} Its price is still tracked from every invoice.{" "}
-            <Link href="/recipes" className="font-medium text-amber-700 underline">Add it to {withArticle(lower(v.recipe))}</Link> to see what it does to your margins.
+            <Link href="/recipes" className="font-medium text-ember-700 underline">Add it to {withArticle(lower(v.recipe))}</Link> to see what it does to your margins.
           </p>
         )}
         {i.otherRecipes.length > 0 && i.uses.length > 0 && <p className="px-3 pt-2 text-xs text-stone-500">Also in {i.otherRecipes.join(", ")} — not sold as {withArticle(lower(v.menuItem))} yet.</p>}

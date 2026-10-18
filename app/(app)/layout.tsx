@@ -48,10 +48,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <VocabProvider vocab={vocab}>
-    <div className="flex min-h-dvh flex-1 bg-[#f3f1ed]">
+    <div className="flex min-h-dvh flex-1 bg-paper">
       {backlog?.blocked && <ActionRequiredGate unresolved={backlog.unresolved} cap={backlog.cap} />}
       {/* The rail's dark background runs the full page height; the rail itself stays pinned. */}
-      <div className="hidden shrink-0 bg-[#1a1714] lg:block">
+      <div className="hidden shrink-0 bg-ink lg:block">
         <Sidebar business={business} owner={profile.data?.full_name ?? user.email ?? null} counts={counts} logOut={logOut} admin={isAdmin(user.email)} labels={labels} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">

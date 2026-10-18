@@ -172,7 +172,7 @@ export default async function DashboardPage() {
             <ul className="divide-y divide-stone-100">
               {o.inbox.slice(0, 8).map((it, i) => (
                 <li key={`${it.href}-${i}`}>
-                  <Link href={it.href} className="flex gap-3 px-3 py-2.5 hover:bg-amber-50/50">
+                  <Link href={it.href} className="flex gap-3 px-3 py-2.5 hover:bg-ember-50/50">
                     <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${it.tone === "critical" ? "bg-red-500" : it.tone === "warning" ? "bg-amber-400" : "bg-stone-300"}`} />
                     <span className="min-w-0">
                       <span className="block text-sm font-medium text-stone-900">{it.title}</span>

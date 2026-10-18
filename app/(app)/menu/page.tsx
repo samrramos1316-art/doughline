@@ -60,7 +60,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
         <Panel title={`Every ${lower(v.menuItem)}`} flush className="xl:col-span-9">
           {items.length === 0 ? (
             <Empty>
-              No {lower(v.menuItems)} yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-amber-700 underline">Import your {lower(v.menu)} from a photo</Link>, or add one by hand.
+              No {lower(v.menuItems)} yet. <Link href="/onboarding/import?kind=menu" className="font-medium text-ember-700 underline">Import your {lower(v.menu)} from a photo</Link>, or add one by hand.
             </Empty>
           ) : (
             <div className="overflow-x-auto">

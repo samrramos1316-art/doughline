@@ -5,7 +5,7 @@ import { useState } from "react";
 // Explicit text, placeholder and background colors on every field, so they
 // never depend on inherited page colors (see the note in globals.css).
 export const fieldClass =
-  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 shadow-sm outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 shadow-sm outline-none transition focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 
 export function Field({
   id,
@@ -58,7 +58,7 @@ export function SubmitButton({ pending, children, pendingText }: { pending: bool
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg bg-stone-900 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
+      className="w-full rounded-full bg-ember-500 px-3 py-2.5 text-sm font-semibold text-ink shadow-sm transition hover:bg-ember-400 disabled:opacity-50"
     >
       {pending ? pendingText : children}
     </button>

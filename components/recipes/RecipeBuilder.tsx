@@ -16,7 +16,7 @@ type IngredientOption = { id: string; name: string; base_unit: string; waste_pct
 type Row = { ingredient_id: string; quantity: string; unit: string; waste_pct: string };
 export type LaborOverheadValues = { labor_minutes: number; labor_rate_per_hour: number | null; overhead_pct: number };
 
-const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 const blankIfZero = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n));
 
 // §9.2: a recipe's ingredient list as grid rows. Paste "Unsalted Butter<TAB>1.25"
@@ -229,7 +229,7 @@ export function RecipeBuilder({
         </p>
       )}
       {!showWaste && (
-        <button type="button" onClick={() => setShowWaste(true)} className="self-start text-xs font-medium text-amber-700 hover:underline">
+        <button type="button" onClick={() => setShowWaste(true)} className="self-start text-xs font-medium text-ember-700 hover:underline">
           + Track waste % (trim, scrap, breakage)
         </button>
       )}

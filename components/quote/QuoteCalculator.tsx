@@ -31,7 +31,7 @@ const COPY = {
   job: { name: "Job", namePlaceholder: "e.g. Mounting bracket, 50 off", count: "Parts", countHint: "How many parts the job makes.", one: "part", many: "parts", loss: "scrap, kerf, drops", laborHint: "Hands-on time for the whole job: setup, fit-up, welding, finishing.", nameIt: "Name the job", howMany: "How many parts does this job make?" },
 } as const;
 
-const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 const blankIfZero = (n: number) => (n === 0 ? "" : String(n));
 
 // Live custom-order quote: the same cost formula as a saved build sheet

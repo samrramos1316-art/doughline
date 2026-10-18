@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 type Item = { id: string; name: string; price: number; recipeId: string | null; servings: number | null; isActive: boolean };
 
-const field = "w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+const field = "w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 const label = "text-[11px] font-semibold tracking-wider text-stone-500 uppercase";
 
 // Fix a menu item after the fact: the price, the recipe it's made from (or
@@ -50,7 +50,7 @@ export function EditMenuItem({ item, recipeOptions }: { item: Item; recipeOption
 
   return (
     <>
-      <button type="button" onClick={() => { setRecipeId(item.recipeId ?? ""); setError(null); dialog.current?.showModal(); }} className="text-xs font-medium text-amber-700 hover:underline" aria-label={`Edit ${item.name}`}>
+      <button type="button" onClick={() => { setRecipeId(item.recipeId ?? ""); setError(null); dialog.current?.showModal(); }} className="text-xs font-medium text-ember-700 hover:underline" aria-label={`Edit ${item.name}`}>
         Edit
       </button>
       <dialog ref={dialog} aria-label={`Edit ${item.name}`} className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-stone-200 p-0 shadow-xl backdrop:bg-stone-900/40">
