@@ -11,7 +11,7 @@ import { newMaterialWastePct } from "@/lib/industries";
 // One Voyage call for every new/renamed ingredient, retried on 429s.
 export const maxDuration = 300;
 
-const COLUMNS = ["id", "name", "category", "base_unit", "current_unit_cost", "commodity_code", "waste_pct", "per_bunch", "per_box"] as const;
+const COLUMNS = ["id", "name", "category", "base_unit", "current_unit_cost", "commodity_code", "waste_pct", "per_bunch", "per_box", "new_unit_per_old"] as const;
 
 // §9.2: bulk upsert of the ingredient list. Takes either a CSV file body
 // (text/csv — a spreadsheet exported from GET /api/ingredients/export, or
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       waste_pct: get(r, "waste_pct"),
       per_bunch: get(r, "per_bunch"),
       per_box: get(r, "per_box"),
+      new_unit_per_old: get(r, "new_unit_per_old"),
     }));
   }
   if (rows.length > 2000) return NextResponse.json({ error: "At most 2000 rows per import" }, { status: 400 });

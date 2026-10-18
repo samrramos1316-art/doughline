@@ -13,6 +13,8 @@ import {
 } from "@/components/grid/EditableGrid";
 import { LOCAL_DATE_HEADER, browserLocalDate } from "@/lib/dates/localDate";
 import { useVocab } from "@/components/app/VocabProvider";
+import { cleanPackSizes, isContainerUnit, packSizeFor } from "@/lib/costing/units";
+import { needsUnitSize } from "@/lib/costing/rebaseUnit";
 
 export type IngredientRecord = {
   id: string;
@@ -124,6 +126,8 @@ function IngredientsGridForm({
   ]);
   const [showAllErrors, setShowAllErrors] = useState(false);
   const [busy, setBusy] = useState<"saving" | "importing" | null>(null);
+  // Sizes typed for unit changes that don't convert on their own, by row key.
+  const [unitSizes, setUnitSizes] = useState<Record<string, string>>({});
 
   const pending = rows.filter((r) => {
     if (isBlankRow(COLUMNS, r)) return false;
@@ -132,6 +136,26 @@ function IngredientsGridForm({
     const o = valuesOf(orig);
     return COLUMNS.some((c) => (r.values[c.key] ?? "").trim() !== o[c.key as keyof typeof o]);
   });
+
+  // Existing rows whose base unit changes. lb → oz converts by itself; lb →
+  // case uses the material's case size if it has one, else asks "1 case =
+  // ? lb", whichever way the change goes. `perOld` is how many of the new
+  // unit are in one of the old (1/36 for lb → a 36 lb case).
+  const unitChanges = pending.flatMap((r) => {
+    const orig = byId.get(r.key);
+    const to = (r.values.base_unit ?? "").trim();
+    if (!orig || !to || to === orig.base_unit) return [];
+    const packs = cleanPackSizes(orig.pack_sizes);
+    if (!needsUnitSize(orig.base_unit, to, packs)) {
+      const known = packSizeFor(packs, to);
+      return known ? [{ row: r, from: orig.base_unit, to, known, intoContainer: true, perOld: null as number | null }] : [];
+    }
+    const intoContainer = isContainerUnit(to) || !isContainerUnit(orig.base_unit);
+    const n = parseNumber(unitSizes[r.key] ?? "");
+    const perOld = n != null && n > 0 ? (intoContainer ? 1 / n : n) : null;
+    return [{ row: r, from: orig.base_unit, to, known: null as number | null, intoContainer, perOld }];
+  });
+  const missingSizes = unitChanges.filter((c) => c.known == null && c.perOld == null);
 
   async function post(body: BodyInit, contentType: string) {
     const res = await fetch("/api/ingredients/import", { method: "POST", headers: { "Content-Type": contentType, [LOCAL_DATE_HEADER]: browserLocalDate() }, body });
@@ -161,12 +185,17 @@ function IngredientsGridForm({
       setMessage({ kind: "error", text: `Fix the ${errors.size} highlighted row${errors.size === 1 ? "" : "s"} first — nothing was saved.` });
       return;
     }
+    if (missingSizes.length) {
+      setMessage({ kind: "error", text: `Say how the units relate for ${missingSizes.map((c) => c.row.values.name).join(", ")} first — nothing was saved.` });
+      return;
+    }
     setBusy("saving");
     try {
       const payload = pending.map((r) => ({
         row: rows.indexOf(r) + 1, // the grid's own # column, so server errors point at the right row
         id: byId.has(r.key) ? r.key : null,
         ...r.values,
+        new_unit_per_old: unitChanges.find((c) => c.row.key === r.key)?.perOld ?? null,
       }));
       report(await post(JSON.stringify({ rows: payload }), "application/json"));
     } catch (err) {
@@ -226,6 +255,42 @@ function IngredientsGridForm({
         canDeleteRow={(r) => !byId.has(r.key)}
         onDeleteRow={(r) => setRows(rows.filter((x) => x.key !== r.key))}
       />
+
+      {unitChanges.length > 0 && (
+        <section aria-label="Unit changes" data-testid="unit-changes" className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+          <p className="font-medium">Changing units</p>
+          <p className="text-xs text-amber-900">The price, pack sizes and every {v.recipe.toLowerCase()} amount move to the new unit, so nothing costs more or less than before.</p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {unitChanges.map((c) => {
+              const big = c.intoContainer ? c.to : c.from;
+              const small = c.intoContainer ? c.from : c.to;
+              return (
+                <li key={c.row.key} className="flex flex-wrap items-center gap-2">
+                  <b>{c.row.values.name}</b> {c.from} → {c.to}:
+                  {c.known != null ? (
+                    <span>
+                      {/* known: how many of the old unit in one new; read it the way round that's a whole number */}
+                      using its size, {c.known >= 1 ? `1 ${c.to} = ${+c.known.toFixed(4)} ${c.from}` : `1 ${c.from} = ${+(1 / c.known).toFixed(4)} ${c.to}`}
+                    </span>
+                  ) : (
+                    <label className="flex items-center gap-1.5">
+                      1 {big} =
+                      <input
+                        inputMode="decimal"
+                        aria-label={`How many ${small} in one ${big} for ${c.row.values.name}`}
+                        value={unitSizes[c.row.key] ?? ""}
+                        onChange={(e) => setUnitSizes({ ...unitSizes, [c.row.key]: e.target.value })}
+                        className={`w-20 rounded-md border bg-white px-2 py-1 text-right tabular-nums ${showAllErrors && c.perOld == null ? "border-red-400" : "border-stone-300"}`}
+                      />
+                      {small}
+                    </label>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <button

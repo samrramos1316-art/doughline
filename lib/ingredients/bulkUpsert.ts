@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { embedTexts, ingredientEmbeddingText, toPgVector } from "@/lib/ai/embeddings/voyage";
-import { cleanPackSizes, type PackSizes } from "@/lib/costing/units";
-import { rebaseCost, rebasePackSizes, rebaseRecipeLines, unitChangeFactor } from "@/lib/costing/rebaseUnit";
+import { cleanPackSizes, sameUnit, type PackSizes } from "@/lib/costing/units";
+import { packSizesAfterUnitChange, rebaseCost, rebaseRecipeLines, unitChangeFactorWith } from "@/lib/costing/rebaseUnit";
 
 type Client = SupabaseClient<Database>;
 
@@ -20,6 +20,10 @@ export type IngredientRowInput = {
   // what's stored; 0 removes it.
   per_bunch?: number | string | null;
   per_box?: number | string | null;
+  // For a base unit change with no fixed conversion (lb → case): how many
+  // of the new unit are in one of the old (1/36 for a 36 lb case). Not
+  // needed when the material already has a size for the new unit.
+  new_unit_per_old?: number | string | null;
 };
 
 export type RowError = { row: number; field?: string; message: string };
@@ -80,6 +84,11 @@ export async function bulkUpsertIngredients(
       if (prior) errors.push({ row, field: "name", message: `"${name}" also appears on row ${prior}` });
       seen.set(norm(name), row);
     }
+    const perText = r.new_unit_per_old == null ? "" : String(r.new_unit_per_old).trim();
+    const unitPer = perText === "" ? null : Number(perText);
+    if (unitPer != null && !(Number.isFinite(unitPer) && unitPer > 0)) {
+      errors.push({ row, field: "new_unit_per_old", message: `"${perText}" isn't a unit size` });
+    }
     const id = r.id?.trim() || null;
     if (id && !byId.has(id)) errors.push({ row, field: "id", message: `No ingredient with id ${id} in this account` });
     const target = id ? byId.get(id) : byName.get(norm(name));
@@ -91,11 +100,32 @@ export async function bulkUpsertIngredients(
       cost,
       waste,
       packs,
+      unitPer,
       category: r.category?.trim() || null,
       commodity_code: r.commodity_code?.trim() || null,
     };
   });
   if (errors.length) return { errors };
+
+  // A base unit change that doesn't convert on its own (lb → case, no case
+  // size known) is refused when there's a price or recipe amounts to carry
+  // over, rather than leaving them in the old unit.
+  const factorOf = (r: (typeof rows)[number]) =>
+    r.target && r.target.base_unit !== r.base_unit ? unitChangeFactorWith(r.target.base_unit, r.base_unit, cleanPackSizes(r.target.pack_sizes), r.unitPer) : null;
+  const stuck = rows.filter((r) => r.target && r.target.base_unit !== r.base_unit && !sameUnit(r.target.base_unit, r.base_unit) && factorOf(r) == null);
+  if (stuck.length) {
+    const { data: used, error: usedErr } = await supabase.from("recipe_ingredients").select("ingredient_id").in("ingredient_id", stuck.map((r) => r.target!.id));
+    if (usedErr) throw new Error(usedErr.message);
+    const inRecipes = new Set((used ?? []).map((u) => u.ingredient_id));
+    for (const r of stuck) {
+      const t = r.target!;
+      const priceToCarry = t.current_unit_cost != null && (r.cost == null || Number(t.current_unit_cost) === r.cost);
+      if (priceToCarry || inRecipes.has(t.id)) {
+        errors.push({ row: r.row, field: "base_unit", message: `${t.base_unit} → ${r.base_unit} doesn't convert on its own: give new_unit_per_old, how many ${r.base_unit} in one ${t.base_unit} (lb → a 36 lb case: 0.02777778)` });
+      }
+    }
+    if (errors.length) return { errors };
+  }
 
   const toEmbed = rows.filter((r) => !r.target || r.target.name !== r.name);
   let vectors: (string | null)[] = toEmbed.map(() => null);
@@ -158,7 +188,7 @@ export async function bulkUpsertIngredients(
     // A unit it converts to (lb → oz) carries the price, pack sizes and
     // recipe quantities over (lib/costing/rebaseUnit.ts), unless the row
     // also gives a new price.
-    const factor = t.base_unit !== r.base_unit ? unitChangeFactor(t.base_unit, r.base_unit) : null;
+    const factor = factorOf(r);
     if (t.base_unit !== r.base_unit) {
       update.base_unit = r.base_unit;
       changes.push(`base unit ${t.base_unit} → ${r.base_unit}`);
@@ -174,8 +204,11 @@ export async function bulkUpsertIngredients(
       changes.push(`commodity ${t.commodity_code ?? "—"} → ${r.commodity_code ?? "—"}`);
     }
     const packsStored = cleanPackSizes(t.pack_sizes);
-    const packsBefore = factor ? rebasePackSizes(packsStored, factor) : packsStored;
-    const packsAfter = withPacks(packsBefore, r.packs);
+    const packsBefore = factor ? packSizesAfterUnitChange(packsStored, factor, t.base_unit, r.base_unit) : packsStored;
+    // The grid sends every row's sizes as shown, in the old unit; after a
+    // unit change, one that's the same as stored is the converted size.
+    const packsGiven = factor ? Object.fromEntries(Object.entries(r.packs).filter(([unit, n]) => packsStored[unit] !== n)) : r.packs;
+    const packsAfter = withPacks(packsBefore, packsGiven);
     for (const unit of ["bunch", "box"] as const) {
       if (packsBefore[unit] !== packsAfter[unit]) changes.push(`per ${unit} ${packsBefore[unit] ?? "—"} → ${packsAfter[unit] ?? "—"}`);
     }

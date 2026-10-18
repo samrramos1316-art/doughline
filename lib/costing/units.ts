@@ -68,7 +68,7 @@ export function canonicalUnit(unit: string | null | undefined): string | null {
 // Kitchen units compare by canonical form; anything else (case, bag, flat,
 // tub…) by its lowercased singular, so "Cases" on an invoice is the same
 // unit as an ingredient costed per "case".
-function unitKey(unit: string | null | undefined): string | null {
+export function unitKey(unit: string | null | undefined): string | null {
   if (!unit) return null;
   const canonical = canonicalUnit(unit);
   if (canonical) return canonical;

@@ -395,9 +395,11 @@ fabrication (desktop + phone) found nothing else.
   That now holds (`lib/costing/rebaseUnit.ts`): recipe saves convert lines
   to it (8 oz → 0.5 lb, a bunch by the material's size) and refuse units
   that don't convert; changing a base unit to one it converts to (lb → oz)
-  carries the price, pack sizes and recipe quantities over. Left: a change
-  that doesn't convert (lb → case) leaves both as they were, so the owner
-  must fix the price and quantities. Prices and recipe amounts keep 8
+  carries the price, pack sizes and recipe quantities over. A change with
+  no fixed conversion (lb → case) converts by the material's case size, or
+  the grid asks "1 case = ? lb" (`new_unit_per_old` in CSV/API); without a
+  size it's refused when there's a price or recipe amounts to carry. The old
+  unit stays as a size, so per-lb invoices still convert. Prices and recipe amounts keep 8
   decimals since migration `031` (butter at $4/lb → $0.00881849/g; at 4
   decimals it was $0.0088, 0.2% low); values saved before it stay rounded
   until the next invoice or edit.
