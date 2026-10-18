@@ -13,8 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    // Splash screen: the icon's dark stone; status bar: the app's white header.
-    background_color: "#1c1917",
+    // Splash screen: the icon's ink; status bar: the app's white header.
+    background_color: "#0c0b09",
     theme_color: "#ffffff",
     categories: ["business", "productivity"],
     icons: [

@@ -5,8 +5,8 @@
 //   - shows /offline when a page can't load because there's no connection, and
 //   - keeps Next's hashed static files (/_next/static/…) and the icons, which
 //     never change once published, so the app shell loads fast.
-// Bump VERSION to drop old caches after changing this file.
-const VERSION = "v2";
+// Bump VERSION to drop old caches after changing this file or the icons.
+const VERSION = "v3";
 const CACHE = `doughtally-${VERSION}`;
 const OFFLINE_URL = "/offline";
 
