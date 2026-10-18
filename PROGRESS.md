@@ -397,8 +397,10 @@ fabrication (desktop + phone) found nothing else.
   that don't convert; changing a base unit to one it converts to (lb → oz)
   carries the price, pack sizes and recipe quantities over. Left: a change
   that doesn't convert (lb → case) leaves both as they were, so the owner
-  must fix the price and quantities. Prices keep 4 decimals, so per-gram
-  prices of cheap items round (butter at $4/lb → $0.0088/g, 0.2% low).
+  must fix the price and quantities. Prices and recipe amounts keep 8
+  decimals since migration `031` (butter at $4/lb → $0.00881849/g; at 4
+  decimals it was $0.0088, 0.2% low); values saved before it stay rounded
+  until the next invoice or edit.
   Tested: `scripts/test-recipe-units-e2e.mjs`.
 
 ## Test scripts (all repeatable against real Supabase)

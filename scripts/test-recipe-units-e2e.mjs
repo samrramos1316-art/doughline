@@ -75,7 +75,7 @@ try {
   res = await api.post(`${BASE}/api/ingredients/import`, { data: { rows: [{ id: butter.id, name: "Butter", base_unit: "g", current_unit_cost: 0.25 }] } });
   assert(res.ok(), `grid oz → g saved: ${res.status()} ${await res.text()}`);
   s = await state();
-  assert(Number(s.ing.current_unit_cost) === 0.0088 && near(s.line.quantity, 907.1847) && s.line.unit === "g",
+  assert(Number(s.ing.current_unit_cost) === 0.00881849 && near(s.line.quantity, 907.1847) && s.line.unit === "g",
     `grid carried price and line over: $${s.ing.current_unit_cost}/g, ${s.line.quantity} ${s.line.unit}`);
   assert(Math.abs(s.batch - 8) / 8 < 0.005, `batch cost within the 4-decimal price rounding of $8: $${s.batch}`);
 

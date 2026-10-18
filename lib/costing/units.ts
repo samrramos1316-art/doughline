@@ -164,10 +164,10 @@ export function toBaseUnitCost(
   const unitDim = UNITS[canonicalUnit(line.unit) ?? ""]?.dim;
   const byDirect = (factor: number): BaseUnitCost => ({
     ok: true,
-    cost: round4(unitCost / factor),
+    cost: round8(unitCost / factor),
     basis: `$${unitCost} per ${line.unit}`,
   });
-  if (isContainerUnit(line.unit) && sameUnit(line.unit, baseUnit)) return { ok: true, cost: round4(unitCost), basis: `$${unitCost} per ${line.unit}` };
+  if (isContainerUnit(line.unit) && sameUnit(line.unit, baseUnit)) return { ok: true, cost: round8(unitCost), basis: `$${unitCost} per ${line.unit}` };
   if (direct && unitDim !== "count") return byDirect(direct);
 
   const packFactor = conversionFactor(line.pack_unit, baseUnit);
@@ -175,8 +175,8 @@ export function toBaseUnitCost(
     const baseQty = line.pack_quantity * packFactor;
     return {
       ok: true,
-      cost: round4(unitCost / baseQty),
-      basis: `$${unitCost} per ${line.unit ?? "unit"} of ${line.pack_quantity} ${line.pack_unit} = ${round4(baseQty)} ${baseUnit}`,
+      cost: round8(unitCost / baseQty),
+      basis: `$${unitCost} per ${line.unit ?? "unit"} of ${line.pack_quantity} ${line.pack_unit} = ${round8(baseQty)} ${baseUnit}`,
     };
   }
 
@@ -184,13 +184,14 @@ export function toBaseUnitCost(
 
   const size = packSizeFor(packSizes, line.unit);
   if (size) {
-    return { ok: true, cost: round4(unitCost / size), basis: `$${unitCost} per ${line.unit} of ${size} ${baseUnit}` };
+    return { ok: true, cost: round8(unitCost / size), basis: `$${unitCost} per ${line.unit} of ${size} ${baseUnit}` };
   }
 
   const what = line.pack_quantity && line.pack_unit ? `${line.pack_quantity} ${line.pack_unit}` : `"${line.unit ?? "?"}"`;
   return { ok: false, note: `Can't convert ${what} to ${baseUnit} — price not applied` };
 }
 
-function round4(n: number) {
-  return Math.round(n * 10000) / 10000;
+// Unit prices are stored to 8 decimals (migration 031).
+function round8(n: number) {
+  return Math.round(n * 1e8) / 1e8;
 }
