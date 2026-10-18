@@ -428,7 +428,7 @@ fabrication (desktop + phone) found nothing else.
 - `scripts/test-recipe-units-e2e.mjs` (after `npm run build`; base-unit changes, recipe line units)
 - `scripts/test-industries-e2e.mjs [--food]` (after `npm run build`; industry words, costing, quotes, cost sheets, signup gate)
 - `scripts/test-markup-e2e.mjs` (after `npm run build`; markup pricing, quote price basis)
-- `scripts/test-florist-extras-e2e.mjs` (after `npm run build`; Seasons and Order plan; run between Mother's Day and Christmas)
+- `scripts/test-florist-extras-e2e.mjs` (after `npm run build`; Seasons and Order plan; pins the Seasons date with DOUGHTALLY_SEASONS_TODAY, so it runs any time of year)
 - `scripts/make-icons.mjs` (regenerates the app icons, not a test)
 - `scripts/query-invoice-scan.mjs` (inspect one invoice's rows, not a test)
 - `scripts/seed-demo-data.mjs` (idempotent demo data, not a test)
