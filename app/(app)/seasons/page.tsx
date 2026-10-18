@@ -18,7 +18,10 @@ export default async function SeasonsPage() {
   if (!industry.features.seasons) notFound();
   const v = industry.vocab;
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
+  // DOUGHTALLY_SEASONS_TODAY (YYYY-MM-DD) pins the date the page works from,
+  // so its end-to-end test sees the same holidays any time of year.
+  const pinned = process.env.DOUGHTALLY_SEASONS_TODAY;
+  const today = pinned && /^\d{4}-\d{2}-\d{2}$/.test(pinned) ? pinned : new Date().toISOString().slice(0, 10);
   const year = Number(today.slice(0, 4));
   // Back far enough for last year's holidays and the year before each.
   const since = `${year - 2}-01-01`;

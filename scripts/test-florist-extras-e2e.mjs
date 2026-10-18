@@ -4,9 +4,10 @@
 //   /plan — an event quote's arrangements → stems to buy, with spoilage, in
 //   bunches and boxes (lib/costing/orderPlan.ts).
 //
-// The price history is laid out around this year's holidays, so run it
-// between Mother's Day and Christmas (the latest past holidays are then
-// last Christmas, this Valentine's and this Mother's Day; next is Christmas).
+// The price history is laid out around one year's holidays, so the server
+// runs with its seasons date pinned (DOUGHTALLY_SEASONS_TODAY) to a day
+// between Mother's Day and Christmas: the latest past holidays are then last
+// Christmas, this Valentine's and this Mother's Day; next is Christmas.
 // Needs a production build (`npx next build`); starts `next start` itself.
 //   node scripts/test-florist-extras-e2e.mjs
 import { spawn, execSync } from "node:child_process";
@@ -14,14 +15,8 @@ import { chromium } from "playwright-core";
 import { getAdminClient, assert } from "./lib/supabaseTestEnv.mjs";
 import { waitForServer } from "./lib/devServer.mjs";
 
-const today = new Date().toISOString().slice(0, 10);
-const Y = Number(today.slice(0, 4));
-const may1 = new Date(Date.UTC(Y, 4, 1)).getUTCDay();
-const mothersDay = `${Y}-05-${String(8 + ((7 - may1) % 7)).padStart(2, "0")}`;
-if (!(today > mothersDay && today < `${Y}-12-25`)) {
-  console.log(`Run this between Mother's Day (${mothersDay}) and Christmas: its price history is laid out around this year's holidays.`);
-  process.exit(1);
-}
+const TODAY = "2026-10-17";
+const Y = Number(TODAY.slice(0, 4));
 
 const PORT = 3225;
 const BASE = `http://localhost:${PORT}`;
@@ -40,7 +35,9 @@ async function makeUser(type) {
   return { email, orgId };
 }
 
-const server = spawn("npx", ["next", "start", "--port", String(PORT)], { shell: true, stdio: "ignore" });
+const server = spawn("npx", ["next", "start", "--port", String(PORT)], {
+  shell: true, stdio: "ignore", env: { ...process.env, DOUGHTALLY_SEASONS_TODAY: TODAY },
+});
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 try {
   await waitForServer(BASE, 60_000);
@@ -78,6 +75,7 @@ try {
   await f.getByTestId("seasons-months").waitFor();
   const main = await text(f.locator("main"));
   assert(main.includes("NEXT HOLIDAY Christmas"), `next holiday is Christmas: ${main.slice(0, 300)}`);
+  assert(main.includes(`Dec 25, ${Y} · in 69 days`), `counted from the pinned ${TODAY}: ${main.slice(0, 300)}`);
   // Last Christmas: $1.60 in the 3 weeks before vs (2.0 + 1.0 + 1.1) / 3 = $1.3667 the rest of that year → +17.1%.
   const upcoming = await text(f.getByTestId("seasons-upcoming"));
   assert(upcoming.includes("Red rose 50cm $1.37 → $1.60") && upcoming.includes("17.1%"), `before Christmas last year: ${upcoming}`);
