@@ -1,6 +1,6 @@
 // Draws DoughTally's app icons and renders them to PNG/ICO in headless Edge.
-// The mark is the logo's loaf: an amber dome whose score line doubles as a
-// rising price line, on the site's dark stone background.
+// The mark is the logo's loaf: an ember dome whose score line doubles as a
+// rising price line, on the site's near-black ink.
 //
 // Writes:
 //   public/icons/icon-192.png, icon-512.png   manifest "any" icons (rounded corners baked in)
@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import { chromium } from "playwright-core";
 
-const STONE = "#1c1917";
+const STONE = "#0c0b09";
 
 // Large-size icon on a 512 grid. `rounded` bakes in corners for the "any"
 // icons; `scale` shrinks the loaf about the centre (maskable icons must keep
@@ -22,13 +22,13 @@ function bigIcon({ rounded, scale = 1 }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <radialGradient id="glow" cx="50%" cy="30%" r="75%">
-      <stop offset="0%" stop-color="#44403c"/>
+      <stop offset="0%" stop-color="#2b2620"/>
       <stop offset="100%" stop-color="${STONE}"/>
     </radialGradient>
     <linearGradient id="crust" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fcd34d"/>
-      <stop offset="55%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#d97706"/>
+      <stop offset="0%" stop-color="#ffb08a"/>
+      <stop offset="55%" stop-color="#ff5b1f"/>
+      <stop offset="100%" stop-color="#e94a12"/>
     </linearGradient>
     <clipPath id="loaf"><path d="${LOAF}"/></clipPath>
   </defs>
@@ -36,8 +36,8 @@ function bigIcon({ rounded, scale = 1 }) {
   <g transform="translate(256 262) scale(${scale}) translate(-256 -262)">
     <ellipse cx="256" cy="366" rx="170" ry="14" fill="#000" opacity="0.35"/>
     <path d="${LOAF}" fill="url(#crust)"/>
-    <path d="M136 250 C160 196 204 170 256 168" fill="none" stroke="#fef3c7" stroke-width="10" stroke-linecap="round" opacity="0.55" clip-path="url(#loaf)"/>
-    <path d="${SCORE}" fill="none" stroke="#fde68a" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" clip-path="url(#loaf)"/>
+    <path d="M136 250 C160 196 204 170 256 168" fill="none" stroke="#ffe5d6" stroke-width="10" stroke-linecap="round" opacity="0.55" clip-path="url(#loaf)"/>
+    <path d="${SCORE}" fill="none" stroke="#ffc8ad" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" clip-path="url(#loaf)"/>
     <path d="${SCORE}" fill="none" stroke="${STONE}" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>`;
@@ -50,7 +50,7 @@ const LOAF = "M100 330 C100 226 170 156 256 156 C342 156 412 226 412 330 Q412 35
 // thicker strokes so it still reads at 16px.
 const SMALL = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="8" fill="${STONE}"/>
-  <path d="M5.5 21c0-6.3 4.7-10.8 10.5-10.8S26.5 14.7 26.5 21c0 1.1-.9 2-2 2h-17c-1.1 0-2-.9-2-2Z" fill="#f59e0b"/>
+  <path d="M5.5 21c0-6.3 4.7-10.8 10.5-10.8S26.5 14.7 26.5 21c0 1.1-.9 2-2 2h-17c-1.1 0-2-.9-2-2Z" fill="#ff5b1f"/>
   <path d="M9.8 19l3.8-3.3 3.1 2.1 5-5" fill="none" stroke="${STONE}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
 

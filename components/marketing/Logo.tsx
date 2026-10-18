@@ -2,9 +2,9 @@
 export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <rect width="32" height="32" rx="9" fill="#1c1917" />
-      <path d="M7 20.5c0-5.5 4-9.5 9-9.5s9 4 9 9.5c0 1.1-.9 2-2 2H9c-1.1 0-2-.9-2-2Z" fill="#f59e0b" />
-      <path d="M10.5 18.5l3.5-3 3 2 4.5-4.5" fill="none" stroke="#1c1917" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <rect width="32" height="32" rx="9" fill="#0c0b09" />
+      <path d="M7 20.5c0-5.5 4-9.5 9-9.5s9 4 9 9.5c0 1.1-.9 2-2 2H9c-1.1 0-2-.9-2-2Z" fill="#ff5b1f" />
+      <path d="M10.5 18.5l3.5-3 3 2 4.5-4.5" fill="none" stroke="#0c0b09" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
