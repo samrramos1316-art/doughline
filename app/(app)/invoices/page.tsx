@@ -88,9 +88,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                       <td className={td}><InvoiceStatusBadge status={inv.status} /></td>
                       <td className={`${td} text-right`}>
                         {inv.status === "failed" ? (
-                          <Link href={`/invoices/${inv.id}/manual-entry`} className="text-xs font-medium text-amber-700 hover:underline">Enter by hand →</Link>
+                          <Link href={`/invoices/${inv.id}/manual-entry`} className="text-xs font-medium text-ember-700 hover:underline">Enter by hand →</Link>
                         ) : open ? (
-                          <Link href={`/invoices/${inv.id}/review`} className="text-xs font-medium text-amber-700 hover:underline">Review →</Link>
+                          <Link href={`/invoices/${inv.id}/review`} className="text-xs font-medium text-ember-700 hover:underline">Review →</Link>
                         ) : (
                           <Link href={`/invoices/${inv.id}`} className="text-xs text-stone-500 hover:underline">Open →</Link>
                         )}

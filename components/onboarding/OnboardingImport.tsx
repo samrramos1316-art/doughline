@@ -63,7 +63,7 @@ type RecipeDraft = { key: string; include: boolean; source: string; name: string
 type MenuDraft = { key: string; include: boolean; name: string; price: string; recipe: string; servings: string; note: string };
 
 const CATEGORIES = ["dairy", "dry_goods", "produce", "protein", "packaging", "beverage", "frozen"];
-const cell = "w-full min-w-0 rounded border border-stone-300 bg-white px-2 py-1 text-[13px] text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+const cell = "w-full min-w-0 rounded border border-stone-300 bg-white px-2 py-1 text-[13px] text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 const th = "px-2 py-1.5 text-left text-[11px] font-semibold tracking-wider text-stone-500 uppercase whitespace-nowrap";
 const newKey = () => crypto.randomUUID();
 const round8 = (n: number) => Math.round(n * 1e8) / 1e8; // recipe amounts keep 8 decimals (migration 031)
@@ -471,7 +471,7 @@ export function OnboardingImport({
                     <span className="block truncate font-medium text-stone-900">{f.name}</span>
                     <span className="text-xs text-stone-500">{f.kind === "menu" ? "Menu" : "Recipe"}{f.note ? ` · ${f.note}` : ""}</span>
                   </span>
-                  <span className={`shrink-0 text-xs font-semibold ${f.status === "failed" ? "text-red-600" : f.status === "done" ? "text-emerald-700" : f.status === "reading" ? "text-amber-700" : "text-stone-500"}`}>
+                  <span className={`shrink-0 text-xs font-semibold ${f.status === "failed" ? "text-red-600" : f.status === "done" ? "text-emerald-700" : f.status === "reading" ? "text-ember-700" : "text-stone-500"}`}>
                     {f.status === "ready" ? (
                       <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((cur) => cur.filter((x) => x.key !== f.key))} className="text-stone-400 hover:text-stone-700">✕</button>
                     ) : f.status === "reading" ? "Reading…" : f.status === "done" ? "Read" : f.status === "invoice" || f.status === "sending" || f.status === "sent" ? "An invoice" : "Couldn't read"}
@@ -532,7 +532,7 @@ export function OnboardingImport({
           <section aria-label={`${v.recipes} to add`} className="overflow-hidden rounded-lg border border-stone-200 bg-white">
             <header className="flex items-center justify-between border-b border-stone-200 bg-stone-50/80 px-3 py-2">
               <h2 className="text-[11px] font-semibold tracking-[0.12em] text-stone-600 uppercase">{v.recipes} · {included.length}</h2>
-              <button type="button" onClick={() => setDrafts((ds) => [...ds, { key: newKey(), include: true, source: "typed in", name: "", yieldQty: "", yieldUnit: v.servings, lines: [] }])} className="text-xs font-medium text-amber-700">+ Add {withArticle(lower(v.recipe))}</button>
+              <button type="button" onClick={() => setDrafts((ds) => [...ds, { key: newKey(), include: true, source: "typed in", name: "", yieldQty: "", yieldUnit: v.servings, lines: [] }])} className="text-xs font-medium text-ember-700">+ Add {withArticle(lower(v.recipe))}</button>
             </header>
             {drafts.length === 0 && <p className="px-3 py-4 text-sm text-stone-500">No {lower(v.recipes)} read. Add one above, or skip — you can build {lower(v.recipes)} any time.</p>}
             {drafts.map((d) => {
@@ -641,7 +641,7 @@ export function OnboardingImport({
                         })}
                       </tbody>
                     </table>
-                    <button type="button" onClick={() => setDraft(d.key, { lines: [...d.lines, { key: newKey(), include: true, raw: "(added)", qtyGuess: null, unitGuess: null, choice: "", status: "confirmed", candidates: [], qty: "", newName: "", newUnit: "lb", newCategory: "", note: "" }] })} className="mt-1 text-xs font-medium text-amber-700">
+                    <button type="button" onClick={() => setDraft(d.key, { lines: [...d.lines, { key: newKey(), include: true, raw: "(added)", qtyGuess: null, unitGuess: null, choice: "", status: "confirmed", candidates: [], qty: "", newName: "", newUnit: "lb", newCategory: "", note: "" }] })} className="mt-1 text-xs font-medium text-ember-700">
                       + Add an ingredient line
                     </button>
                   </div>
@@ -661,7 +661,7 @@ export function OnboardingImport({
                 Menu items · {includedMenu.length}
                 {linking && <span className="ml-2 font-normal tracking-normal text-amber-700 normal-case">matching to {lower(v.recipes)}…</span>}
               </h2>
-              <button type="button" onClick={() => setMenu((ms) => [...ms, { key: newKey(), include: true, name: "", price: "", recipe: "", servings: "", note: "" }])} className="text-xs font-medium text-amber-700">+ Add {withArticle(lower(v.menuItem))}</button>
+              <button type="button" onClick={() => setMenu((ms) => [...ms, { key: newKey(), include: true, name: "", price: "", recipe: "", servings: "", note: "" }])} className="text-xs font-medium text-ember-700">+ Add {withArticle(lower(v.menuItem))}</button>
             </header>
             {menu.length === 0 ? (
               <p className="px-3 py-4 text-sm text-stone-500">No {lower(v.menuItems)} read. Add them above, or skip — you can add them on {v.menu} any time.</p>
@@ -740,9 +740,9 @@ function DropZone({ kind, title, hint, onFiles, disabled }: { kind: Kind; title:
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); if (!disabled) onFiles(e.dataTransfer.files, kind); }}
-      className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed px-5 py-10 text-center transition ${over ? "border-amber-500 bg-amber-50" : "border-amber-300 bg-amber-50/40 hover:border-amber-400"}`}
+      className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed px-5 py-10 text-center transition ${over ? "border-ember-500 bg-ember-50" : "border-ember-300 bg-ember-50/40 hover:border-ember-400"}`}
     >
-      <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-400 text-stone-900">
+      <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-ember-400 text-stone-900">
         <svg viewBox="0 0 24 24" className="h-6 w-6">
           <path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .8-.4l1-1.3A1 1 0 0 1 9.8 4h4.4a1 1 0 0 1 .8.3l1 1.3a1 1 0 0 0 .8.4H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" fill="none" stroke="currentColor" strokeWidth="2" />
           <circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" strokeWidth="2" />

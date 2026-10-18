@@ -10,7 +10,7 @@ import { money } from "@/components/ui/dash";
 export type PlanArrangement = { id: string; name: string } & PlanRecipe;
 export type PlanStart = { name: string; items: { recipe_id: string; quantity: string }[] };
 
-const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 const qty = (n: number) => Number(n.toFixed(2)).toLocaleString("en-US");
 const plural = (unit: string, n: number) => (n === 1 ? unit : /(x|ch|sh|s)$/.test(unit) ? `${unit}es` : `${unit}s`);
 

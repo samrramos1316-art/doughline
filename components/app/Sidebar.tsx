@@ -96,19 +96,19 @@ export function Sidebar({ business, owner, counts, logOut, admin = false, labels
   const v = useVocab();
   const path = usePathname();
   return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-[#1a1714] text-stone-300 lg:flex">
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-ink text-stone-300 lg:flex">
       <Link href="/dashboard" className="flex items-center gap-2.5 border-b border-white/5 px-4 py-4">
         <LogoMark className="h-8 w-8" />
         <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-white">{business}</span>
-          <span className="block text-[11px] tracking-wider text-stone-500 uppercase">DoughTally</span>
+          <span className="block truncate font-display text-[15px] font-semibold text-white">{business}</span>
+          <span className="block font-ledger text-[10px] tracking-[0.14em] text-stone-500 uppercase">DoughTally</span>
         </span>
       </Link>
       <div className="px-3 pt-3">
         <Link
           href="/add"
           aria-current={path === "/add" ? "page" : undefined}
-          className="flex items-center justify-center gap-2 rounded-md bg-amber-400 px-3 py-2.5 text-sm font-semibold text-stone-900 shadow-[0_0_0_1px_rgba(251,191,36,0.4),0_6px_18px_-6px_rgba(251,191,36,0.6)] hover:bg-amber-300"
+          className="flex items-center justify-center gap-2 rounded-full bg-ember-500 px-3 py-2.5 text-sm font-semibold text-ink shadow-[0_6px_18px_-6px_rgba(255,91,31,0.6)] hover:bg-ember-400"
         >
           <CameraIcon /> Add from a photo
         </Link>
@@ -117,7 +117,7 @@ export function Sidebar({ business, owner, counts, logOut, admin = false, labels
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3">
         {groupsFor(admin, labels).map((g) => (
           <div key={g.label || "top"} className="mb-3">
-            {g.label && <p className="px-2 pb-1 text-[10px] font-semibold tracking-[0.16em] text-stone-500 uppercase">{g.label}</p>}
+            {g.label && <p className="px-2 pb-1 font-ledger text-[10px] font-medium tracking-[0.1em] text-stone-500 uppercase">{g.label}</p>}
             {g.items.map((it) => {
               const active = isActive(path, it.href);
               const badge = it.badge?.(counts);
@@ -130,7 +130,7 @@ export function Sidebar({ business, owner, counts, logOut, admin = false, labels
                     active ? "bg-white/10 font-medium text-white" : "hover:bg-white/5 hover:text-white"
                   }`}
                 >
-                  {active && <span aria-hidden className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded bg-amber-400" />}
+                  {active && <span aria-hidden className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded bg-ember-500" />}
                   <Icon name={it.icon} />
                   {it.label}
                   {badge && <Badge {...badge} />}
@@ -155,13 +155,13 @@ export function MobileNav({ business, counts, admin = false, labels }: { busines
   const path = usePathname();
   const items = groupsFor(admin, labels).flatMap((g) => g.items);
   return (
-    <div className="sticky top-0 z-30 bg-[#1a1714] text-stone-300 lg:hidden">
+    <div className="sticky top-0 z-30 bg-ink text-stone-300 lg:hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-2.5">
         <Link href="/dashboard" className="flex min-w-0 items-center gap-2">
           <LogoMark className="h-7 w-7" />
           <span className="truncate text-sm font-semibold text-white">{business}</span>
         </Link>
-        <Link href="/add" className="flex shrink-0 items-center gap-1.5 rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-stone-900">
+        <Link href="/add" className="flex shrink-0 items-center gap-1.5 rounded-full bg-ember-500 px-3 py-1.5 text-xs font-semibold text-ink">
           <CameraIcon /> Add photo
         </Link>
       </div>

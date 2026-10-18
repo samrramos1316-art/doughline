@@ -40,7 +40,7 @@ export default async function AddPage() {
       <div className="grid gap-4 md:grid-cols-3">
         {KINDS.map((k) => (
           <div key={k.href} className="flex flex-col rounded-xl border border-stone-200 bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
-            <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+            <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-lg bg-ember-100 text-ember-800">
               <svg viewBox="0 0 24 24" className="h-6 w-6">
                 <path d={k.icon} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>

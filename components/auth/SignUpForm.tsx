@@ -25,7 +25,7 @@ export function SignUpForm({ industries, defaultIndustry = "" }: { industries: I
           {choices.map((c) => (
             <label
               key={c.id || "other"}
-              className={`flex cursor-pointer flex-col rounded-lg border px-3 py-2.5 text-left transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-amber-300 ${
+              className={`flex cursor-pointer flex-col rounded-lg border px-3 py-2.5 text-left transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ember-300 ${
                 picked === c.id ? "border-stone-900 bg-stone-900 text-white" : "border-stone-300 bg-white text-stone-900 hover:border-stone-500"
               }`}
             >
@@ -33,7 +33,7 @@ export function SignUpForm({ industries, defaultIndustry = "" }: { industries: I
               <span className="flex items-center gap-2 text-sm font-semibold">
                 {c.name}
                 {c.beta && (
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${picked === c.id ? "bg-white/15 text-amber-200" : "bg-amber-100 text-amber-800"}`}>Beta</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${picked === c.id ? "bg-white/15 text-ember-200" : "bg-ember-100 text-ember-800"}`}>Beta</span>
                 )}
               </span>
               <span className={`mt-0.5 text-xs leading-snug ${picked === c.id ? "text-stone-300" : "text-stone-500"}`}>{c.description}</span>

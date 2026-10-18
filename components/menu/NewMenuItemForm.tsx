@@ -52,12 +52,12 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
 
       <div className="flex flex-col gap-1">
         <label htmlFor="menu-name" className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">Name</label>
-        <input id="menu-name" name="name" required className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200" />
+        <input id="menu-name" name="name" required className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200" />
       </div>
 
       <div className="flex flex-col gap-1">
         <label htmlFor="menu-recipe-id" className="text-[11px] font-semibold tracking-wider text-stone-500 uppercase">{v.recipe}</label>
-        <select id="menu-recipe-id" name="recipe_id" className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200">
+        <select id="menu-recipe-id" name="recipe_id" className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200">
           <option value="">—</option>
           {recipeOptions.map((r) => (
             <option key={r.id} value={r.id}>
@@ -75,7 +75,7 @@ export function NewMenuItemForm({ recipeOptions }: { recipeOptions: { id: string
           type="number"
           step="0.01"
           required
-          className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200"
+          className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200"
         />
       </div>
 

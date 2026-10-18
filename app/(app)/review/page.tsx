@@ -52,7 +52,7 @@ export default async function ReviewQueuePage() {
               <ul className="divide-y divide-stone-100">
                 {[...groups.entries()].map(([id, g]) => (
                   <li key={id}>
-                    <Link href={`/invoices/${id}/review`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-amber-50/50">
+                    <Link href={`/invoices/${id}/review`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-ember-50/50">
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-stone-900">{g.label}</span>
                         <span className="block text-[11px] text-stone-500">{g.date ?? "no date"}</span>

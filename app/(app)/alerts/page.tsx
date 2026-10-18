@@ -79,7 +79,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
                       <td className={`${td} text-stone-500`}>{a.invoices ? `${a.invoices.vendors?.name ?? "Invoice"} · ${a.invoices.invoice_date ?? ""}` : "—"}</td>
                       <td className={td}>{isOpen(a) ? <Pill tone={pct >= 20 ? "critical" : "warning"}>Open</Pill> : <Pill tone="neutral">{pct < 0 ? "Price drop" : "Handled"}</Pill>}</td>
                       <td className={`${td} text-right`}>
-                        <Link href={`/alerts/${a.id}`} className="text-xs font-medium text-amber-700 hover:underline">What to do →</Link>
+                        <Link href={`/alerts/${a.id}`} className="text-xs font-medium text-ember-700 hover:underline">What to do →</Link>
                       </td>
                     </tr>
                   );

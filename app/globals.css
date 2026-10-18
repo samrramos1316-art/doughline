@@ -14,6 +14,22 @@
   --font-display: var(--ff-display), system-ui, sans-serif;
   --font-body: var(--ff-body), system-ui, sans-serif;
   --font-ledger: var(--ff-ledger), ui-monospace, monospace;
+
+  /* The brand: the marketing site's ember orange on near-black ink, carried
+     into the app. Ember is the accent (actions, links, focus, the current
+     page); amber stays the warning colour, so the two never get confused. */
+  --color-ember-50: #fff4ee;
+  --color-ember-100: #ffe5d6;
+  --color-ember-200: #ffc8ad;
+  --color-ember-300: #ffb08a;
+  --color-ember-400: #ff7a45;
+  --color-ember-500: #ff5b1f;
+  --color-ember-600: #e94a12;
+  --color-ember-700: #c23a0b;
+  --color-ember-800: #9a2f0d;
+  --color-ember-900: #7a2a12;
+  --color-ink: #0c0b09;
+  --color-paper: #f4f0e8;
 }
 
 /* Light-only design. (The create-next-app dark-mode override that used to be
@@ -33,7 +49,7 @@ input::-ms-clear {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--ff-body), var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 /* ---- marketing site (dark ledger look) --------------------------------- */

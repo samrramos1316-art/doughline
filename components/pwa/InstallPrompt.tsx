@@ -91,7 +91,7 @@ export function InstallPrompt() {
           {ios ? (
             <p className="mt-1 text-sm text-stone-300">
               Tap{" "}
-              <svg viewBox="0 0 16 16" className="inline h-4 w-4 -translate-y-px text-amber-400" aria-label="the Share button" role="img">
+              <svg viewBox="0 0 16 16" className="inline h-4 w-4 -translate-y-px text-ember-400" aria-label="the Share button" role="img">
                 <path d="M8 1.5v8.5M5 4.5l3-3 3 3M4 7H3v7.5h10V7h-1" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>{" "}
               in Safari, then <span className="font-medium text-white">Add to Home Screen</span>. It opens full screen, ready to snap invoices.
@@ -106,7 +106,7 @@ export function InstallPrompt() {
           {ios ? "Got it" : "Not now"}
         </button>
         {!ios && (
-          <button type="button" onClick={install} className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-stone-900 hover:bg-amber-300">
+          <button type="button" onClick={install} className="rounded-full bg-ember-400 px-5 py-2 text-sm font-semibold text-stone-900 hover:bg-ember-300">
             Install
           </button>
         )}

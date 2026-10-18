@@ -328,7 +328,7 @@ function ManualEntryForm({
           {saving ? "Saving & matching…" : "Save lines"}
         </button>
         {unresolved > 0 && (
-          <Link href={`/invoices/${invoiceId}/review`} className="text-sm font-medium text-amber-800 underline">
+          <Link href={`/invoices/${invoiceId}/review`} className="text-sm font-medium text-ember-800 underline">
             Review {unresolved} match{unresolved === 1 ? "" : "es"} →
           </Link>
         )}

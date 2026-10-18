@@ -43,7 +43,7 @@ export default async function RecipesPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <Panel title={`All ${lower(v.recipes)}`} flush className="xl:col-span-9">
           {list.length === 0 ? (
-            <Empty>No {lower(v.recipes)} yet. <Link href="/onboarding/import?kind=recipe" className="font-medium text-amber-700 underline">Import them from photos or PDFs</Link>, or create one by hand.</Empty>
+            <Empty>No {lower(v.recipes)} yet. <Link href="/onboarding/import?kind=recipe" className="font-medium text-ember-700 underline">Import them from photos or PDFs</Link>, or create one by hand.</Empty>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -74,7 +74,7 @@ export default async function RecipesPage() {
                         <td className={tdNum}>{money(c?.batch_total_cost == null ? null : Number(c.batch_total_cost))}</td>
                         <td className={`${tdNum} font-semibold`}>
                           {c?.unpriced_ingredients ? (
-                            <Link href="/ingredients" className="text-xs font-medium text-amber-700 hover:underline">{c.unpriced_ingredients} without a price</Link>
+                            <Link href="/ingredients" className="text-xs font-medium text-ember-700 hover:underline">{c.unpriced_ingredients} without a price</Link>
                           ) : c?.cost_per_serving == null ? "—" : `$${Number(c.cost_per_serving).toFixed(4)}`}
                         </td>
                         <td className={`${td} text-stone-500`}>{menuBy.get(r.id)?.join(", ") ?? <span className="text-stone-400">Not {v.onMenu}</span>}</td>

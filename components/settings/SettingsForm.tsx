@@ -8,7 +8,7 @@ import { lower } from "@/lib/vocab";
 
 type Initial = { name: string; target_margin_pct: number; target_markup: number | null;price_alert_threshold_pct: number; max_unreviewed_line_items: number; default_labor_rate_per_hour: number; default_machine_rate_per_hour?: number | null; business_type: string };
 
-const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint: string; children: React.ReactNode }) {
   return (

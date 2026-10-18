@@ -19,7 +19,7 @@ export type EventStart = {
   price: string;
 };
 
-const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-amber-200";
+const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-ember-200";
 
 // Event / wedding quote (docs: florist core): arrangements at their live
 // cost per piece × how many, plus delivery, setup time and other costs,
