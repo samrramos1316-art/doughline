@@ -15,72 +15,102 @@ const MENU = [
   { name: "Custard Cup", price: 5, cost: 0.6327, before: 87.35, after: 87.35 },
 ];
 
+// The app's Overview as it looks today: the ink rail with its groups, the
+// ember "Add from a photo", paper behind white panels with mono labels.
+const NAV: [string, string[]][] = [
+  ["", ["Overview"]],
+  ["Sell", ["Menu", "Margins"]],
+  ["Make", ["Recipes", "Ingredients"]],
+  ["Buy", ["Invoices", "Match lines", "Price alerts", "Market watch"]],
+];
+const label = "font-ledger text-[9.5px] font-medium tracking-[0.06em] text-stone-500 uppercase";
+
 export function DashboardMock() {
   return (
-    <div className="grid text-left md:grid-cols-[180px_1fr]">
-      <aside className="hidden border-r border-stone-900/5 bg-stone-50/60 p-4 md:block">
-        <p className="mb-3 text-[11px] font-semibold tracking-wide text-stone-400 uppercase">Sweet Crumb Bakery</p>
-        {["Dashboard", "Invoices", "Review", "Ingredients", "Recipes", "Menu", "Alerts", "Market"].map((n, i) => (
-          <p key={n} className={`rounded-lg px-2.5 py-1.5 text-[13px] ${i === 0 ? "bg-white font-medium text-stone-900 shadow-sm ring-1 ring-stone-900/5" : "text-stone-500"}`}>
-            {n}
-            {n === "Alerts" && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800">1</span>}
-          </p>
-        ))}
-      </aside>
-      <div className="space-y-4 p-4 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <p className="text-lg font-semibold text-stone-900">Dashboard</p>
-            <p className="text-xs text-stone-500">Target margin 65% · updated from invoice 7719-204583</p>
-          </div>
-          <span className="rounded-full bg-stone-900 px-3 py-1.5 text-xs font-medium text-white">Scan invoice</span>
+    <div className="grid text-left md:grid-cols-[172px_1fr]">
+      <aside className="hidden bg-[#0c0b09] text-stone-300 md:block">
+        <div className="border-b border-white/5 px-3.5 py-3">
+          <p className="font-display text-[13px] font-semibold text-white">Sweet Crumb Bakery</p>
+          <p className="font-ledger text-[8.5px] tracking-[0.14em] text-stone-500 uppercase">DoughTally</p>
         </div>
-
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[13px]">
-          <span className="text-amber-900">
-            <span className="font-semibold">Unsalted butter +16.5%</span> ($3.40 → $3.96/lb) · 3 menu items affected
-          </span>
-          <span className="shrink-0 font-medium text-amber-900 underline">View</span>
+        <div className="px-2.5 pt-2.5">
+          <p className="rounded-full bg-[#ff5b1f] py-1.5 text-center text-[11px] font-semibold text-[#0c0b09]">Add from a photo</p>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {MENU.map((m) => (
-            <div key={m.name} className="rounded-xl border border-stone-900/5 bg-white p-3.5 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-[13px] font-medium text-stone-900">{m.name}</p>
-                  <p className="text-[11px] text-stone-500">
-                    ${m.price.toFixed(2)} · costs ${m.cost.toFixed(4)}
-                  </p>
-                </div>
-                <MarginPill pct={m.after} />
-              </div>
-              <div className="mt-2 flex items-end justify-between">
-                <Spark values={[m.before, m.before, m.before, m.before, m.after]} width={110} height={24} stroke={m.after < m.before ? "#e11d48" : "#059669"} />
-                <span className={`text-[11px] font-medium tabular-nums ${m.after < m.before ? "text-rose-600" : "text-stone-400"}`}>
-                  {m.after < m.before ? `${(m.after - m.before).toFixed(2)} pts` : "no change"}
-                </span>
-              </div>
+        <div className="px-2 py-2.5">
+          {NAV.map(([group, items]) => (
+            <div key={group || "top"} className="mb-2">
+              {group && <p className="px-1.5 pb-0.5 font-ledger text-[8.5px] tracking-[0.1em] text-stone-500 uppercase">{group}</p>}
+              {items.map((n) => (
+                <p key={n} className={`relative flex items-center rounded px-1.5 py-1 text-[11.5px] ${n === "Overview" ? "bg-white/10 font-medium text-white" : ""}`}>
+                  {n === "Overview" && <span className="absolute top-1 bottom-1 left-0 w-0.5 rounded bg-[#ff5b1f]" />}
+                  {n}
+                  {n === "Price alerts" && <span className="ml-auto rounded bg-red-500 px-1 text-[9px] font-semibold text-white">1</span>}
+                </p>
+              ))}
             </div>
           ))}
         </div>
+      </aside>
+      <div className="bg-[#f4f0e8]">
+        <div className="flex flex-wrap items-end justify-between gap-2 border-b border-stone-200 bg-white px-4 py-3 sm:px-5">
+          <div>
+            <p className="font-display text-lg font-semibold tracking-tight text-stone-900">Overview</p>
+            <p className="text-[11px] text-stone-500">Target margin 65% · updated from invoice 7719-204583</p>
+          </div>
+          <span className="rounded-md bg-[#0c0b09] px-2.5 py-1.5 text-[11px] font-medium text-white">Add from a photo</span>
+        </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <p className="mb-2 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Market Watch · 90 days · context, not a forecast</p>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              ["Wheat", "+13.2%", WHEAT],
-              ["Eggs", "+62.3%", EGGS],
-              ["Butter", "−15.2%", BUTTER],
-            ].map(([n, p, v]) => (
-              <div key={n as string} className="min-w-0 rounded-lg bg-white p-2 ring-1 ring-slate-200">
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-600">{n as string}</span>
-                  <span className="font-medium text-slate-800">{p as string}</span>
+        <div className="space-y-3 p-3 sm:p-4">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-white px-3 py-2 text-[12px]">
+            <span className="text-stone-700">
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-red-500" />
+              <span className="font-semibold text-stone-900">Unsalted butter ▲ 16.5%</span> ($3.40 → $3.96/lb) · 3 menu items affected
+            </span>
+            <span className="shrink-0 font-medium text-[#c23a0b]">What to do →</span>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <p className={`border-b border-stone-200 bg-[#faf7f1] px-3 py-1.5 ${label}`}>Menu margins — worst first</p>
+            <div className="grid sm:grid-cols-2">
+              {MENU.map((m, i) => (
+                <div key={m.name} className={`p-3 ${i > 0 ? "border-t border-stone-100" : ""} ${i === 1 ? "sm:border-t-0" : ""} ${i % 2 ? "sm:border-l" : ""} border-stone-100`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[12.5px] font-medium text-stone-900">{m.name}</p>
+                      <p className="text-[10.5px] text-stone-500">
+                        ${m.price.toFixed(2)} · costs ${m.cost.toFixed(4)}
+                      </p>
+                    </div>
+                    <MarginPill pct={m.after} />
+                  </div>
+                  <div className="mt-1.5 flex items-end justify-between">
+                    <Spark values={[m.before, m.before, m.before, m.before, m.after]} width={110} height={22} stroke={m.after < m.before ? "#dc2626" : "#059669"} />
+                    <span className={`text-[10.5px] font-medium tabular-nums ${m.after < m.before ? "text-red-600" : "text-stone-400"}`}>
+                      {m.after < m.before ? `▼ ${(m.before - m.after).toFixed(2)} pts` : "no change"}
+                    </span>
+                  </div>
                 </div>
-                <Spark values={v as number[]} width={100} height={20} fluid />
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <p className={`border-b border-stone-200 bg-[#faf7f1] px-3 py-1.5 ${label}`}>Market watch · 90 days</p>
+            <div className="grid grid-cols-3 divide-x divide-stone-100">
+              {[
+                ["Wheat", "▲ 13.2%", WHEAT],
+                ["Eggs", "▲ 62.3%", EGGS],
+                ["Butter", "▼ 15.2%", BUTTER],
+              ].map(([n, p, v]) => (
+                <div key={n as string} className="min-w-0 p-2.5">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-stone-600">{n as string}</span>
+                    <span className="font-medium text-stone-800 tabular-nums">{p as string}</span>
+                  </div>
+                  <Spark values={v as number[]} width={100} height={20} stroke="#ff5b1f" fluid />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -352,11 +352,13 @@ export function Landing({ variant = "general", enabled = [] }: { variant?: "gene
             .from(q(".hero-ticker"), { y: 60, rotate: -4, opacity: 0, duration: 1.3 }, 0.9);
 
           // …and gets pulled apart as you scroll away from it
-          gsap.timeline({ scrollTrigger: { trigger: q(".hero")[0], start: "top top", end: "bottom top", scrub: 0.6 } })
+          const pullApart = gsap.timeline({ scrollTrigger: { trigger: q(".hero")[0], start: "top top", end: "bottom top", scrub: 0.6 } })
             .to(q(".mh-row-1"), { xPercent: -10, ease: "none" }, 0)
             .to(q(".mh-char"), { yPercent: (i) => (i % 2 ? -30 : 25), rotate: (i) => (i % 2 ? -6 : 5), ease: "none" }, 0)
-            .to(q(".hero-line"), { yPercent: -60, opacity: 0, ease: "none" }, 0)
-            .to(q(".hero-ticker"), { y: -120, rotate: 3, ease: "none" }, 0);
+            .to(q(".hero-line"), { yPercent: -60, opacity: 0, ease: "none" }, 0);
+          // Side by side only: on phones the card sits under the text, and
+          // lifting it would slide it over the line above.
+          if (desktop) pullApart.to(q(".hero-ticker"), { y: -120, rotate: 3, ease: "none" }, 0);
 
           // cursor spotlight on the hero
           const hero = q(".hero")[0] as HTMLElement;
